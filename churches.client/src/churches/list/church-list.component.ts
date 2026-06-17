@@ -62,7 +62,7 @@ export class ChurchListComponent implements OnInit {
   }
 
   protected goToPage(p: number): void {
-    this.router.navigate([], {
+    void this.router.navigate([], {
       relativeTo: this.route,
       queryParamsHandling: 'merge',
       queryParams: { page: p },

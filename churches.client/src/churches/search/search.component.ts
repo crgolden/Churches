@@ -49,6 +49,6 @@ export class SearchComponent {
       params['lat'] = String(lat);
       params['lng'] = String(lng);
     }
-    this.router.navigate(['/churches'], { queryParams: params });
+    void this.router.navigate(['/churches'], { queryParams: params });
   }
 }

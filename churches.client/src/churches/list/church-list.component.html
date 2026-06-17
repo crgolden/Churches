@@ -26,7 +26,7 @@
               {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
             </p>
             <div class="card-tags">
-              @if (item.distanceMiles != null) {
+              @if (item.distanceMiles !== null) {
                 <span class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
               }
               @if (item.church.worshipStyle) {

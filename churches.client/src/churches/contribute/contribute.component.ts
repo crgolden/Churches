@@ -32,7 +32,7 @@ export class ContributeComponent implements OnInit {
     if (!slug) return;
     this.api.getChurchBySlug(slug).subscribe({
       next: c => this.church.set(c),
-      error: () => this.router.navigate(['/']),
+      error: () => { void this.router.navigate(['/']); },
     });
   }
 
