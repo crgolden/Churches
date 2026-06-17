@@ -1,0 +1,49 @@
+.moderation-page {
+  padding: 2rem 0 3rem;
+}
+
+.moderation-page h1 {
+  margin-bottom: 1.5rem;
+}
+
+.table-card {
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  background: rgba(67, 56, 202, .05);
+  border-bottom: 1px solid var(--color-border);
+}
+
+td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.empty-state {
+  padding: 2.5rem;
+  text-align: center;
+}

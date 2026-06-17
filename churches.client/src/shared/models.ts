@@ -1,0 +1,80 @@
+export interface Church {
+  id: string;
+  canonicalName: string;
+  slug: string;
+  latitude: number;
+  longitude: number;
+  street: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  phoneNumber: string | null;
+  website: string | null;
+  emailAddress: string | null;
+  denominationId: string | null;
+  worshipStyle: number;
+  primaryLanguage: string;
+  acceptsLGBTQ: boolean | null;
+  wheelchairAccessible: boolean | null;
+  hasNursery: boolean | null;
+  hasYouthProgram: boolean | null;
+  confidenceScore: number;
+  lastVerifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isActive: boolean;
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface SearchResult {
+  church: Church;
+  distanceMiles: number | null;
+}
+
+export interface SearchPagedResult {
+  items: SearchResult[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface UserCorrection {
+  id: string;
+  churchId: string;
+  userId: string;
+  field: string;
+  oldValue: string | null;
+  newValue: string;
+  status: number;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  churchName: string | null;
+}
+
+export interface SearchParams {
+  q?: string;
+  lat?: number;
+  lng?: number;
+  radiusMiles?: number;
+  state?: string;
+  denominationId?: string;
+  worshipStyle?: number;
+  wheelchairAccessible?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export const WORSHIP_STYLES: { value: number; label: string }[] = [
+  { value: 1, label: 'Traditional' },
+  { value: 2, label: 'Contemporary' },
+  { value: 3, label: 'Blended' },
+  { value: 4, label: 'Charismatic' },
+  { value: 5, label: 'Liturgical' },
+];

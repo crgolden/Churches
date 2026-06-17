@@ -1,0 +1,91 @@
+@if (loading()) {
+  <div class="page-container detail-page">
+    <p class="text-muted">Loading...</p>
+  </div>
+} @else if (error()) {
+  <div class="page-container detail-page">
+    <p id="church-error" class="text-error">{{ error() }}</p>
+  </div>
+} @else if (church()) {
+  <div class="page-container detail-page">
+    <a class="back-link btn-ghost" href="#" (click)="$event.preventDefault(); back()">&larr; Search results</a>
+    <article class="church-detail card">
+      <header class="detail-header">
+        <h1 id="church-name">{{ church()!.canonicalName }}</h1>
+        <address id="church-address">
+          @if (church()!.street) { <span>{{ church()!.street }}, </span> }
+          {{ church()!.city }}, {{ church()!.state }} {{ church()!.zip }}
+        </address>
+      </header>
+      <div class="detail-body">
+        <div class="detail-section">
+          <h4>Contact</h4>
+          <div class="info-rows">
+            @if (church()!.phoneNumber) {
+              <div class="info-row">
+                <span class="info-label">Phone</span>
+                <a id="church-phone" [href]="'tel:' + church()!.phoneNumber">{{ church()!.phoneNumber }}</a>
+              </div>
+            }
+            @if (church()!.website) {
+              <div class="info-row">
+                <span class="info-label">Website</span>
+                <a id="church-website" [href]="church()!.website!" target="_blank" rel="noopener">{{ church()!.website }}</a>
+              </div>
+            }
+            @if (church()!.emailAddress) {
+              <div class="info-row">
+                <span class="info-label">Email</span>
+                <a id="church-email" [href]="'mailto:' + church()!.emailAddress">{{ church()!.emailAddress }}</a>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="detail-section">
+          <h4>About</h4>
+          <div class="info-rows">
+            <div class="info-row">
+              <span class="info-label">Worship Style</span>
+              <span id="church-worship-style">{{ worshipStyleLabel(church()!.worshipStyle) }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Language</span>
+              <span id="church-language">{{ church()!.primaryLanguage }}</span>
+            </div>
+            @if (church()!.wheelchairAccessible != null) {
+              <div id="church-wheelchair" class="info-row">
+                <span class="info-label">Wheelchair Accessible</span>
+                <span>{{ church()!.wheelchairAccessible ? 'Yes' : 'No' }}</span>
+              </div>
+            }
+            @if (church()!.hasNursery != null) {
+              <div class="info-row">
+                <span class="info-label">Nursery</span>
+                <span>{{ church()!.hasNursery ? 'Yes' : 'No' }}</span>
+              </div>
+            }
+            @if (church()!.hasYouthProgram != null) {
+              <div class="info-row">
+                <span class="info-label">Youth Program</span>
+                <span>{{ church()!.hasYouthProgram ? 'Yes' : 'No' }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+      <div class="detail-actions">
+        <a
+          [href]="'https://maps.google.com/?q=' + encodeAddress(church()!)"
+          target="_blank"
+          rel="noopener"
+          class="btn-secondary"
+        >Get Directions</a>
+        @if (auth.isAuthenticated()) {
+          <a id="contribute-link" [routerLink]="['/contribute', church()!.slug]" class="btn-ghost">
+            Suggest a correction
+          </a>
+        }
+      </div>
+    </article>
+  </div>
+}

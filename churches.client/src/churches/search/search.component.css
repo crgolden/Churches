@@ -1,0 +1,173 @@
+/* Hero */
+.hero {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #6D28D9 100%);
+  padding: 5rem 0 4rem;
+  color: #fff;
+}
+
+.hero-content {
+  max-width: 700px;
+}
+
+.hero h1 {
+  font-size: 2.75rem;
+  color: #fff;
+  margin-bottom: 0.75rem;
+}
+
+.hero-sub {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, .85);
+  margin-bottom: 2rem;
+  max-width: 560px;
+}
+
+.search-card {
+  padding: 1.75rem;
+}
+
+.search-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.search-row input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-row input[type='text'] {
+  width: 100px;
+  flex: none;
+}
+
+.filter-row select {
+  flex: 1;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.checkbox-label input[type='checkbox'] {
+  margin: 0;
+}
+
+.location-note {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+}
+
+.search-submit {
+  width: 100%;
+}
+
+/* Value props */
+.value-props {
+  padding: 4rem 0;
+  background: var(--color-bg);
+}
+
+.props-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.prop-card {
+  padding: 1.75rem;
+  text-align: center;
+}
+
+.prop-num {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 0.5rem;
+}
+
+.prop-card h3 {
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+}
+
+.prop-card p {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* How it works */
+.how-it-works {
+  padding: 4rem 0;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+
+.how-it-works h2 {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.step {
+  text-align: center;
+}
+
+.step-num {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.75rem;
+}
+
+.step h4 {
+  margin-bottom: 0.4rem;
+}
+
+.step p {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2rem;
+  }
+
+  .props-grid,
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+}

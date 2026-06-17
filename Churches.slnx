@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="COVERAGE-TRUTH-TABLES.md" />
+    <File Path="coverage.settings.xml" />
+    <File Path="dotnet-tools.json" />
+    <File Path="global.json" />
+    <File Path="Invoke-SmokeTests.ps1" />
+    <File Path="README.md" />
+    <File Path="TESTING.md" />
+  </Folder>
+  <Project Path="churches.client/churches.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="Churches.Server/Churches.Server.csproj" Id="0ed84700-296c-40f1-ab51-64c9423085c0" />
+  <Project Path="Churches.Tests/Churches.Tests.csproj" Id="55880324-eb11-4b92-8528-98f615e5f30e" />
+</Solution>

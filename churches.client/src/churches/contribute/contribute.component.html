@@ -1,0 +1,44 @@
+@if (submitted()) {
+  <div class="contribute-page">
+    <div class="success-card card">
+      <div class="success-icon">&#10003;</div>
+      <h2>Thank you!</h2>
+      <p>Your correction has been submitted for review.</p>
+      <a [href]="'/churches/' + church()?.slug" class="btn-primary">Back to church</a>
+    </div>
+  </div>
+} @else if (church()) {
+  <div class="contribute-page">
+    <div class="contribute-card card">
+      <h1>Suggest a Correction</h1>
+      <p class="church-label">For: <strong>{{ church()!.canonicalName }}</strong></p>
+      <form class="contribute-form" (submit)="$event.preventDefault(); submit()">
+        <div class="field-group">
+          <label for="field-select">Field to correct</label>
+          <select id="field-select" #sel (change)="field.set(sel.value)" [value]="field()">
+            @for (f of fields; track f) {
+              <option [value]="f">{{ f }}</option>
+            }
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="new-value">Correct value</label>
+          <input
+            id="new-value"
+            #val
+            type="text"
+            [value]="newValue()"
+            (input)="newValue.set(val.value)"
+            required
+          />
+        </div>
+        @if (error()) {
+          <p class="text-error">{{ error() }}</p>
+        }
+        <button type="submit" class="btn-primary" [disabled]="submitting()">
+          {{ submitting() ? 'Submitting...' : 'Submit Correction' }}
+        </button>
+      </form>
+    </div>
+  </div>
+}

@@ -1,0 +1,101 @@
+.list-page {
+  padding: 2rem 0 3rem;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.count {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.church-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+.church-card {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.church-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.card-body {
+  padding: 1.25rem;
+  flex: 1;
+}
+
+.church-name h2 {
+  font-size: 1.1rem;
+  color: var(--color-primary);
+  margin-bottom: 0.35rem;
+  transition: text-decoration 0.1s;
+}
+
+.church-name:hover h2 {
+  text-decoration: underline;
+}
+
+.church-location {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  background: rgba(67, 56, 202, .08);
+  color: var(--color-primary);
+}
+
+.tag-accent {
+  background: rgba(245, 158, 11, .15);
+  color: var(--color-accent-dark);
+}
+
+.tag-muted {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.card-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+.page-indicator {
+  font-size: 0.9rem;
+}

@@ -1,0 +1,66 @@
+@if (loading()) {
+  <div class="page-container list-page">
+    <p class="text-muted">Loading results...</p>
+  </div>
+} @else if (error()) {
+  <div class="page-container list-page">
+    <p class="text-error">{{ error() }}</p>
+  </div>
+} @else if (results()) {
+  <div class="page-container list-page">
+    <div class="list-header">
+      <p class="count">
+        {{ results()!.totalCount | number }}
+        {{ results()!.totalCount === 1 ? 'church' : 'churches' }} found
+      </p>
+      <a routerLink="/" class="btn-ghost">&larr; Refine search</a>
+    </div>
+    <div class="church-grid">
+      @for (item of results()!.items; track item.church.id) {
+        <article class="church-card card">
+          <div class="card-body">
+            <a [routerLink]="['/churches', item.church.slug]" class="church-name">
+              <h2>{{ item.church.canonicalName }}</h2>
+            </a>
+            <p class="church-location">
+              {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
+            </p>
+            <div class="card-tags">
+              @if (item.distanceMiles != null) {
+                <span class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
+              }
+              @if (item.church.worshipStyle) {
+                <span class="tag">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
+              }
+              @if (item.church.wheelchairAccessible) {
+                <span class="tag tag-muted">Accessible</span>
+              }
+            </div>
+          </div>
+          @if (item.church.website) {
+            <div class="card-footer">
+              <a [href]="item.church.website" target="_blank" rel="noopener" class="btn-ghost">
+                Visit Website &nearr;
+              </a>
+            </div>
+          }
+        </article>
+      }
+    </div>
+    @if (results()!.totalCount > 20) {
+      <nav class="pagination" aria-label="Pagination">
+        @if (page() > 1) {
+          <button class="btn-ghost" (click)="goToPage(page() - 1)">&larr; Previous</button>
+        }
+        <span class="page-indicator text-muted">Page {{ page() }}</span>
+        @if (page() * 20 < results()!.totalCount) {
+          <button class="btn-ghost" (click)="goToPage(page() + 1)">Next &rarr;</button>
+        }
+      </nav>
+    }
+  </div>
+} @else {
+  <div class="page-container list-page">
+    <p class="text-muted">Enter a search above to find churches.</p>
+  </div>
+}

@@ -1,0 +1,28 @@
+<nav class="app-nav">
+  <div class="nav-inner page-container">
+    <a routerLink="/" class="brand">Churches</a>
+    <button
+      class="nav-toggle"
+      type="button"
+      (click)="toggleMenu()"
+      [attr.aria-expanded]="menuOpen()"
+      aria-label="Toggle navigation"
+    >
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" [class.open]="menuOpen()">
+      <li><a routerLink="/churches" (click)="menuOpen.set(false)">Browse</a></li>
+      @if (auth.hasModerationScope()) {
+        <li><a routerLink="/admin/moderation" (click)="menuOpen.set(false)">Moderation</a></li>
+      }
+      @if (auth.isAnonymous()) {
+        <li><a [href]="auth.loginUrl" class="btn-primary nav-cta">Log in</a></li>
+      } @else {
+        <li class="nav-user">
+          <span>{{ auth.username() }}</span>
+          <a [href]="auth.logoutUrl()" class="btn-ghost">Log out</a>
+        </li>
+      }
+    </ul>
+  </div>
+</nav>

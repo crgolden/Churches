@@ -1,0 +1,45 @@
+<div class="page-container moderation-page">
+  <h1>Moderation Queue</h1>
+  @if (error()) {
+    <p class="text-error">{{ error() }}</p>
+  }
+  @if (loading()) {
+    <p class="text-muted">Loading...</p>
+  } @else if ((corrections()?.items?.length ?? 0) === 0) {
+    <div class="table-card card">
+      <p class="empty-state text-muted">No pending corrections.</p>
+    </div>
+  } @else {
+    <div class="table-card card">
+      <table>
+        <thead>
+          <tr>
+            <th>Church</th>
+            <th>Field</th>
+            <th>Old Value</th>
+            <th>New Value</th>
+            <th>Submitted</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of corrections()?.items ?? []; track c.id) {
+            <tr>
+              <td>{{ c.churchName ?? c.churchId }}</td>
+              <td>{{ c.field }}</td>
+              <td>{{ c.oldValue ?? '&mdash;' }}</td>
+              <td>{{ c.newValue }}</td>
+              <td>{{ c.createdAt | date }}</td>
+              <td>
+                <div class="actions">
+                  <button class="btn-primary btn-sm" (click)="approve(c.id)">Approve</button>
+                  <button class="btn-ghost btn-ghost-danger btn-sm" (click)="reject(c.id)">Reject</button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

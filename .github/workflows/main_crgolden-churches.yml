@@ -7,33 +7,176 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
+    name: Build and analyze
     runs-on: windows-latest
     permissions:
+      id-token: write #This is required for requesting the JWT (needed for Azure OIDC in E2E tests)
       contents: read #This is required for actions/checkout
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: 'zulu'
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Cache SonarQube Cloud packages
+        uses: actions/cache@v5
+        with:
+          path: ~\sonar\cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Cache SonarQube Cloud scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}\scanner
+          key: ${{ runner.os }}-sonar-scanner
+          restore-keys: ${{ runner.os }}-sonar-scanner
+
+      - name: Install SonarQube Cloud scanner
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+        shell: powershell
+        run: |
+          New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
+          dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
 
       - name: Set up .NET Core
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
 
+      - name: Cache dotnet global tools
+        id: cache-dotnet-tools
+        uses: actions/cache@v5
+        with:
+          path: ~/.dotnet/tools
+          key: ${{ runner.os }}-dotnet-tools-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-dotnet-tools-
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache npm packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('churches.client/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Install npm dependencies
+        working-directory: churches.client
+        run: npm ci
+
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      - name: Lint
+        working-directory: churches.client
+        run: npm run lint
+
+      - name: Begin Sonar analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+        shell: powershell
+        run: |
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin `
+            /k:"$env:SONAR_PROJECT_KEY" `
+            /o:"$env:SONAR_ORGANIZATION" `
+            /d:sonar.token="$env:SONAR_TOKEN" `
+            /d:sonar.host.url="https://sonarcloud.io" `
+            /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" `
+            /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" `
+            /d:sonar.exclusions="churches.client/aspnetcore-https.js,churches.client/start-os.js,**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
+            /d:sonar.coverage.exclusions="churches.client/e2e/**,churches.client/src/test-setup.ts" `
+            /d:sonar.test.inclusions="**/*.spec.ts" `
+            /d:sonar.scanner.skipJreProvisioning=true
+
       - name: Build with dotnet
-        run: dotnet build --configuration Release
+        run: dotnet build Churches.slnx --no-incremental --configuration Release /p:AngularConfiguration=ci
+
+      - name: Run unit tests with coverage
+        run: |
+          dotnet coverlet Churches.Tests\bin\Release\net10.0 `
+            --target "dotnet" `
+            --targetargs "test --project Churches.Tests --no-build --configuration Release -- --filter-trait Category=Unit --report-xunit-trx --report-xunit-trx-filename unit-tests.trx" `
+            --format opencover --output "coverage.opencover.xml" `
+            --skipautoprops `
+            --exclude-by-attribute GeneratedCodeAttribute `
+            --exclude-by-file "**/obj/**" `
+            --exclude-by-file "**/Program.cs" `
+            --does-not-return-attribute DoesNotReturnAttribute `
+            --include "[Churches.Server]*"
+
+      - name: Run UI tests
+        working-directory: churches.client
+        run: npx vitest run --coverage
+
+      - name: Fix LCOV paths for SonarQube
+        shell: powershell
+        run: |
+          # The Scanner for .NET (v8+) indexes churches.client as its own module whose base dir IS
+          # churches.client, so the JS coverage sensor resolves both sonar.javascript.lcov.reportPaths
+          # (coverage/lcov.info) and the lcov SF: paths relative to churches.client — i.e. module-relative
+          # (src/...), NOT repo-relative. Do NOT prefix churches.client/ (that double-nests and the sensor
+          # reports "No LCOV files were found"). istanbul on Windows writes backslash separators, so only
+          # normalize them to forward slashes for matching.
+          (Get-Content "churches.client/coverage/lcov.info") `
+            -replace '\\', '/' |
+            Set-Content "churches.client/coverage/lcov.info"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results-churches
+          path: Churches.Tests/bin/Release/net10.0/TestResults/
 
       - name: dotnet publish
-        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+        run: >
+          dotnet publish Churches.Server/Churches.Server.csproj
+          -c Release
+          -r win-x86
+          --self-contained false
+          -o ${{ github.workspace }}\publish
 
       - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: .net-app
-          path: ${{env.DOTNET_ROOT}}/myapp
+          path: ${{ github.workspace }}\publish
+
+      - name: End Sonar analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: powershell
+        run: |
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
 
   deploy:
     runs-on: windows-latest
@@ -44,12 +187,12 @@ jobs:
 
     steps:
       - name: Download artifact from build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: .net-app
-      
+
       - name: Login to Azure
-        uses: azure/login@v2
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5  # v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C4CF7EE65BC442259601FFDB3B86513D }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D1FC42A8E15547A18F5A397D64F179D0 }}
@@ -57,9 +200,8 @@ jobs:
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
+        uses: azure/webapps-deploy@84a80cfe7e9889f35148ed88c307e6e93bf02578  # v3
         with:
           app-name: 'crgolden-churches'
           slot-name: 'Production'
           package: .
-          

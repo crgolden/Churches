@@ -1,0 +1,81 @@
+.detail-page {
+  padding: 1.5rem 0 3rem;
+}
+
+.back-link {
+  display: inline-flex;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.church-detail {
+  overflow: hidden;
+}
+
+.detail-header {
+  padding: 1.75rem 1.75rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-header h1 {
+  margin-bottom: 0.3rem;
+}
+
+.detail-header address {
+  font-style: normal;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.detail-body {
+  padding: 1.5rem 1.75rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.detail-section h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.info-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  align-items: baseline;
+}
+
+.info-label {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.detail-actions {
+  padding: 1.25rem 1.75rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .detail-body {
+    grid-template-columns: 1fr;
+  }
+
+  .info-row {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+}

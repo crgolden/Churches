@@ -1,0 +1,108 @@
+<section class="hero">
+  <div class="hero-content page-container">
+    <h1>Find Your Church Home</h1>
+    <p class="hero-sub">
+      Discover congregations across the United States by location, worship style,
+      and what matters to your family.
+    </p>
+    <div class="search-card card">
+      <form (submit)="$event.preventDefault(); search()">
+        <div class="search-row">
+          <input
+            #kw
+            type="text"
+            placeholder="Church name or city"
+            [value]="keyword()"
+            (input)="keyword.set(kw.value)"
+          />
+          <button type="button" class="btn-secondary" (click)="useLocation()" [disabled]="locating()">
+            {{ locating() ? 'Locating...' : 'Near Me' }}
+          </button>
+        </div>
+        <div class="filter-row">
+          <input
+            #st
+            type="text"
+            placeholder="State (e.g. AZ)"
+            maxlength="2"
+            [value]="state()"
+            (input)="state.set(st.value.toUpperCase())"
+          />
+          <select #ws (change)="worshipStyle.set(ws.value ? +ws.value : null)">
+            <option value="">Any Worship Style</option>
+            @for (style of worshipStyles; track style.value) {
+              <option [value]="style.value">{{ style.label }}</option>
+            }
+          </select>
+          <label class="checkbox-label">
+            <input
+              #wa
+              type="checkbox"
+              [checked]="wheelchairAccessible() === true"
+              (change)="wheelchairAccessible.set(wa.checked ? true : null)"
+            />
+            <span>Wheelchair Accessible</span>
+          </label>
+        </div>
+        @if (lat() != null) {
+          <p class="location-note">Using your location for nearby results</p>
+        }
+        <button type="submit" class="btn-primary search-submit">Search Churches</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="value-props">
+  <div class="page-container">
+    <div class="props-grid">
+      <div class="prop-card card">
+        <div class="prop-num">10,000+</div>
+        <h3>Churches</h3>
+        <p>
+          A comprehensive, growing directory of congregations from every denomination
+          and tradition across all 50 states.
+        </p>
+      </div>
+      <div class="prop-card card">
+        <div class="prop-num">&#9673;</div>
+        <h3>Search by Location</h3>
+        <p>
+          Find churches near you with distance estimates, or search by city and state
+          to explore anywhere in the country.
+        </p>
+      </div>
+      <div class="prop-card card">
+        <div class="prop-num">&#10003;</div>
+        <h3>Filter What Matters</h3>
+        <p>
+          Narrow by worship style, accessibility features, and programs for families
+          to find the right fit.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="how-it-works">
+  <div class="page-container">
+    <h2>How It Works</h2>
+    <div class="steps-grid">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h4>Search</h4>
+        <p>Enter a city, church name, or use your current location to get started.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h4>Browse Results</h4>
+        <p>See matching churches with addresses, distances, worship styles, and website links.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h4>Plan Your Visit</h4>
+        <p>View full details and get directions to churches that look like the right fit.</p>
+      </div>
+    </div>
+  </div>
+</section>
