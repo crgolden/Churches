@@ -115,7 +115,7 @@ describe('SearchComponent', () => {
     const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     component['lat'].set(39.7);
     component['search']();
-    const [, opts] = spy.mock.calls[0]!;
+    const [, opts] = spy.mock.calls[0];
     expect((opts as { queryParams: Record<string, string> }).queryParams['lat']).toBeUndefined();
   });
 

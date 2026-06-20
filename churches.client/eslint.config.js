@@ -39,6 +39,12 @@ module.exports = tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/require-await': 'off',
+      // Tests reach protected/private component members via bracket notation; dot notation
+      // would be a TS access-modifier error, so allow bracket access for those members.
+      '@typescript-eslint/dot-notation': [
+        'error',
+        { allowPrivateClassPropertyAccess: true, allowProtectedClassPropertyAccess: true },
+      ],
     },
   },
   {

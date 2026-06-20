@@ -47,7 +47,7 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['items'] && this.map) {
-      this.loadLeaflet().then(L => this.renderMarkers(L));
+      void this.loadLeaflet().then(L => this.renderMarkers(L));
     }
   }
 
@@ -58,7 +58,7 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private async loadLeaflet(): Promise<typeof LeafletType> {
     const mod = await import('leaflet');
-    return (mod.default ?? mod) as unknown as typeof LeafletType;
+    return mod.default ?? mod;
   }
 
   private renderMarkers(L: typeof LeafletType): void {
@@ -73,20 +73,20 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       const lng = item.church.longitude;
       if (!lat || !lng) continue;
       const marker = L.marker([lat, lng])
-        .addTo(this.map!)
+        .addTo(this.map)
         .bindPopup(item.church.canonicalName);
       marker.on('click', () => this.markerClick.emit(item.church.slug));
       this.markers.push(marker);
     }
     if (this.markers.length > 0) {
       const group = L.featureGroup(this.markers);
-      this.map!.fitBounds(group.getBounds(), { padding: [40, 40] });
+      this.map.fitBounds(group.getBounds(), { padding: [40, 40] });
     }
   }
 
   private fixDefaultIcon(L: typeof LeafletType): void {
     const iconProto = L.Icon.Default.prototype as { _getIconUrl?: unknown };
-    delete iconProto['_getIconUrl'];
+    delete iconProto._getIconUrl;
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'assets/marker-icon-2x.png',
       iconUrl: 'assets/marker-icon.png',
