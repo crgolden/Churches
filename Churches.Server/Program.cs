@@ -82,8 +82,12 @@ try
                 {
                     ["deployment.environment"] = builder.Environment.EnvironmentName.ToLowerInvariant()
                 }))
-            .WithMetrics(meterProviderBuilder => meterProviderBuilder.AddRuntimeInstrumentation())
-            .WithTracing(tracerProviderBuilder => tracerProviderBuilder.SetSampler(new AlwaysOnSampler()))
+            .WithMetrics(meterProviderBuilder => meterProviderBuilder
+                .AddRuntimeInstrumentation()
+                .AddOtlpExporter(o => o.Endpoint = new Uri(builder.Configuration.GetRequired<string>("AlloyEndpoint"))))
+            .WithTracing(tracerProviderBuilder => tracerProviderBuilder
+                .SetSampler(new AlwaysOnSampler())
+                .AddOtlpExporter(o => o.Endpoint = new Uri(builder.Configuration.GetRequired<string>("AlloyEndpoint"))))
             .UseAzureMonitor().Services
             .AddDataProtection()
             .SetApplicationName(applicationName)
