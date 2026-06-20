@@ -67,8 +67,16 @@ export interface SearchParams {
   denominationId?: string;
   worshipStyle?: number;
   wheelchairAccessible?: boolean;
+  dayOfWeek?: number;
+  startTimeBefore?: string;
+  startTimeAfter?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface Denomination {
+  id: string;
+  name: string;
 }
 
 export const WORSHIP_STYLES: { value: number; label: string }[] = [
@@ -77,4 +85,16 @@ export const WORSHIP_STYLES: { value: number; label: string }[] = [
   { value: 3, label: 'Blended' },
   { value: 4, label: 'Charismatic' },
   { value: 5, label: 'Liturgical' },
+];
+
+// Matches .NET System.DayOfWeek (Sunday = 0 ... Saturday = 6), the value the
+// Directory API binds for the ServiceSchedules day filter.
+export const DAYS_OF_WEEK: { value: number; label: string }[] = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
 ];

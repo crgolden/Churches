@@ -1,0 +1,7 @@
+organization=crgolden
+projectKey=crgolden_Churches
+serverUrl=https://sonarcloud.io
+serverVersion=8.0.0.92448
+dashboardUrl=https://sonarcloud.io/dashboard?id=crgolden_Churches
+ceTaskId=AZ7l3T89wb6nMlYZxJ2l
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AZ7l3T89wb6nMlYZxJ2l

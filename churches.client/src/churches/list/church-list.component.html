@@ -13,50 +13,62 @@
         {{ results()!.totalCount | number }}
         {{ results()!.totalCount === 1 ? 'church' : 'churches' }} found
       </p>
-      <a routerLink="/" class="btn-ghost">&larr; Refine search</a>
+      <div class="list-actions">
+        <button class="btn-ghost" (click)="toggleView()">
+          {{ showMap() ? 'List view' : 'Map view' }}
+        </button>
+        <a routerLink="/" class="btn-ghost">&larr; Refine search</a>
+      </div>
     </div>
-    <div class="church-grid">
-      @for (item of results()!.items; track item.church.id) {
-        <article class="church-card card">
-          <div class="card-body">
-            <a [routerLink]="['/churches', item.church.slug]" class="church-name">
-              <h2>{{ item.church.canonicalName }}</h2>
-            </a>
-            <p class="church-location">
-              {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
-            </p>
-            <div class="card-tags">
-              @if (item.distanceMiles !== null) {
-                <span class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
-              }
-              @if (item.church.worshipStyle) {
-                <span class="tag">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
-              }
-              @if (item.church.wheelchairAccessible) {
-                <span class="tag tag-muted">Accessible</span>
-              }
-            </div>
-          </div>
-          @if (item.church.website) {
-            <div class="card-footer">
-              <a [href]="item.church.website" target="_blank" rel="noopener" class="btn-ghost">
-                Visit Website &nearr;
+    @if (showMap()) {
+      <app-church-map
+        [items]="results()!.items"
+        (markerClick)="null">
+      </app-church-map>
+    } @else {
+      <div class="church-grid">
+        @for (item of results()!.items; track item.church.id) {
+          <article class="church-card card">
+            <div class="card-body">
+              <a [routerLink]="['/churches', item.church.slug]" class="church-name">
+                <h2>{{ item.church.canonicalName }}</h2>
               </a>
+              <p class="church-location">
+                {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
+              </p>
+              <div class="card-tags">
+                @if (item.distanceMiles !== null) {
+                  <span class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
+                }
+                @if (item.church.worshipStyle) {
+                  <span class="tag">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
+                }
+                @if (item.church.wheelchairAccessible) {
+                  <span class="tag tag-muted">Accessible</span>
+                }
+              </div>
             </div>
+            @if (item.church.website) {
+              <div class="card-footer">
+                <a [href]="item.church.website" target="_blank" rel="noopener" class="btn-ghost">
+                  Visit Website &nearr;
+                </a>
+              </div>
+            }
+          </article>
+        }
+      </div>
+      @if (results()!.totalCount > 20) {
+        <nav class="pagination" aria-label="Pagination">
+          @if (page() > 1) {
+            <button class="btn-ghost" (click)="goToPage(page() - 1)">&larr; Previous</button>
           }
-        </article>
+          <span class="page-indicator text-muted">Page {{ page() }}</span>
+          @if (page() * 20 < results()!.totalCount) {
+            <button class="btn-ghost" (click)="goToPage(page() + 1)">Next &rarr;</button>
+          }
+        </nav>
       }
-    </div>
-    @if (results()!.totalCount > 20) {
-      <nav class="pagination" aria-label="Pagination">
-        @if (page() > 1) {
-          <button class="btn-ghost" (click)="goToPage(page() - 1)">&larr; Previous</button>
-        }
-        <span class="page-indicator text-muted">Page {{ page() }}</span>
-        @if (page() * 20 < results()!.totalCount) {
-          <button class="btn-ghost" (click)="goToPage(page() + 1)">Next &rarr;</button>
-        }
-      </nav>
     }
   </div>
 } @else {

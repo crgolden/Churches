@@ -8,7 +8,9 @@
     <div class="search-card card">
       <form (submit)="$event.preventDefault(); search()">
         <div class="search-row">
+          <label for="search-keyword" class="sr-only">Church name or city</label>
           <input
+            id="search-keyword"
             #kw
             type="text"
             placeholder="Church name or city"
@@ -20,7 +22,9 @@
           </button>
         </div>
         <div class="filter-row">
+          <label for="search-state" class="sr-only">State</label>
           <input
+            id="search-state"
             #st
             type="text"
             placeholder="State (e.g. AZ)"
@@ -28,14 +32,25 @@
             [value]="state()"
             (input)="state.set(st.value.toUpperCase())"
           />
-          <select #ws (change)="worshipStyle.set(ws.value ? +ws.value : null)">
+          <label for="search-worship-style" class="sr-only">Worship style</label>
+          <select id="search-worship-style" #ws (change)="worshipStyle.set(ws.value ? +ws.value : null)">
             <option value="">Any Worship Style</option>
             @for (style of worshipStyles; track style.value) {
               <option [value]="style.value">{{ style.label }}</option>
             }
           </select>
-          <label class="checkbox-label">
+          @if (denominations().length > 0) {
+            <label for="search-denomination" class="sr-only">Denomination</label>
+            <select id="search-denomination" #denom (change)="denominationId.set(denom.value || null)">
+              <option value="">Any Denomination</option>
+              @for (d of denominations(); track d.id) {
+                <option [value]="d.id">{{ d.name }}</option>
+              }
+            </select>
+          }
+          <label for="search-wheelchair" class="checkbox-label">
             <input
+              id="search-wheelchair"
               #wa
               type="checkbox"
               [checked]="wheelchairAccessible() === true"
@@ -43,6 +58,31 @@
             />
             <span>Wheelchair Accessible</span>
           </label>
+        </div>
+        <div class="filter-row">
+          <label for="search-day" class="sr-only">Service day</label>
+          <select id="search-day" #day (change)="dayOfWeek.set(day.value ? +day.value : null)">
+            <option value="">Any Service Day</option>
+            @for (d of daysOfWeek; track d.value) {
+              <option [value]="d.value">{{ d.label }}</option>
+            }
+          </select>
+          <label for="search-time-after">Starts after</label>
+          <input
+            id="search-time-after"
+            #ta
+            type="time"
+            [value]="startTimeAfter()"
+            (input)="startTimeAfter.set(ta.value)"
+          />
+          <label for="search-time-before">and before</label>
+          <input
+            id="search-time-before"
+            #tb
+            type="time"
+            [value]="startTimeBefore()"
+            (input)="startTimeBefore.set(tb.value)"
+          />
         </div>
         @if (lat() !== null) {
           <p class="location-note">Using your location for nearby results</p>

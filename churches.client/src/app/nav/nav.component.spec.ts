@@ -24,4 +24,12 @@ describe('NavComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('toggleMenu flips menuOpen signal', () => {
+    expect(component['menuOpen']()).toBe(false);
+    component['toggleMenu']();
+    expect(component['menuOpen']()).toBe(true);
+    component['toggleMenu']();
+    expect(component['menuOpen']()).toBe(false);
+  });
 });

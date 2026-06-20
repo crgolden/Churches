@@ -286,6 +286,19 @@ public sealed partial class ChurchesFixture : IAsyncLifetime
     private static void Stage(string msg) =>
         Console.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] ChurchesFixture: {msg}");
 
+    private static async Task HandleDenominationsAsync(IRoute route)
+    {
+        // No denominations are seeded in the test store; the real endpoint returns
+        // a JSON array, so mirror that with an empty array (200, not 404) to avoid a
+        // spurious HttpErrorResponse in the client's getDenominations() bootstrap call.
+        await route.FulfillAsync(new RouteFulfillOptions
+        {
+            Status = 200,
+            ContentType = "application/json",
+            Body = "[]"
+        });
+    }
+
     private async Task WireApiRoutesAsync(IPage page)
     {
         await page.RouteAsync("**/directory/api/**", async route =>
@@ -332,6 +345,11 @@ public sealed partial class ChurchesFixture : IAsyncLifetime
         {
             var slug = apiPath["/churches/".Length..];
             await HandleChurchBySlugAsync(route, slug);
+        }
+        else if (apiPath.Equals("/denominations", StringComparison.OrdinalIgnoreCase) ||
+                 apiPath.StartsWith("/denominations?", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleDenominationsAsync(route);
         }
         else if (apiPath.Equals("/corrections", StringComparison.OrdinalIgnoreCase) ||
                  apiPath.StartsWith("/corrections?", StringComparison.OrdinalIgnoreCase))
