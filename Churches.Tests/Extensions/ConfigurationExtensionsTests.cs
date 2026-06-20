@@ -24,4 +24,31 @@ public sealed class ConfigurationExtensionsTests
         var ex = Assert.Throws<InvalidOperationException>(() => config.GetRequired<string>("Missing"));
         Assert.Equal("Invalid 'Missing'.", ex.Message);
     }
+
+    [Fact]
+    public void GetChurchesSecrets_ReturnsClientIdAndSecret()
+    {
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ChurchesClientId"] = "test-client-id",
+                ["ChurchesClientSecret"] = "test-client-secret",
+            })
+            .Build();
+
+        var (clientId, clientSecret) = config.GetChurchesSecrets();
+
+        Assert.Equal("test-client-id", clientId);
+        Assert.Equal("test-client-secret", clientSecret);
+    }
+
+    [Fact]
+    public void GetChurchesSecrets_ThrowsWhenClientIdMissing()
+    {
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ChurchesClientSecret"] = "s" })
+            .Build();
+
+        Assert.Throws<InvalidOperationException>(() => config.GetChurchesSecrets());
+    }
 }

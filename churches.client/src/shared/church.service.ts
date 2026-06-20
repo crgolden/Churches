@@ -1,12 +1,16 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Church, PagedResult, SearchPagedResult, SearchParams, UserCorrection } from './models';
+import { Church, Denomination, PagedResult, SearchPagedResult, SearchParams, UserCorrection } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ChurchApiService {
   private readonly http = inject(HttpClient);
   private readonly base = '/directory/api';
+
+  getDenominations(): Observable<Denomination[]> {
+    return this.http.get<Denomination[]>(`${this.base}/denominations`);
+  }
 
   getChurches(page = 1, pageSize = 20): Observable<PagedResult<Church>> {
     return this.http.get<PagedResult<Church>>(`${this.base}/churches`, {
@@ -28,6 +32,9 @@ export class ChurchApiService {
     if (params.denominationId) httpParams = httpParams.set('denominationId', params.denominationId);
     if (params.worshipStyle != null) httpParams = httpParams.set('worshipStyle', params.worshipStyle);
     if (params.wheelchairAccessible != null) httpParams = httpParams.set('wheelchairAccessible', params.wheelchairAccessible);
+    if (params.dayOfWeek != null) httpParams = httpParams.set('dayOfWeek', params.dayOfWeek);
+    if (params.startTimeBefore) httpParams = httpParams.set('startTimeBefore', params.startTimeBefore);
+    if (params.startTimeAfter) httpParams = httpParams.set('startTimeAfter', params.startTimeAfter);
     httpParams = httpParams.set('page', params.page ?? 1);
     httpParams = httpParams.set('pageSize', params.pageSize ?? 20);
     return this.http.get<SearchPagedResult>(`${this.base}/search`, { params: httpParams });

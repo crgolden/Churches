@@ -69,7 +69,7 @@ public sealed class AnonymousTests
         var (ctx, page) = await _fixture.NewAnonymousPageAsync("/");
         await using (ctx)
         {
-            await page.Locator("select").SelectOptionAsync("1");
+            await page.Locator("#search-worship-style").SelectOptionAsync("1");
             await page.GetByRole(AriaRole.Button, new() { Name = "Search" }).ClickAsync();
             await page.WaitForURLAsync("**/churches**");
             Assert.Contains("/churches", page.Url, StringComparison.Ordinal);
@@ -221,6 +221,21 @@ public sealed class AnonymousTests
         {
             await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Previous" })).ToBeVisibleAsync();
             await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Next" })).ToHaveCountAsync(0);
+        }
+    }
+
+    [Fact]
+    public async Task ChurchList_TogglingMapView_RendersLeafletMapWithMarkers()
+    {
+        _fixture.ChurchStore.Clear();
+        _fixture.ChurchStore.Seed(ChurchStore.FirstBaptistAustin);
+
+        var (ctx, page) = await _fixture.NewAnonymousPageAsync("/churches?q=Baptist&page=1&pageSize=20");
+        await using (ctx)
+        {
+            await page.GetByRole(AriaRole.Button, new() { Name = "Map view" }).ClickAsync();
+            await Assertions.Expect(page.Locator(".leaflet-container")).ToBeVisibleAsync();
+            await Assertions.Expect(page.Locator(".leaflet-marker-icon").First).ToBeVisibleAsync();
         }
     }
 

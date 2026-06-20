@@ -2,11 +2,12 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { DecimalPipe } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { ChurchApiService } from '../../shared/church.service';
+import { ChurchMapComponent } from '../map/church-map.component';
 import { SearchPagedResult, WORSHIP_STYLES } from '../../shared/models';
 
 @Component({
   selector: 'app-church-list',
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DecimalPipe, ChurchMapComponent],
   templateUrl: './church-list.component.html',
   styleUrl: './church-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,9 +22,14 @@ export class ChurchListComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly page = signal(1);
   protected readonly worshipStyles = WORSHIP_STYLES;
+  protected readonly showMap = signal(false);
 
   protected worshipStyleLabel(value: number): string {
     return this.worshipStyles.find(s => s.value === value)?.label ?? '';
+  }
+
+  protected toggleView(): void {
+    this.showMap.update(v => !v);
   }
 
   ngOnInit(): void {
@@ -42,10 +48,14 @@ export class ChurchListComponent implements OnInit {
       lat: params['lat'] ? +params['lat'] : undefined,
       lng: params['lng'] ? +params['lng'] : undefined,
       radiusMiles: params['radiusMiles'] ? +params['radiusMiles'] : undefined,
+      denominationId: params['denominationId'] || undefined,
       worshipStyle: params['worshipStyle'] ? +params['worshipStyle'] : undefined,
       wheelchairAccessible: params['wheelchairAccessible'] != null
         ? params['wheelchairAccessible'] === 'true'
         : undefined,
+      dayOfWeek: params['dayOfWeek'] ? +params['dayOfWeek'] : undefined,
+      startTimeAfter: params['startTimeAfter'] || undefined,
+      startTimeBefore: params['startTimeBefore'] || undefined,
       page: this.page(),
       pageSize: 20,
     };
