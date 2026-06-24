@@ -8,6 +8,10 @@ const CORRECTABLE_FIELDS = [
   'phoneNumber', 'website', 'emailAddress', 'primaryLanguage',
 ] as const;
 
+// Only the scalar string fields above are correctable, so indexing Church by one yields a string —
+// never the schedules/ministries/campuses arrays that keyof Church would also admit.
+type CorrectableField = typeof CORRECTABLE_FIELDS[number];
+
 @Component({
   selector: 'app-contribute',
   templateUrl: './contribute.component.html',
@@ -39,8 +43,9 @@ export class ContributeComponent implements OnInit {
   protected submit(): void {
     const c = this.church();
     if (!c || !this.field() || !this.newValue().trim()) return;
-    const fieldKey = this.field() as keyof Church;
-    const oldValue = c[fieldKey] != null ? String(c[fieldKey]) : null;
+    const fieldKey = this.field() as CorrectableField;
+    const current = c[fieldKey];
+    const oldValue = current != null ? String(current) : null;
     if (this.newValue().trim() === oldValue) {
       this.error.set('This field already has that value. Please enter a different correction.');
       return;
