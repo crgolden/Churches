@@ -69,14 +69,6 @@ jobs:
         with:
           dotnet-version: '10.x'
 
-      - name: Cache dotnet global tools
-        id: cache-dotnet-tools
-        uses: actions/cache@v5
-        with:
-          path: ~/.dotnet/tools
-          key: ${{ runner.os }}-dotnet-tools-${{ hashFiles('**/*.csproj') }}
-          restore-keys: ${{ runner.os }}-dotnet-tools-
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -93,11 +85,9 @@ jobs:
         working-directory: churches.client
         run: npm ci
 
-      - name: Install dotnet-coverage
-        if: steps.cache-dotnet-tools.outputs.cache-hit != 'true'
-        run: dotnet tool install --global dotnet-coverage
-
       - name: Restore local tools
+        # Provisions both coverlet and dotnet-coverage from dotnet-tools.json — unconditional, so the
+        # tools are always present, and the NuGet cache still accelerates the restore.
         run: dotnet tool restore
 
       - name: Lint
@@ -180,7 +170,7 @@ jobs:
         env:
           ASPNETCORE_ENVIRONMENT: CI
         run: |
-          dotnet-coverage collect `
+          dotnet dotnet-coverage collect `
             "dotnet test --project Churches.Tests --no-build --configuration Release -- --filter-trait Category=E2E --report-xunit-trx --report-xunit-trx-filename e2e-tests.trx" `
             -f xml -o "coverage-e2e.xml" -s "coverage.settings.xml"
 
