@@ -66,6 +66,12 @@ with coordinates, toggles "Map view" on `/churches`, and asserts `div.leaflet-co
 and at least one `.leaflet-marker-icon` renders. Leaflet loads via dynamic import; OpenStreetMap tile
 requests may fail under restricted network but do not affect the container/marker assertions.
 
+**Church detail:** `ChurchDetailTests` covers the `/churches/:slug` page — the schedules / ministries /
+campuses sections (rendered when populated or to a moderator), the detail Leaflet map (`.leaflet-container`
+plus the church and campus markers), and moderator add/delete of a schedule and a ministry. The add forms
+and per-item delete buttons gate on `auth.hasModerationScope()`; the in-memory `ChurchStore` mutates via its
+`Add*`/`Remove*` methods so the child POST/DELETE routes round-trip against the mocked `/directory/api`.
+
 ## Smoke tests (post-deploy)
 
 `Category=Smoke` tests target a **deployed** stack and exercise the real OIDC login plus the BFF → Directory

@@ -266,6 +266,40 @@ public sealed partial class ChurchesFixture : IAsyncLifetime
         createdAt = c.CreatedAt,
         updatedAt = c.UpdatedAt,
         isActive = c.IsActive,
+        schedules = c.Schedules.Select(s => new
+        {
+            id = s.Id,
+            churchId = s.ChurchId,
+            campusId = s.CampusId,
+            dayOfWeek = s.DayOfWeek,
+            startTime = s.StartTime,
+            description = s.Description,
+            createdAt = s.CreatedAt,
+            updatedAt = s.UpdatedAt,
+        }),
+        ministries = c.Ministries.Select(m => new
+        {
+            id = m.Id,
+            churchId = m.ChurchId,
+            name = m.Name,
+            description = m.Description,
+            createdAt = m.CreatedAt,
+            updatedAt = m.UpdatedAt,
+        }),
+        campuses = c.Campuses.Select(cp => new
+        {
+            id = cp.Id,
+            churchId = cp.ChurchId,
+            name = cp.Name,
+            street = cp.Street,
+            city = cp.City,
+            state = cp.State,
+            zip = cp.Zip,
+            latitude = cp.Latitude,
+            longitude = cp.Longitude,
+            createdAt = cp.CreatedAt,
+            updatedAt = cp.UpdatedAt,
+        }),
     };
 
     private static object CorrectionToJson(CorrectionRecord c) => new
@@ -298,6 +332,9 @@ public sealed partial class ChurchesFixture : IAsyncLifetime
             Body = "[]"
         });
     }
+
+    private static string? OptionalString(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
     private async Task WireApiRoutesAsync(IPage page)
     {
@@ -343,8 +380,25 @@ public sealed partial class ChurchesFixture : IAsyncLifetime
         }
         else if (apiPath.StartsWith("/churches/", StringComparison.OrdinalIgnoreCase))
         {
-            var slug = apiPath["/churches/".Length..];
-            await HandleChurchBySlugAsync(route, slug);
+            var rest = apiPath["/churches/".Length..];
+            var slashIndex = rest.IndexOf('/');
+            if (slashIndex > 0)
+            {
+                var churchIdRaw = rest[..slashIndex];
+                var afterSlash = slashIndex + 1;
+                var childType = rest[afterSlash..];
+                await HandleChildCreateAsync(route, method, churchIdRaw, childType, request);
+            }
+            else
+            {
+                await HandleChurchBySlugAsync(route, rest);
+            }
+        }
+        else if (apiPath.StartsWith("/schedules/", StringComparison.OrdinalIgnoreCase)
+            || apiPath.StartsWith("/ministries/", StringComparison.OrdinalIgnoreCase)
+            || apiPath.StartsWith("/campuses/", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleChildDeleteAsync(route, method, apiPath);
         }
         else if (apiPath.Equals("/denominations", StringComparison.OrdinalIgnoreCase) ||
                  apiPath.StartsWith("/denominations?", StringComparison.OrdinalIgnoreCase))
@@ -436,6 +490,81 @@ public sealed partial class ChurchesFixture : IAsyncLifetime
             ContentType = "application/json",
             Body = JsonSerializer.Serialize(ChurchToJson(church), CamelCase)
         });
+    }
+
+    private async Task HandleChildCreateAsync(IRoute route, string method, string churchIdRaw, string childType, IRequest request)
+    {
+        if (!string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) || !Guid.TryParse(churchIdRaw, out var churchId))
+        {
+            await route.FulfillAsync(new RouteFulfillOptions { Status = 405 });
+            return;
+        }
+
+        using var doc = JsonDocument.Parse(request.PostData ?? "{}");
+        var root = doc.RootElement;
+        Guid createdId;
+        switch (childType.ToLowerInvariant())
+        {
+            case "schedules":
+                createdId = ChurchStore.AddSchedule(
+                    churchId,
+                    root.GetProperty("dayOfWeek").GetInt32(),
+                    root.GetProperty("startTime").GetString() ?? string.Empty,
+                    OptionalString(root, "description")).Id;
+                break;
+            case "ministries":
+                createdId = ChurchStore.AddMinistry(
+                    churchId,
+                    root.GetProperty("name").GetString() ?? string.Empty,
+                    OptionalString(root, "description")).Id;
+                break;
+            case "campuses":
+                createdId = ChurchStore.AddCampus(
+                    churchId,
+                    root.GetProperty("name").GetString() ?? string.Empty,
+                    OptionalString(root, "street"),
+                    root.GetProperty("city").GetString() ?? string.Empty,
+                    root.GetProperty("state").GetString() ?? string.Empty,
+                    root.GetProperty("zip").GetString() ?? string.Empty,
+                    root.GetProperty("latitude").GetDouble(),
+                    root.GetProperty("longitude").GetDouble()).Id;
+                break;
+            default:
+                await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
+                return;
+        }
+
+        await route.FulfillAsync(new RouteFulfillOptions
+        {
+            Status = 201,
+            ContentType = "application/json",
+            Body = JsonSerializer.Serialize(new { id = createdId }, CamelCase)
+        });
+    }
+
+    private async Task HandleChildDeleteAsync(IRoute route, string method, string apiPath)
+    {
+        if (!string.Equals(method, "DELETE", StringComparison.OrdinalIgnoreCase))
+        {
+            await route.FulfillAsync(new RouteFulfillOptions { Status = 405 });
+            return;
+        }
+
+        var parts = apiPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2 || !Guid.TryParse(parts[1], out var id))
+        {
+            await route.FulfillAsync(new RouteFulfillOptions { Status = 400 });
+            return;
+        }
+
+        var removed = parts[0].ToLowerInvariant() switch
+        {
+            "schedules" => ChurchStore.RemoveSchedule(id),
+            "ministries" => ChurchStore.RemoveMinistry(id),
+            "campuses" => ChurchStore.RemoveCampus(id),
+            _ => false,
+        };
+        await route.FulfillAsync(new RouteFulfillOptions { Status = removed ? 204 : 404 });
     }
 
     private async Task HandleCorrectionsCollectionAsync(IRoute route, string method, Uri uri, IRequest request)

@@ -23,6 +23,44 @@ export interface Church {
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
+  // Present only on the church-detail response.
+  schedules?: ServiceSchedule[];
+  ministries?: Ministry[];
+  campuses?: Campus[];
+}
+
+export interface ServiceSchedule {
+  id: string;
+  churchId: string;
+  campusId: string | null;
+  dayOfWeek: number;
+  startTime: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Ministry {
+  id: string;
+  churchId: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Campus {
+  id: string;
+  churchId: string;
+  name: string;
+  street: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PagedResult<T> {

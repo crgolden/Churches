@@ -1,7 +1,28 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Church, Denomination, PagedResult, SearchPagedResult, SearchParams, UserCorrection } from './models';
+import { Campus, Church, Denomination, Ministry, PagedResult, SearchPagedResult, SearchParams, ServiceSchedule, UserCorrection } from './models';
+
+export interface ScheduleInput {
+  dayOfWeek: number;
+  startTime: string;
+  description: string | null;
+}
+
+export interface MinistryInput {
+  name: string;
+  description: string | null;
+}
+
+export interface CampusInput {
+  name: string;
+  street: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  latitude: number;
+  longitude: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ChurchApiService {
@@ -56,5 +77,31 @@ export class ChurchApiService {
 
   rejectCorrection(id: string): Observable<void> {
     return this.http.patch<void>(`${this.base}/corrections/${id}/reject`, null);
+  }
+
+  // --- Moderator curation of church children (requires the churches.mod claim) ---
+
+  createSchedule(churchId: string, input: ScheduleInput): Observable<ServiceSchedule> {
+    return this.http.post<ServiceSchedule>(`${this.base}/churches/${churchId}/schedules`, input);
+  }
+
+  deleteSchedule(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/schedules/${id}`);
+  }
+
+  createMinistry(churchId: string, input: MinistryInput): Observable<Ministry> {
+    return this.http.post<Ministry>(`${this.base}/churches/${churchId}/ministries`, input);
+  }
+
+  deleteMinistry(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/ministries/${id}`);
+  }
+
+  createCampus(churchId: string, input: CampusInput): Observable<Campus> {
+    return this.http.post<Campus>(`${this.base}/churches/${churchId}/campuses`, input);
+  }
+
+  deleteCampus(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/campuses/${id}`);
   }
 }

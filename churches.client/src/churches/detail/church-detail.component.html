@@ -72,7 +72,96 @@
             }
           </div>
         </div>
+        @if (church()!.schedules?.length || auth.hasModerationScope()) {
+          <div class="detail-section">
+            <h4>Service Times</h4>
+            <ul id="church-schedules" class="info-rows">
+              @for (s of church()!.schedules ?? []; track s.id) {
+                <li class="info-row">
+                  <span class="info-label">{{ scheduleLabel(s) }}</span>
+                  <span>
+                    @if (s.description) { {{ s.description }} }
+                    @if (auth.hasModerationScope()) {
+                      <button type="button" class="btn-ghost mod-delete" (click)="deleteSchedule(s.id)" aria-label="Delete schedule">✕</button>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+            @if (auth.hasModerationScope()) {
+              <form class="mod-add" [formGroup]="scheduleForm" (ngSubmit)="addSchedule()">
+                <select formControlName="dayOfWeek" aria-label="Day of week">
+                  @for (d of daysOfWeek; track d.value) { <option [ngValue]="d.value">{{ d.label }}</option> }
+                </select>
+                <input type="time" formControlName="startTime" aria-label="Start time" />
+                <input type="text" formControlName="description" placeholder="Description" aria-label="Schedule description" />
+                <button type="submit" id="add-schedule" class="btn-secondary">Add service time</button>
+              </form>
+            }
+          </div>
+        }
+        @if (church()!.ministries?.length || auth.hasModerationScope()) {
+          <div class="detail-section">
+            <h4>Ministries</h4>
+            <ul id="church-ministries" class="info-rows">
+              @for (m of church()!.ministries ?? []; track m.id) {
+                <li class="info-row">
+                  <span class="info-label">{{ m.name }}</span>
+                  <span>
+                    @if (m.description) { {{ m.description }} }
+                    @if (auth.hasModerationScope()) {
+                      <button type="button" class="btn-ghost mod-delete" (click)="deleteMinistry(m.id)" aria-label="Delete ministry">✕</button>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+            @if (auth.hasModerationScope()) {
+              <form class="mod-add" [formGroup]="ministryForm" (ngSubmit)="addMinistry()">
+                <input type="text" formControlName="name" placeholder="Name" aria-label="Ministry name" />
+                <input type="text" formControlName="description" placeholder="Description" aria-label="Ministry description" />
+                <button type="submit" id="add-ministry" class="btn-secondary">Add ministry</button>
+              </form>
+            }
+          </div>
+        }
+        @if (church()!.campuses?.length || auth.hasModerationScope()) {
+          <div class="detail-section">
+            <h4>Campuses</h4>
+            <ul id="church-campuses" class="info-rows">
+              @for (cp of church()!.campuses ?? []; track cp.id) {
+                <li class="info-row">
+                  <span class="info-label">{{ cp.name }}</span>
+                  <span>
+                    {{ campusAddress(cp) }}
+                    @if (auth.hasModerationScope()) {
+                      <button type="button" class="btn-ghost mod-delete" (click)="deleteCampus(cp.id)" aria-label="Delete campus">✕</button>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+            @if (auth.hasModerationScope()) {
+              <form class="mod-add" [formGroup]="campusForm" (ngSubmit)="addCampus()">
+                <input type="text" formControlName="name" placeholder="Name" aria-label="Campus name" />
+                <input type="text" formControlName="street" placeholder="Street" aria-label="Campus street" />
+                <input type="text" formControlName="city" placeholder="City" aria-label="Campus city" />
+                <input type="text" formControlName="state" placeholder="State" aria-label="Campus state" />
+                <input type="text" formControlName="zip" placeholder="Zip" aria-label="Campus zip" />
+                <input type="number" formControlName="latitude" placeholder="Latitude" aria-label="Campus latitude" />
+                <input type="number" formControlName="longitude" placeholder="Longitude" aria-label="Campus longitude" />
+                <button type="submit" id="add-campus" class="btn-secondary">Add campus</button>
+              </form>
+            }
+          </div>
+        }
       </div>
+      @if (mapPoints().length) {
+        <div class="detail-section" id="church-map-section">
+          <h4>Location</h4>
+          <app-location-map [points]="mapPoints()" />
+        </div>
+      }
       <div class="detail-actions">
         <a
           [href]="'https://maps.google.com/?q=' + encodeAddress(church()!)"
