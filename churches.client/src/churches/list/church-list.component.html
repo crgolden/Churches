@@ -1,13 +1,13 @@
 @if (loading()) {
-  <div class="page-container list-page">
+  <div class="page-container page-section">
     <p class="text-muted">Loading results...</p>
   </div>
 } @else if (error()) {
-  <div class="page-container list-page">
+  <div class="page-container page-section">
     <p class="text-error">{{ error() }}</p>
   </div>
 } @else if (results()) {
-  <div class="page-container list-page">
+  <div class="page-container page-section">
     <div class="list-header">
       <p class="count">
         {{ results()!.totalCount | number }}
@@ -72,7 +72,7 @@
     }
   </div>
 } @else {
-  <div class="page-container list-page">
+  <div class="page-container page-section">
     <p class="text-muted">Enter a search above to find churches.</p>
   </div>
 }

@@ -8,10 +8,11 @@ import { ContributeComponent } from '../churches/contribute/contribute.component
 import { ModerationComponent } from '../admin/moderation/moderation.component';
 
 export const routes: Routes = [
-  { path: '', component: SearchComponent },
-  { path: 'churches', component: ChurchListComponent },
-  { path: 'churches/:slug', component: ChurchDetailComponent },
-  { path: 'contribute/:slug', component: ContributeComponent, canActivate: [authGuard] },
-  { path: 'admin/moderation', component: ModerationComponent, canActivate: [modGuard] },
+  { path: '', component: SearchComponent, title: 'Find Your Church Home' },
+  { path: 'churches', component: ChurchListComponent, title: 'Browse Churches' },
+  // The church name is set dynamically by ChurchDetailComponent once the church loads.
+  { path: 'churches/:slug', component: ChurchDetailComponent, title: 'Church' },
+  { path: 'contribute/:slug', component: ContributeComponent, canActivate: [authGuard], title: 'Suggest a Correction' },
+  { path: 'admin/moderation', component: ModerationComponent, canActivate: [modGuard], title: 'Moderation' },
   { path: '**', redirectTo: '' },
 ];

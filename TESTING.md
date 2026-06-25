@@ -62,9 +62,14 @@ E2E coverage (`E2E/`): `AnonymousTests` (public search/landing), `ChurchDetailTe
 (BFF login/logout), `ContributeTests` (correction submission), `ModerationTests`, `EdgeCaseTests`.
 
 **Map view:** `AnonymousTests.ChurchList_TogglingMapView_RendersLeafletMapWithMarkers` seeds a church
-with coordinates, toggles "Map view" on `/churches`, and asserts `div.leaflet-container` is visible
-and at least one `.leaflet-marker-icon` renders. Leaflet loads via dynamic import; OpenStreetMap tile
-requests may fail under restricted network but do not affect the container/marker assertions.
+with coordinates, toggles "Map view" on `/churches`, and asserts `div.leaflet-container` is visible,
+at least one `.leaflet-marker-icon` renders, **and that `leaflet.css` actually applied** — it reads
+computed styles that only the stylesheet supplies (`.leaflet-map-pane`/`.leaflet-tile`
+`position: absolute`, `.leaflet-container` `overflow: hidden`). This last check is the important one:
+markers and the container exist even with the stylesheet missing (Leaflet positions markers via inline
+JS), so a broken-but-present map would otherwise pass. The assertions read CSS state, not tile images,
+so they're independent of whether OpenStreetMap tile requests succeed under restricted network.
+`ChurchDetailTests` applies the same guard to the church-detail `location-map`.
 
 **Church detail:** `ChurchDetailTests` covers the `/churches/:slug` page — the schedules / ministries /
 campuses sections (rendered when populated or to a moderator), the detail Leaflet map (`.leaflet-container`

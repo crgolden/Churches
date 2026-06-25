@@ -155,4 +155,90 @@ describe('SearchComponent', () => {
     component['useLocation']();
     expect(component['locating']()).toBe(false);
   });
+
+  it('useLocation sets a locationError message on error', () => {
+    const geoMock = {
+      getCurrentPosition: vi.fn((_: unknown, error: () => void) => error()),
+    };
+    Object.defineProperty(navigator, 'geolocation', { value: geoMock, configurable: true });
+    component['useLocation']();
+    expect(component['locationError']()).toContain('Couldn’t get your location');
+  });
+
+  it('useLocation sets a locationError message when geolocation is unavailable', () => {
+    const origGeo = navigator.geolocation;
+    Object.defineProperty(navigator, 'geolocation', { value: null, configurable: true });
+    component['useLocation']();
+    expect(component['locationError']()).toContain('isn’t available');
+    Object.defineProperty(navigator, 'geolocation', { value: origGeo, configurable: true });
+  });
+
+  it('useLocation clears a prior locationError on success', () => {
+    component['locationError'].set('previous error');
+    const geoMock = {
+      getCurrentPosition: vi.fn((success: (p: GeolocationPosition) => void) => {
+        success({ coords: { latitude: 39.7, longitude: -104.9 } } as GeolocationPosition);
+      }),
+    };
+    Object.defineProperty(navigator, 'geolocation', { value: geoMock, configurable: true });
+    component['useLocation']();
+    expect(component['locationError']()).toBeNull();
+  });
+
+  it('resolveStateCode passes a valid 2-letter code through (any case)', () => {
+    expect(component['resolveStateCode']('tx')).toBe('TX');
+    expect(component['resolveStateCode']('AZ')).toBe('AZ');
+  });
+
+  it('resolveStateCode resolves a full state name to its code (any case)', () => {
+    expect(component['resolveStateCode']('Texas')).toBe('TX');
+    expect(component['resolveStateCode']('  new york ')).toBe('NY');
+    expect(component['resolveStateCode']('DISTRICT OF COLUMBIA')).toBe('DC');
+  });
+
+  it('resolveStateCode returns null for empty or unrecognizable input', () => {
+    expect(component['resolveStateCode']('')).toBeNull();
+    expect(component['resolveStateCode']('   ')).toBeNull();
+    expect(component['resolveStateCode']('Atlantis')).toBeNull();
+    expect(component['resolveStateCode']('123')).toBeNull();
+  });
+
+  it('commitState snaps a typed state name to its 2-letter code', () => {
+    component['commitState']('California');
+    expect(component['state']()).toBe('CA');
+  });
+
+  it('commitState leaves unrecognized input as trimmed text', () => {
+    component['commitState']('  somewhere ');
+    expect(component['state']()).toBe('somewhere');
+  });
+
+  it('search resolves a typed state name to its code in the query params', async () => {
+    const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    component['state'].set('Texas');
+    component['search']();
+    expect(spy).toHaveBeenCalledWith(['/churches'], {
+      queryParams: expect.objectContaining({ state: 'TX' }),
+    });
+  });
+
+  it('search omits state when input is not a recognizable state', async () => {
+    const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    component['state'].set('Atlantis');
+    component['search']();
+    const [, opts] = spy.mock.calls[0];
+    expect((opts as { queryParams: Record<string, string> }).queryParams['state']).toBeUndefined();
+  });
+
+  it('renders the locationError message in the DOM when geolocation fails', () => {
+    const geoMock = {
+      getCurrentPosition: vi.fn((_: unknown, error: () => void) => error()),
+    };
+    Object.defineProperty(navigator, 'geolocation', { value: geoMock, configurable: true });
+    component['useLocation']();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const note = el.querySelector('.location-error');
+    expect(note?.textContent?.trim()).toContain('Couldn’t get your location');
+  });
 });

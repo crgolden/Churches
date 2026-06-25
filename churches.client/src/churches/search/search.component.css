@@ -1,7 +1,7 @@
 /* Hero */
 .hero {
-  background: linear-gradient(135deg, var(--color-primary) 0%, #6D28D9 100%);
-  padding: 5rem 0 4rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-deep) 100%);
+  padding: 5rem 0 var(--space-8);
   color: #fff;
 }
 
@@ -23,13 +23,13 @@
 }
 
 .search-card {
-  padding: 1.75rem;
+  padding: var(--card-pad);
 }
 
 .search-row {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
 }
 
@@ -38,40 +38,58 @@
   min-width: 200px;
 }
 
-.filter-row {
+.search-row .btn-secondary {
+  flex-shrink: 0;
+}
+
+/* Auto-fit grid: each filter keeps a sensible min-width so labels/values never truncate,
+   and the grid collapses to fewer columns (down to one) as the card narrows. */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.filter-field {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
-.filter-row input[type='text'] {
-  width: 100px;
-  flex: none;
-}
-
-.filter-row select {
-  flex: 1;
+.filter-field label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   cursor: pointer;
   font-size: 0.9rem;
   white-space: nowrap;
+  margin-bottom: var(--space-4);
 }
 
 .checkbox-label input[type='checkbox'] {
   margin: 0;
 }
 
-.location-note {
+.location-note,
+.location-error {
   font-size: 0.85rem;
+  margin: 0 0 var(--space-3);
+}
+
+.location-note {
   color: var(--color-text-muted);
-  margin: 0 0 0.75rem;
+}
+
+.location-error {
+  color: var(--color-error);
 }
 
 .search-submit {
@@ -80,18 +98,18 @@
 
 /* Value props */
 .value-props {
-  padding: 4rem 0;
+  padding: var(--space-8) 0;
   background: var(--color-bg);
 }
 
 .props-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  gap: var(--space-5);
 }
 
 .prop-card {
-  padding: 1.75rem;
+  padding: var(--card-pad);
   text-align: center;
 }
 
@@ -116,20 +134,20 @@
 
 /* How it works */
 .how-it-works {
-  padding: 4rem 0;
+  padding: var(--space-8) 0;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
 }
 
 .how-it-works h2 {
   text-align: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: var(--space-7);
 }
 
 .steps-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
+  gap: var(--space-6);
 }
 
 .step {

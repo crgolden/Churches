@@ -1,9 +1,5 @@
-.moderation-page {
-  padding: 2rem 0 3rem;
-}
-
 .moderation-page h1 {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-5);
 }
 
 .table-card {
@@ -16,20 +12,16 @@ table {
   font-size: 0.9rem;
 }
 
+/* Typography comes from the shared .eyebrow utility on each <th>. */
 th {
   text-align: left;
-  padding: 0.75rem 1rem;
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted);
-  background: rgba(67, 56, 202, .05);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(var(--color-primary-rgb), .05);
   border-bottom: 1px solid var(--color-border);
 }
 
 td {
-  padding: 0.85rem 1rem;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
@@ -40,10 +32,10 @@ tr:last-child td {
 
 .actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .empty-state {
-  padding: 2.5rem;
+  padding: var(--space-6);
   text-align: center;
 }

@@ -1,13 +1,13 @@
 @if (loading()) {
-  <div class="page-container detail-page">
+  <div class="page-container page-section">
     <p class="text-muted">Loading...</p>
   </div>
 } @else if (error()) {
-  <div class="page-container detail-page">
+  <div class="page-container page-section">
     <p id="church-error" class="text-error">{{ error() }}</p>
   </div>
 } @else if (church()) {
-  <div class="page-container detail-page">
+  <div class="page-container page-section">
     <a class="back-link btn-ghost" href="#" (click)="$event.preventDefault(); back()">&larr; Search results</a>
     <article class="church-detail card">
       <header class="detail-header">
@@ -19,7 +19,7 @@
       </header>
       <div class="detail-body">
         <div class="detail-section">
-          <h4>Contact</h4>
+          <h4 class="eyebrow">Contact</h4>
           <div class="info-rows">
             @if (church()!.phoneNumber) {
               <div class="info-row">
@@ -42,7 +42,7 @@
           </div>
         </div>
         <div class="detail-section">
-          <h4>About</h4>
+          <h4 class="eyebrow">About</h4>
           <div class="info-rows">
             <div class="info-row">
               <span class="info-label">Worship Style</span>
@@ -74,7 +74,7 @@
         </div>
         @if (church()!.schedules?.length || auth.hasModerationScope()) {
           <div class="detail-section">
-            <h4>Service Times</h4>
+            <h4 class="eyebrow">Service Times</h4>
             <ul id="church-schedules" class="info-rows">
               @for (s of church()!.schedules ?? []; track s.id) {
                 <li class="info-row">
@@ -102,7 +102,7 @@
         }
         @if (church()!.ministries?.length || auth.hasModerationScope()) {
           <div class="detail-section">
-            <h4>Ministries</h4>
+            <h4 class="eyebrow">Ministries</h4>
             <ul id="church-ministries" class="info-rows">
               @for (m of church()!.ministries ?? []; track m.id) {
                 <li class="info-row">
@@ -127,7 +127,7 @@
         }
         @if (church()!.campuses?.length || auth.hasModerationScope()) {
           <div class="detail-section">
-            <h4>Campuses</h4>
+            <h4 class="eyebrow">Campuses</h4>
             <ul id="church-campuses" class="info-rows">
               @for (cp of church()!.campuses ?? []; track cp.id) {
                 <li class="info-row">
@@ -158,7 +158,7 @@
       </div>
       @if (mapPoints().length) {
         <div class="detail-section" id="church-map-section">
-          <h4>Location</h4>
+          <h4 class="eyebrow">Location</h4>
           <app-location-map [points]="mapPoints()" />
         </div>
       }

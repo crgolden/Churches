@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { ChurchApiService } from '../../shared/church.service';
-import { DAYS_OF_WEEK, WORSHIP_STYLES } from '../../shared/models';
+import { DAYS_OF_WEEK, US_STATES, WORSHIP_STYLES } from '../../shared/models';
 
 @Component({
   selector: 'app-search',
@@ -25,12 +25,36 @@ export class SearchComponent {
   protected readonly lat = signal<number | null>(null);
   protected readonly lng = signal<number | null>(null);
   protected readonly locating = signal(false);
+  protected readonly locationError = signal<string | null>(null);
   protected readonly worshipStyles = WORSHIP_STYLES;
   protected readonly daysOfWeek = DAYS_OF_WEEK;
+  protected readonly usStates = US_STATES;
   protected readonly denominations = toSignal(this.churchService.getDenominations(), { initialValue: [] });
 
+  // Resolves whatever the user typed/picked (a 2-letter code or a full state name, any case) to the
+  // 2-letter code the Directory API expects, or null when it isn't a recognizable state.
+  protected resolveStateCode(raw: string): string | null {
+    const value = raw.trim();
+    if (!value) return null;
+    const upper = value.toUpperCase();
+    const byCode = US_STATES.find(s => s.code === upper);
+    if (byCode) return byCode.code;
+    const byName = US_STATES.find(s => s.name.toLowerCase() === value.toLowerCase());
+    if (byName) return byName.code;
+    return /^[A-Z]{2}$/.test(upper) ? upper : null;
+  }
+
+  // Snap the field to the canonical code on commit (blur / datalist pick) so "Texas" becomes "TX".
+  protected commitState(raw: string): void {
+    this.state.set(this.resolveStateCode(raw) ?? raw.trim());
+  }
+
   protected useLocation(): void {
-    if (!navigator.geolocation) return;
+    this.locationError.set(null);
+    if (!navigator.geolocation) {
+      this.locationError.set('Location isn’t available in this browser — try searching by city or state.');
+      return;
+    }
     this.locating.set(true);
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -38,7 +62,10 @@ export class SearchComponent {
         this.lng.set(pos.coords.longitude);
         this.locating.set(false);
       },
-      () => this.locating.set(false)
+      () => {
+        this.locating.set(false);
+        this.locationError.set('Couldn’t get your location — try searching by city or state.');
+      }
     );
   }
 
@@ -46,7 +73,7 @@ export class SearchComponent {
     const params: Record<string, string> = {};
     const kw = this.keyword().trim();
     if (kw) params['q'] = kw;
-    const st = this.state().trim();
+    const st = this.resolveStateCode(this.state());
     if (st) params['state'] = st;
     const ws = this.worshipStyle();
     if (ws != null) params['worshipStyle'] = String(ws);

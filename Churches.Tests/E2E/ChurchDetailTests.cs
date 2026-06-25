@@ -43,6 +43,16 @@ public sealed class ChurchDetailTests
 
             // Main church + one campus marker.
             await Assertions.Expect(page.Locator(".leaflet-marker-icon")).ToHaveCountAsync(2);
+
+            // Same leaflet.css guard as the list map: without the stylesheet the pane/tiles compute
+            // position:static and the map renders broken even though markers are present.
+            await Assertions.Expect(page.Locator(".leaflet-tile").First).ToBeVisibleAsync();
+            var mapPanePosition = await page.EvaluateAsync<string>(
+                "() => getComputedStyle(document.querySelector('.leaflet-map-pane')).position");
+            Assert.Equal("absolute", mapPanePosition);
+            var tilePosition = await page.EvaluateAsync<string>(
+                "() => getComputedStyle(document.querySelector('.leaflet-tile')).position");
+            Assert.Equal("absolute", tilePosition);
         }
     }
 

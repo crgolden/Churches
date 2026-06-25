@@ -30,7 +30,7 @@
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: var(--space-5);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -53,10 +53,17 @@
   padding: 0.45rem 1rem;
 }
 
+/* The generic `.nav-links a` color rule (dark) would otherwise override .btn-primary's
+   white text via specificity, making the CTA unreadable on the indigo background. */
+.nav-links a.nav-cta,
+.nav-links a.nav-cta:hover {
+  color: #fff;
+}
+
 .nav-user {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
   font-size: 0.9rem;
 }
 

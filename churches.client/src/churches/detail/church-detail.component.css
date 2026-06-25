@@ -1,10 +1,6 @@
-.detail-page {
-  padding: 1.5rem 0 3rem;
-}
-
 .back-link {
   display: inline-flex;
-  margin-bottom: 1.25rem;
+  margin-bottom: var(--space-5);
   font-size: 0.9rem;
 }
 
@@ -13,12 +9,12 @@
 }
 
 .detail-header {
-  padding: 1.75rem 1.75rem 1.25rem;
+  padding: var(--card-pad) var(--card-pad) var(--space-5);
   border-bottom: 1px solid var(--color-border);
 }
 
 .detail-header h1 {
-  margin-bottom: 0.3rem;
+  margin-bottom: var(--space-1);
 }
 
 .detail-header address {
@@ -28,30 +24,27 @@
 }
 
 .detail-body {
-  padding: 1.5rem 1.75rem;
+  padding: var(--space-5) var(--card-pad);
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  gap: var(--space-6);
 }
 
+/* Typography comes from the shared .eyebrow utility on each section <h4>. */
 .detail-section h4 {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-muted);
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3);
 }
 
 .info-rows {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--space-2);
 }
 
 .info-row {
   display: grid;
   grid-template-columns: 9rem 1fr;
-  gap: 0.5rem;
+  gap: var(--space-2);
   font-size: 0.95rem;
   align-items: baseline;
 }
@@ -62,10 +55,10 @@
 }
 
 .detail-actions {
-  padding: 1.25rem 1.75rem;
+  padding: var(--space-5) var(--card-pad);
   border-top: 1px solid var(--color-border);
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 

@@ -18,75 +18,105 @@
             (input)="keyword.set(kw.value)"
           />
           <button type="button" class="btn-secondary" (click)="useLocation()" [disabled]="locating()">
-            {{ locating() ? 'Locating...' : 'Near Me' }}
+            {{ locating() ? 'Locating…' : 'Near Me' }}
           </button>
         </div>
-        <div class="filter-row">
-          <label for="search-state" class="sr-only">State</label>
-          <input
-            id="search-state"
-            #st
-            type="text"
-            placeholder="State (e.g. AZ)"
-            maxlength="2"
-            [value]="state()"
-            (input)="state.set(st.value.toUpperCase())"
-          />
-          <label for="search-worship-style" class="sr-only">Worship style</label>
-          <select id="search-worship-style" #ws (change)="worshipStyle.set(ws.value ? +ws.value : null)">
-            <option value="">Any Worship Style</option>
-            @for (style of worshipStyles; track style.value) {
-              <option [value]="style.value">{{ style.label }}</option>
-            }
-          </select>
-          @if (denominations().length > 0) {
-            <label for="search-denomination" class="sr-only">Denomination</label>
-            <select id="search-denomination" #denom (change)="denominationId.set(denom.value || null)">
-              <option value="">Any Denomination</option>
-              @for (d of denominations(); track d.id) {
-                <option [value]="d.id">{{ d.name }}</option>
-              }
-            </select>
-          }
-          <label for="search-wheelchair" class="checkbox-label">
-            <input
-              id="search-wheelchair"
-              #wa
-              type="checkbox"
-              [checked]="wheelchairAccessible() === true"
-              (change)="wheelchairAccessible.set(wa.checked ? true : null)"
-            />
-            <span>Wheelchair Accessible</span>
-          </label>
-        </div>
-        <div class="filter-row">
-          <label for="search-day" class="sr-only">Service day</label>
-          <select id="search-day" #day (change)="dayOfWeek.set(day.value ? +day.value : null)">
-            <option value="">Any Service Day</option>
-            @for (d of daysOfWeek; track d.value) {
-              <option [value]="d.value">{{ d.label }}</option>
-            }
-          </select>
-          <label for="search-time-after">Starts after</label>
-          <input
-            id="search-time-after"
-            #ta
-            type="time"
-            [value]="startTimeAfter()"
-            (input)="startTimeAfter.set(ta.value)"
-          />
-          <label for="search-time-before">and before</label>
-          <input
-            id="search-time-before"
-            #tb
-            type="time"
-            [value]="startTimeBefore()"
-            (input)="startTimeBefore.set(tb.value)"
-          />
-        </div>
-        @if (lat() !== null) {
+
+        <!-- Kept always-in-DOM with [hidden] rather than @if: locationError is set from the async
+             geolocation callback, and under zoneless CD an interpolation inside a freshly-@if-created
+             view rendered empty. Toggling an existing element's binding updates reliably. -->
+        <p class="location-error" [hidden]="!locationError()">{{ locationError() }}</p>
+        @if (lat() !== null && !locationError()) {
           <p class="location-note">Using your location for nearby results</p>
         }
+
+        <div class="filter-grid">
+          <div class="filter-field">
+            <label for="search-state">State</label>
+            <input
+              id="search-state"
+              #st
+              type="text"
+              list="us-states"
+              placeholder="Any state"
+              autocomplete="off"
+              [value]="state()"
+              (input)="state.set(st.value)"
+              (change)="commitState(st.value)"
+            />
+            <datalist id="us-states">
+              @for (s of usStates; track s.code) {
+                <option [value]="s.name">{{ s.code }}</option>
+              }
+            </datalist>
+          </div>
+
+          <div class="filter-field">
+            <label for="search-worship-style">Worship style</label>
+            <select id="search-worship-style" #ws (change)="worshipStyle.set(ws.value ? +ws.value : null)">
+              <option value="">Any worship style</option>
+              @for (style of worshipStyles; track style.value) {
+                <option [value]="style.value">{{ style.label }}</option>
+              }
+            </select>
+          </div>
+
+          @if (denominations().length > 0) {
+            <div class="filter-field">
+              <label for="search-denomination">Denomination</label>
+              <select id="search-denomination" #denom (change)="denominationId.set(denom.value || null)">
+                <option value="">Any denomination</option>
+                @for (d of denominations(); track d.id) {
+                  <option [value]="d.id">{{ d.name }}</option>
+                }
+              </select>
+            </div>
+          }
+
+          <div class="filter-field">
+            <label for="search-day">Service day</label>
+            <select id="search-day" #day (change)="dayOfWeek.set(day.value ? +day.value : null)">
+              <option value="">Any day</option>
+              @for (d of daysOfWeek; track d.value) {
+                <option [value]="d.value">{{ d.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="filter-field">
+            <label for="search-time-after">Service starts after</label>
+            <input
+              id="search-time-after"
+              #ta
+              type="time"
+              [value]="startTimeAfter()"
+              (input)="startTimeAfter.set(ta.value)"
+            />
+          </div>
+
+          <div class="filter-field">
+            <label for="search-time-before">…and before</label>
+            <input
+              id="search-time-before"
+              #tb
+              type="time"
+              [value]="startTimeBefore()"
+              (input)="startTimeBefore.set(tb.value)"
+            />
+          </div>
+        </div>
+
+        <label for="search-wheelchair" class="checkbox-label">
+          <input
+            id="search-wheelchair"
+            #wa
+            type="checkbox"
+            [checked]="wheelchairAccessible() === true"
+            (change)="wheelchairAccessible.set(wa.checked ? true : null)"
+          />
+          <span>Wheelchair accessible</span>
+        </label>
+
         <button type="submit" class="btn-primary search-submit">Search Churches</button>
       </form>
     </div>

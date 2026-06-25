@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
+import { Title } from '@angular/platform-browser';
 import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ChurchApiService } from '../../shared/church.service';
@@ -19,6 +20,7 @@ export class ChurchDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly location = inject(Location);
   private readonly fb = inject(FormBuilder);
+  private readonly title = inject(Title);
   private slug: string | null = null;
 
   protected readonly auth = inject(AuthService);
@@ -153,7 +155,11 @@ export class ChurchDetailComponent implements OnInit {
     if (!this.slug) return;
     this.loading.set(true);
     this.api.getChurchBySlug(this.slug).subscribe({
-      next: c => { this.church.set(c); this.loading.set(false); },
+      next: c => {
+        this.church.set(c);
+        this.title.setTitle(`${c.canonicalName} | Churches`);
+        this.loading.set(false);
+      },
       error: () => { this.error.set('Church not found.'); this.loading.set(false); },
     });
   }

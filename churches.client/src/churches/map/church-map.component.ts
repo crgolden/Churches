@@ -42,6 +42,9 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(this.map);
+    // The container is sized after the @if (showMap()) block reveals it, so Leaflet may have
+    // read a zero/stale size during init — recompute now that it's laid out.
+    this.map.invalidateSize();
     this.renderMarkers(L);
   }
 

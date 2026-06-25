@@ -236,6 +236,14 @@ public sealed class AnonymousTests
             await page.GetByRole(AriaRole.Button, new() { Name = "Map view" }).ClickAsync();
             await Assertions.Expect(page.Locator(".leaflet-container")).ToBeVisibleAsync();
             await Assertions.Expect(page.Locator(".leaflet-marker-icon").First).ToBeVisibleAsync();
+            await Assertions.Expect(page.Locator(".leaflet-tile").First).ToBeVisibleAsync();
+
+            // Guard against the missing-leaflet.css regression that shipped a visually broken map:
+            // markers/container are present even without the stylesheet (Leaflet positions markers via
+            // inline JS), so we assert the CSS actually applied. Without leaflet.css the map pane and
+            // tiles compute position:static (tiles flow as static blocks and pile up) and the container
+            // does not clip overflow; with it they are absolutely positioned inside a clipped container.
+            await AssertLeafletStylesheetAppliedAsync(page);
         }
     }
 
@@ -252,5 +260,22 @@ public sealed class AnonymousTests
             await page.WaitForURLAsync("**/churches/first-baptist-church-austin-tx**");
             await Assertions.Expect(page.Locator("h1")).ToContainTextAsync("First Baptist Church Austin");
         }
+    }
+
+    // Reads computed styles that only leaflet.css supplies. Deterministic and independent of whether
+    // the OpenStreetMap tile images finish downloading — we assert CSS state, not the network image.
+    private static async Task AssertLeafletStylesheetAppliedAsync(IPage page)
+    {
+        var mapPanePosition = await page.EvaluateAsync<string>(
+            "() => getComputedStyle(document.querySelector('.leaflet-map-pane')).position");
+        Assert.Equal("absolute", mapPanePosition);
+
+        var tilePosition = await page.EvaluateAsync<string>(
+            "() => getComputedStyle(document.querySelector('.leaflet-tile')).position");
+        Assert.Equal("absolute", tilePosition);
+
+        var containerOverflow = await page.EvaluateAsync<string>(
+            "() => getComputedStyle(document.querySelector('.leaflet-container')).overflow");
+        Assert.Contains("hidden", containerOverflow, StringComparison.Ordinal);
     }
 }

@@ -59,6 +59,8 @@ export class LocationMapComponent implements AfterViewInit, OnChanges, OnDestroy
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(this.map);
+    // Recompute size in case the container was laid out after Leaflet read it during init.
+    this.map.invalidateSize();
     this.renderMarkers(L);
   }
 

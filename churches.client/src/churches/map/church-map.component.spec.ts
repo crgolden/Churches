@@ -15,6 +15,7 @@ const mapStub = {
   setView: vi.fn().mockReturnThis(),
   remove: vi.fn(),
   fitBounds: vi.fn(),
+  invalidateSize: vi.fn(),
 };
 vi.mock('leaflet', () => ({
   default: {

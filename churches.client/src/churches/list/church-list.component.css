@@ -1,14 +1,16 @@
-.list-page {
-  padding: 2rem 0 3rem;
-}
-
 .list-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-5);
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--space-3);
+}
+
+.list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .count {
@@ -18,10 +20,13 @@
   margin: 0;
 }
 
+/* minmax(min(100%, 300px), 1fr) lets a single column shrink below 300px on narrow viewports —
+   plain minmax(300px, 1fr) forces a 300px floor that overflows the padded container on phones,
+   which made cards render edge-to-edge with no side padding. */
 .church-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--space-5);
 }
 
 .church-card {
@@ -36,7 +41,7 @@
 }
 
 .card-body {
-  padding: 1.25rem;
+  padding: var(--space-5);
   flex: 1;
 }
 
@@ -68,12 +73,12 @@
   padding: 0.2rem 0.6rem;
   font-size: 0.8rem;
   border-radius: 999px;
-  background: rgba(67, 56, 202, .08);
+  background: rgba(var(--color-primary-rgb), .08);
   color: var(--color-primary);
 }
 
 .tag-accent {
-  background: rgba(245, 158, 11, .15);
+  background: rgba(var(--color-accent-rgb), .15);
   color: var(--color-accent-dark);
 }
 
@@ -84,7 +89,7 @@
 }
 
 .card-footer {
-  padding: 0.75rem 1.25rem;
+  padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--color-border);
 }
 
@@ -92,8 +97,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
-  margin-top: 2.5rem;
+  gap: var(--space-4);
+  margin-top: var(--space-7);
 }
 
 .page-indicator {
