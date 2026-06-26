@@ -90,11 +90,32 @@
             </ul>
             @if (auth.hasModerationScope()) {
               <form class="mod-add" [formGroup]="scheduleForm" (ngSubmit)="addSchedule()">
-                <select formControlName="dayOfWeek" aria-label="Day of week">
-                  @for (d of daysOfWeek; track d.value) { <option [ngValue]="d.value">{{ d.label }}</option> }
-                </select>
-                <input type="time" formControlName="startTime" aria-label="Start time" />
-                <input type="text" formControlName="description" placeholder="Description" aria-label="Schedule description" />
+                <div class="mod-add-grid">
+                  <div class="field-group">
+                    <label for="schedule-day">Day</label>
+                    <select id="schedule-day" formControlName="dayOfWeek" aria-label="Day of week">
+                      @for (d of daysOfWeek; track d.value) { <option [ngValue]="d.value">{{ d.label }}</option> }
+                    </select>
+                  </div>
+                  <div class="field-group">
+                    <label for="schedule-time">Start time</label>
+                    <input id="schedule-time" type="time" formControlName="startTime" aria-label="Start time" />
+                  </div>
+                  <div class="field-group">
+                    <label for="schedule-desc">Description</label>
+                    <input
+                      id="schedule-desc"
+                      type="text"
+                      formControlName="description"
+                      placeholder="e.g. Traditional service"
+                      aria-label="Schedule description"
+                      autocomplete="off"
+                      data-lpignore="true"
+                      data-1p-ignore
+                      data-form-type="other"
+                    />
+                  </div>
+                </div>
                 <button type="submit" id="add-schedule" class="btn-secondary">Add service time</button>
               </form>
             }
@@ -118,8 +139,36 @@
             </ul>
             @if (auth.hasModerationScope()) {
               <form class="mod-add" [formGroup]="ministryForm" (ngSubmit)="addMinistry()">
-                <input type="text" formControlName="name" placeholder="Name" aria-label="Ministry name" />
-                <input type="text" formControlName="description" placeholder="Description" aria-label="Ministry description" />
+                <div class="mod-add-grid">
+                  <div class="field-group">
+                    <label for="ministry-name">Name</label>
+                    <input
+                      id="ministry-name"
+                      type="text"
+                      formControlName="name"
+                      placeholder="e.g. Youth Group"
+                      aria-label="Ministry name"
+                      autocomplete="off"
+                      data-lpignore="true"
+                      data-1p-ignore
+                      data-form-type="other"
+                    />
+                  </div>
+                  <div class="field-group">
+                    <label for="ministry-desc">Description</label>
+                    <input
+                      id="ministry-desc"
+                      type="text"
+                      formControlName="description"
+                      placeholder="Optional"
+                      aria-label="Ministry description"
+                      autocomplete="off"
+                      data-lpignore="true"
+                      data-1p-ignore
+                      data-form-type="other"
+                    />
+                  </div>
+                </div>
                 <button type="submit" id="add-ministry" class="btn-secondary">Add ministry</button>
               </form>
             }
@@ -143,13 +192,36 @@
             </ul>
             @if (auth.hasModerationScope()) {
               <form class="mod-add" [formGroup]="campusForm" (ngSubmit)="addCampus()">
-                <input type="text" formControlName="name" placeholder="Name" aria-label="Campus name" />
-                <input type="text" formControlName="street" placeholder="Street" aria-label="Campus street" />
-                <input type="text" formControlName="city" placeholder="City" aria-label="Campus city" />
-                <input type="text" formControlName="state" placeholder="State" aria-label="Campus state" />
-                <input type="text" formControlName="zip" placeholder="Zip" aria-label="Campus zip" />
-                <input type="number" formControlName="latitude" placeholder="Latitude" aria-label="Campus latitude" />
-                <input type="number" formControlName="longitude" placeholder="Longitude" aria-label="Campus longitude" />
+                <div class="mod-add-grid">
+                  <div class="field-group">
+                    <label for="campus-name">Name</label>
+                    <input id="campus-name" type="text" formControlName="name" placeholder="e.g. North Campus" aria-label="Campus name" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  </div>
+                  <div class="field-group">
+                    <label for="campus-street">Street</label>
+                    <input id="campus-street" type="text" formControlName="street" placeholder="Street" aria-label="Campus street" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  </div>
+                  <div class="field-group">
+                    <label for="campus-city">City</label>
+                    <input id="campus-city" type="text" formControlName="city" placeholder="City" aria-label="Campus city" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  </div>
+                  <div class="field-group">
+                    <label for="campus-state">State</label>
+                    <input id="campus-state" type="text" formControlName="state" placeholder="State" aria-label="Campus state" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  </div>
+                  <div class="field-group">
+                    <label for="campus-zip">Zip</label>
+                    <input id="campus-zip" type="text" formControlName="zip" placeholder="Zip" aria-label="Campus zip" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  </div>
+                  <div class="field-group">
+                    <label for="campus-lat">Latitude</label>
+                    <input id="campus-lat" type="number" step="any" formControlName="latitude" placeholder="e.g. 30.27" aria-label="Campus latitude" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  </div>
+                  <div class="field-group">
+                    <label for="campus-lng">Longitude</label>
+                    <input id="campus-lng" type="number" step="any" formControlName="longitude" placeholder="e.g. -97.74" aria-label="Campus longitude" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  </div>
+                </div>
                 <button type="submit" id="add-campus" class="btn-secondary">Add campus</button>
               </form>
             }
@@ -157,7 +229,7 @@
         }
       </div>
       @if (mapPoints().length) {
-        <div class="detail-section" id="church-map-section">
+        <div class="detail-section detail-section--full" id="church-map-section">
           <h4 class="eyebrow">Location</h4>
           <app-location-map [points]="mapPoints()" />
         </div>

@@ -188,4 +188,9 @@
   .steps-grid {
     grid-template-columns: 1fr;
   }
+
+  /* Full-width Near Me on phones for a larger tap target once the row wraps. */
+  .search-row .btn-secondary {
+    width: 100%;
+  }
 }

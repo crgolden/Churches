@@ -41,6 +41,17 @@ public sealed class ChurchDetailTests
             await Assertions.Expect(page.Locator("#church-campuses")).ToContainTextAsync("1200 N Lamar Blvd");
             await Assertions.Expect(page.Locator("#church-map-section .leaflet-container")).ToBeVisibleAsync();
 
+            // The Location section lives outside the padded body grid; its heading must still line up
+            // horizontally with the Contact/About headings (was flush to the card edge before the fix).
+            var headingsAligned = await page.EvaluateAsync<bool>(
+                @"() => {
+                    const contact = document.querySelector('.detail-body .detail-section h4');
+                    const location = document.querySelector('#church-map-section h4');
+                    if (!contact || !location) return false;
+                    return Math.abs(contact.getBoundingClientRect().left - location.getBoundingClientRect().left) < 1;
+                }");
+            Assert.True(headingsAligned, "Location heading should align with the Contact/About headings.");
+
             // Main church + one campus marker.
             await Assertions.Expect(page.Locator(".leaflet-marker-icon")).ToHaveCountAsync(2);
 
@@ -110,6 +121,19 @@ public sealed class ChurchDetailTests
         await using (ctx)
         {
             await Assertions.Expect(page.Locator("#church-name")).ToContainTextAsync("Mosaic Church Austin");
+
+            // Render guard: the add-forms must be laid out usably, not stacked flush with no spacing.
+            // A zero-CSS regression (no .mod-add-grid styling) leaves the wrapper as a plain block with
+            // no gap, and the per-field labels missing — both checked here so the defect can't recur.
+            await Assertions.Expect(page.Locator("label[for='schedule-day']")).ToBeVisibleAsync();
+            await Assertions.Expect(page.Locator("label[for='schedule-time']")).ToBeVisibleAsync();
+            var gridDisplay = await page.EvaluateAsync<string>(
+                "() => getComputedStyle(document.querySelector('.mod-add-grid')).display");
+            Assert.Equal("grid", gridDisplay);
+            var gridRowGap = await page.EvaluateAsync<string>(
+                "() => getComputedStyle(document.querySelector('.mod-add-grid')).rowGap");
+            Assert.NotEqual("0px", gridRowGap);
+            Assert.NotEqual("normal", gridRowGap);
 
             // Moderators see the add form even with no existing schedules.
             await page.GetByLabel("Day of week").SelectOptionAsync(new SelectOptionValue { Label = "Wednesday" });

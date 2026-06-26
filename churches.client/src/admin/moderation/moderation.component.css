@@ -2,12 +2,14 @@
   margin-bottom: var(--space-5);
 }
 
+/* Scroll horizontally on narrow viewports instead of clipping the right-hand columns. */
 .table-card {
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   font-size: 0.9rem;
 }

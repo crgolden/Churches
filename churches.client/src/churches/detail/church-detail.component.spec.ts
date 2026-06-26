@@ -135,4 +135,23 @@ describe('ChurchDetailComponent', () => {
     expect(req.request.body.name).toBe('North');
     req.flush({ id: 'cp1' });
   });
+
+  it('campusForm starts with empty (null) coordinates so the inputs render blank', () => {
+    expect(component['campusForm'].controls.latitude.value).toBeNull();
+    expect(component['campusForm'].controls.longitude.value).toBeNull();
+  });
+
+  it('addCampus coerces blank coordinates to 0 in the posted body', () => {
+    component['church'].set({ id: 'church-1' } as never);
+    component['campusForm'].setValue({
+      name: 'North', street: '', city: 'Denver', state: 'CO', zip: '80201', latitude: null, longitude: null,
+    });
+
+    component['addCampus']();
+
+    const req = controller.expectOne('/directory/api/churches/church-1/campuses');
+    expect(req.request.body.latitude).toBe(0);
+    expect(req.request.body.longitude).toBe(0);
+    req.flush({ id: 'cp1' });
+  });
 });

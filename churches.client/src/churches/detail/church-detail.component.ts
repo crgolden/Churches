@@ -47,8 +47,9 @@ export class ChurchDetailComponent implements OnInit {
     city: '',
     state: '',
     zip: '',
-    latitude: 0,
-    longitude: 0,
+    // Nullable so the inputs render empty (placeholder/label visible) instead of a literal 0.
+    latitude: this.fb.control<number | null>(null),
+    longitude: this.fb.control<number | null>(null),
   });
 
   ngOnInit(): void {
@@ -128,11 +129,11 @@ export class ChurchDetailComponent implements OnInit {
         city: v.city,
         state: v.state,
         zip: v.zip,
-        latitude: v.latitude,
-        longitude: v.longitude,
+        latitude: v.latitude ?? 0,
+        longitude: v.longitude ?? 0,
       })
       .subscribe(() => {
-        this.campusForm.reset({ name: '', street: '', city: '', state: '', zip: '', latitude: 0, longitude: 0 });
+        this.campusForm.reset({ name: '', street: '', city: '', state: '', zip: '', latitude: null, longitude: null });
         this.reload();
       });
   }
