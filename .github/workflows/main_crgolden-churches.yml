@@ -1,7 +1,7 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Build and deploy ASP.Net Core app to Azure Web App - crgolden-churches
+name: Build and deploy Node.js app to Azure Web App - crgolden-churches
 
 on:
   push:
@@ -17,57 +17,17 @@ env:
 jobs:
   build:
     name: Build and analyze
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     outputs:
       playwright-version: ${{ steps.playwright-version.outputs.version }}
     permissions:
-      id-token: write #This is required for requesting the JWT (needed for Azure OIDC in E2E tests)
-      contents: read #This is required for actions/checkout
+      id-token: write   # Required for Azure OIDC login in smoke job
+      contents: read
 
     steps:
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          java-version: 17
-          distribution: 'zulu'
-
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: ${{ runner.os }}-nuget-
-
-      - name: Cache SonarQube Cloud packages
-        uses: actions/cache@v5
-        with:
-          path: ~\sonar\cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-
-      - name: Cache SonarQube Cloud scanner
-        id: cache-sonar-scanner
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}\scanner
-          key: ${{ runner.os }}-sonar-scanner
-          restore-keys: ${{ runner.os }}-sonar-scanner
-
-      - name: Install SonarQube Cloud scanner
-        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
-        shell: powershell
-        run: |
-          New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
-          dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
-
-      - name: Set up .NET Core
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '10.x'
+          fetch-depth: 0  # Shallow clones should be disabled for better Sonar analysis relevancy
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -78,93 +38,38 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('churches.client/package-lock.json') }}
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
           restore-keys: ${{ runner.os }}-npm-
 
       - name: Install npm dependencies
-        working-directory: churches.client
         run: npm ci
 
-      - name: Restore local tools
-        # Provisions both coverlet and dotnet-coverage from dotnet-tools.json — unconditional, so the
-        # tools are always present, and the NuGet cache still accelerates the restore.
-        run: dotnet tool restore
-
       - name: Lint
-        working-directory: churches.client
         run: npm run lint
 
-      - name: Begin Sonar analysis
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
-          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
-        shell: powershell
-        run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin `
-            /k:"$env:SONAR_PROJECT_KEY" `
-            /o:"$env:SONAR_ORGANIZATION" `
-            /d:sonar.token="$env:SONAR_TOKEN" `
-            /d:sonar.host.url="https://sonarcloud.io" `
-            /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" `
-            /d:sonar.cs.vscoveragexml.reportsPaths="coverage-e2e.xml" `
-            /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" `
-            /d:sonar.exclusions="churches.client/aspnetcore-https.js,churches.client/start-os.js,**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
-            /d:sonar.coverage.exclusions="churches.client/e2e/**,churches.client/src/test-setup.ts" `
-            /d:sonar.test.inclusions="**/*.spec.ts" `
-            /d:sonar.scanner.skipJreProvisioning=true
-
-      - name: Build with dotnet
-        run: dotnet build Churches.slnx --no-incremental --configuration Release /p:AngularConfiguration=ci
-
       - name: Run unit tests with coverage
-        run: |
-          dotnet coverlet Churches.Tests\bin\Release\net10.0 `
-            --target "dotnet" `
-            --targetargs "test --project Churches.Tests --no-build --configuration Release -- --filter-trait Category=Unit --report-xunit-trx --report-xunit-trx-filename unit-tests.trx" `
-            --format opencover --output "coverage.opencover.xml" `
-            --skipautoprops `
-            --exclude-by-attribute GeneratedCodeAttribute `
-            --exclude-by-file "**/obj/**" `
-            --exclude-by-file "**/Program.cs" `
-            --does-not-return-attribute DoesNotReturnAttribute `
-            --include "[Churches.Server]*"
-
-      - name: Run UI tests
-        working-directory: churches.client
         run: npx vitest run --coverage
 
+      # istanbul on Linux writes forward-slash paths already; normalise for safety.
       - name: Fix LCOV paths for SonarQube
-        shell: powershell
-        run: |
-          # The Scanner for .NET (v8+) indexes churches.client as its own module whose base dir IS
-          # churches.client, so the JS coverage sensor resolves both sonar.javascript.lcov.reportPaths
-          # (coverage/lcov.info) and the lcov SF: paths relative to churches.client — i.e. module-relative
-          # (src/...), NOT repo-relative. Do NOT prefix churches.client/ (that double-nests and the sensor
-          # reports "No LCOV files were found"). istanbul on Windows writes backslash separators, so only
-          # normalize them to forward slashes for matching.
-          (Get-Content "churches.client/coverage/lcov.info") `
-            -replace '\\', '/' |
-            Set-Content "churches.client/coverage/lcov.info"
+        run: sed -i 's|\\|/|g' coverage/lcov.info
 
       - name: Get Playwright version
         id: playwright-version
-        shell: pwsh
         run: |
-          $version = (Select-Xml -Path Churches.Tests/Churches.Tests.csproj `
-            -XPath '//PackageReference[@Include="Microsoft.Playwright"]/@Version').Node.Value
-          echo "version=$version" >> $env:GITHUB_OUTPUT
+          VERSION=$(node -e "console.log(require('./package-lock.json').packages['node_modules/@playwright/test'].version)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Restore Playwright browsers cache
         id: cache-playwright
         uses: actions/cache/restore@v5
         with:
-          path: ~\AppData\Local\ms-playwright
+          path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: pwsh "${{ github.workspace }}\Churches.Tests\bin\Release\net10.0\playwright.ps1" install --with-deps chromium
+        run: npx playwright install --with-deps chromium
 
       # Save immediately after install (before E2E) so the browser download is cached even when a
       # later step fails — actions/cache's post-step save only runs on full job success.
@@ -172,30 +77,26 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
-          path: ~\AppData\Local\ms-playwright
+          path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-      - name: Run E2E tests with coverage
-        env:
-          ASPNETCORE_ENVIRONMENT: CI
-        run: |
-          dotnet dotnet-coverage collect `
-            "dotnet test --project Churches.Tests --no-build --configuration Release -- --filter-trait Category=E2E --report-xunit-trx --report-xunit-trx-filename e2e-tests.trx" `
-            -f xml -o "coverage-e2e.xml" -s "coverage.settings.xml"
+      - name: Run E2E tests
+        run: npm run e2e
 
-      - name: Upload test results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      - name: Upload Playwright HTML report
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-churches
-          path: Churches.Tests/bin/Release/net10.0/TestResults/
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
 
       - name: Upload Playwright failure artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: churches-playwright-artifacts
-          path: Churches.Tests/bin/Release/net10.0/TestResults/PlaywrightArtifacts/
+          path: playwright-artifacts/
           if-no-files-found: ignore
 
       - name: Report E2E results
@@ -207,23 +108,20 @@ jobs:
         run: |
           $appName     = 'Churches'
           $suiteName   = 'E2E'
-          $resultsDir  = 'Churches.Tests/bin/Release/net10.0/TestResults'
-          $artifactDir = 'Churches.Tests/bin/Release/net10.0/TestResults/PlaywrightArtifacts'
+          $junitPath   = 'playwright-results.xml'
+          $artifactDir = 'playwright-artifacts'
 
-          $trx = Get-ChildItem $resultsDir -Filter *.trx | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-          if (-not $trx) {
-              Write-Warning "No TRX file found in $resultsDir - E2E test produced no results. Skipping ADO publish."
+          if (-not (Test-Path $junitPath)) {
+              Write-Warning "No JUnit XML found at $junitPath - E2E tests produced no results. Skipping ADO publish."
               exit 0
           }
-          [xml] $xml   = Get-Content $trx.FullName
-          $allResults  = @($xml.TestRun.Results.UnitTestResult)
-          $failed      = @($allResults | Where-Object { $_.outcome -ne 'Passed' })
+          [xml]$xml  = Get-Content $junitPath
+          $suites    = @($xml.testsuites.testsuite)
+          $allCases  = @($suites | ForEach-Object { @($_.testcase) } | Where-Object { $_ -ne $null })
+          $failed    = @($allCases | Where-Object { $_.failure -ne $null })
 
-          # Azure DevOps — az devops invoke cannot disambiguate duplicate resource names in the ADO
-          # manifest (github.com/Azure/azure-devops-cli-extension/issues/1012), so use Invoke-RestMethod
-          # with explicit URLs instead.
-          $testsById  = @{}
-          foreach ($t in @($xml.TestRun.TestDefinitions.UnitTest)) { $testsById[$t.id] = $t }
+          # Azure DevOps — use Invoke-RestMethod with explicit URLs (az devops invoke cannot
+          # disambiguate duplicate resource names: github.com/Azure/azure-devops-cli-extension/issues/1012).
           $adoHeaders = @{ Authorization = "Basic $([Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$env:AZURE_DEVOPS_EXT_PAT")))" }
           $adoBase    = 'https://dev.azure.com/crgolden/Churches/_apis/test'
           $adoVer     = 'api-version=7.1'
@@ -234,25 +132,39 @@ jobs:
                   -ContentType 'application/json' -Body (ConvertTo-Json -InputObject $Body -Depth 20 -Compress)
           }
 
-          $adoResults = foreach ($r in $allResults) {
-              $m = $testsById[$r.testId].TestMethod
-              @{ testCaseTitle = $r.testName; automatedTestName = "$($m.className).$($m.name)"
-                 automatedTestStorage = $appName; automatedTestType = 'Playwright'; outcome = $r.outcome
-                 durationInMs = [int][TimeSpan]::Parse($r.duration).TotalMilliseconds
-                 errorMessage = $r.Output.ErrorInfo.Message; stackTrace = $r.Output.ErrorInfo.StackTrace
-                 state = 'Completed'; comment = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" }
+          $adoResults = foreach ($tc in $allCases) {
+              $outcome    = if ($tc.failure -ne $null) { 'Failed' } else { 'Passed' }
+              $durationMs = [double]([double]$tc.time * 1000)
+              @{ testCaseTitle        = $tc.name
+                 automatedTestName    = "$($tc.classname) > $($tc.name)"
+                 automatedTestStorage = $appName
+                 automatedTestType    = 'Playwright'
+                 outcome              = $outcome
+                 durationInMs         = [int]$durationMs
+                 errorMessage         = $tc.failure.message
+                 stackTrace           = $tc.failure.'#text'
+                 state                = 'Completed'
+                 comment              = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" }
           }
 
+          $totalMs    = ($allCases | ForEach-Object { [double]$_.time * 1000 } | Measure-Object -Sum).Sum
+          $startedDate = [DateTimeOffset]::UtcNow.AddMilliseconds(-$totalMs).ToString('O')
+
           $run = Invoke-Ado POST "$adoBase/runs?$adoVer" @{
-              name = "$appName $suiteName Playwright - $env:GITHUB_RUN_NUMBER"; automated = $true
-              state = 'InProgress'; startedDate = [DateTimeOffset]::Parse($xml.TestRun.Times.start).UtcDateTime.ToString('O')
-              comment = "GitHub Actions run $env:GITHUB_RUN_ID" }
+              name        = "$appName $suiteName Playwright - $env:GITHUB_RUN_NUMBER"
+              automated   = $true
+              state       = 'InProgress'
+              startedDate = $startedDate
+              comment     = "GitHub Actions run $env:GITHUB_RUN_ID" }
           Invoke-Ado POST "$adoBase/runs/$($run.id)/results?$adoVer" @($adoResults) | Out-Null
           Invoke-Ado POST "$adoBase/runs/$($run.id)/attachments?$adoVer" @{
-              stream = [Convert]::ToBase64String([IO.File]::ReadAllBytes($trx.FullName))
-              fileName = $trx.Name; comment = 'TRX'; attachmentType = 'GeneralAttachment' } | Out-Null
+              stream         = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path $junitPath)))
+              fileName       = 'playwright-results.xml'
+              comment        = 'JUnit XML'
+              attachmentType = 'GeneralAttachment' } | Out-Null
           Invoke-Ado PATCH "$adoBase/runs/$($run.id)?$adoVer" @{
-              state = 'Completed'; completedDate = [DateTimeOffset]::UtcNow.ToString('O') } | Out-Null
+              state         = 'Completed'
+              completedDate = [DateTimeOffset]::UtcNow.ToString('O') } | Out-Null
           Write-Host "Published $($adoResults.Count) results to Azure DevOps run $($run.id)."
 
           # Azure Monitor
@@ -261,7 +173,7 @@ jobs:
           $endpoint = ($cs -split ';' | Where-Object { $_ -like 'IngestionEndpoint=*' })   -replace 'IngestionEndpoint=', ''
           $common   = @{ app = $appName; suite = $suiteName; repository = $env:GITHUB_REPOSITORY
               branch = $env:GITHUB_REF; sha = $env:GITHUB_SHA; githubRunId = $env:GITHUB_RUN_ID
-              githubRunUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+              githubRunUrl      = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
               artifactAvailable = (Test-Path $artifactDir).ToString() }
 
           function New-Event {
@@ -270,58 +182,73 @@ jobs:
                  data = @{ baseType = 'EventData'; baseData = @{ ver = 2; name = $Name; properties = $Props; measurements = $Measurements } } }
           }
 
-          $durationMs = ($allResults | ForEach-Object { [TimeSpan]::Parse($_.duration).TotalMilliseconds } | Measure-Object -Sum).Sum
-          $runProps = $common.Clone(); $runProps['trxFile'] = $trx.Name; $runProps['outcome'] = if ($failed.Count) { 'Failed' } else { 'Passed' }
-          $events = @(New-Event 'PlaywrightTestRun' $runProps @{ total = $allResults.Count; failed = $failed.Count; passed = $allResults.Count - $failed.Count; durationMs = [double]$durationMs })
-          $events += $allResults | ForEach-Object {
-              $p = $common.Clone(); $p['testName'] = $_.testName; $p['outcome'] = $_.outcome; $p['failed'] = ($_.outcome -ne 'Passed').ToString()
-              New-Event 'PlaywrightTestCase' $p @{ durationMs = [double][TimeSpan]::Parse($_.duration).TotalMilliseconds }
+          $runProps = $common.Clone()
+          $runProps['junitFile'] = 'playwright-results.xml'
+          $runProps['outcome']   = if ($failed.Count) { 'Failed' } else { 'Passed' }
+          $events  = @(New-Event 'PlaywrightTestRun' $runProps @{ total = $allCases.Count; failed = $failed.Count; passed = ($allCases.Count - $failed.Count); durationMs = [double]$totalMs })
+          $events += $allCases | ForEach-Object {
+              $p = $common.Clone(); $p['testName'] = $_.name; $p['outcome'] = if ($_.failure -ne $null) { 'Failed' } else { 'Passed' }; $p['failed'] = ($_.failure -ne $null).ToString()
+              New-Event 'PlaywrightTestCase' $p @{ durationMs = [double]([double]$_.time * 1000) }
           }
           Invoke-RestMethod -Method Post -Uri ($endpoint.TrimEnd('/') + '/v2/track') -ContentType 'application/json' -Body ($events | ConvertTo-Json -Depth 20) | Out-Null
           Write-Host "Sent $($events.Count) telemetry events to Azure Monitor."
 
-      - name: Upload test binaries
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: test-binaries
-          path: Churches.Tests/bin/Release/net10.0/
-          include-hidden-files: true
-
-      - name: dotnet publish
-        run: >
-          dotnet publish Churches.Server/Churches.Server.csproj
-          -c Release
-          -r win-x86
-          --self-contained false
-          -o ${{ github.workspace }}\publish
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v7
-        with:
-          name: .net-app
-          path: ${{ github.workspace }}\publish
-
-      - name: End Sonar analysis
+      # SonarCloud analysis — runs after coverage is generated and tests pass.
+      # Uses the sonarcloud-github-action (no JDK/dotnet-sonarscanner setup required).
+      - name: SonarCloud analysis
+        uses: sonarsource/sonarcloud-github-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        shell: powershell
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs
+            -Dsonar.coverage.exclusions=e2e/**,src/test-setup.ts,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.config.ts,src/app/app.config.server.ts,src/app/app.routes.server.ts,**/*.mjs
+            -Dsonar.test.inclusions=**/*.spec.ts
+            -Dsonar.scanner.skipJreProvisioning=true
+
+      # Build production bundle for deployment (separate from the ci-config build used for E2E).
+      - name: Build (production)
+        run: npm run build
+
+      # Strip devDependencies so the deployment package only contains production modules.
+      - name: Prune devDependencies
+        run: npm prune --omit=dev
+
+      - name: Assemble deployment package
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
+          mkdir -p publish
+          cp -r dist publish/dist
+          cp -r node_modules publish/node_modules
+          cp instrumentation.mjs publish/instrumentation.mjs
+          cp package.json publish/package.json
+          cp package-lock.json publish/package-lock.json
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-app
+          path: publish/
 
   deploy:
-    runs-on: windows-latest
+    name: Deploy
+    runs-on: ubuntu-latest
     needs: build
     outputs:
       webapp-url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      id-token: write   # Required for requesting the JWT (Azure OIDC)
+      contents: read
 
     steps:
       - name: Download artifact from build job
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
-          name: .net-app
+          name: node-app
+          path: publish/
 
       - name: Login to Azure
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5  # v2
@@ -336,79 +263,83 @@ jobs:
         with:
           app-name: 'crgolden-churches'
           slot-name: 'Production'
-          package: .
+          package: publish/
+          # Startup command for the Linux Node App Service.
+          # Azure-side: ensure the App Service startup command matches this in the portal/CLI.
+          startup-command: 'node --import ./instrumentation.mjs dist/churches.client/server/server.mjs'
 
   smoke:
     name: Post-deploy smoke
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: [build, deploy]
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
 
     steps:
-      - name: Download test binaries
-        uses: actions/download-artifact@v7
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          name: test-binaries
-          path: Churches.Tests/bin/Release/net10.0/
+          node-version: '22'
+
+      - name: Restore npm cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Install npm dependencies
+        run: npm ci
 
       - name: Restore Playwright browsers cache
         id: cache-playwright
         uses: actions/cache/restore@v5
         with:
-          path: ~\AppData\Local\ms-playwright
+          path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ needs.build.outputs.playwright-version }}
 
       - name: Install Playwright browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: pwsh "${{ github.workspace }}\Churches.Tests\bin\Release\net10.0\playwright.ps1" install --with-deps chromium
-
-      - name: Clear downloaded test results
-        run: Remove-Item Churches.Tests/bin/Release/net10.0/TestResults -Recurse -Force -ErrorAction SilentlyContinue
+        run: npx playwright install --with-deps chromium
 
       - name: Warm up deployed app
-        shell: pwsh
         run: |
-          $url = "${{ needs.deploy.outputs.webapp-url }}/health"
-          $maxAttempts = 12
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-            try {
-              $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10
-              if ($r.StatusCode -eq 200 -and $r.Content -eq 'Healthy') {
-                Write-Host "App is healthy after $i attempt(s)."; break
-              }
-            } catch { }
-            if ($i -eq $maxAttempts) { Write-Host "Warning: app did not report Healthy after $maxAttempts attempts — proceeding anyway." }
-            else { Write-Host "Attempt $i`: not ready yet, waiting 10 s..."; Start-Sleep 10 }
-          }
+          url="${{ needs.deploy.outputs.webapp-url }}/health"
+          for i in $(seq 1 12); do
+            if curl -sf "$url" | grep -q 'Healthy'; then
+              echo "App is healthy after $i attempt(s)."
+              break
+            fi
+            if [ "$i" -eq 12 ]; then
+              echo "Warning: app did not report Healthy after 12 attempts — proceeding anyway."
+            else
+              echo "Attempt $i: not ready yet, waiting 10s..."
+              sleep 10
+            fi
+          done
 
       - name: Run smoke tests
         env:
-          CI: true
           SmokeBaseUrl: ${{ needs.deploy.outputs.webapp-url }}
-          AdminEmail: ${{ secrets.TEST_USERNAME }}
-          AdminPassword: ${{ secrets.TEST_PASSWORD }}
-        run: |
-          $resultsDir = "${{ github.workspace }}\Churches.Tests\bin\Release\net10.0\TestResults"
-          New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
-          & "${{ github.workspace }}\Churches.Tests\bin\Release\net10.0\Churches.Tests.exe" `
-            -trait "Category=Smoke" `
-            -trx "$resultsDir\smoke-tests.trx"
+        run: npm run e2e:smoke
 
-      - name: Upload smoke results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      - name: Upload smoke Playwright report
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: smoke-test-results
-          path: Churches.Tests/bin/Release/net10.0/TestResults/
+          name: smoke-playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
 
       - name: Upload smoke Playwright failure artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: churches-smoke-playwright-artifacts
-          path: Churches.Tests/bin/Release/net10.0/TestResults/PlaywrightArtifacts/
+          path: playwright-artifacts/
           if-no-files-found: ignore
 
       - name: Report smoke results
@@ -420,23 +351,18 @@ jobs:
         run: |
           $appName     = 'Churches'
           $suiteName   = 'Smoke'
-          $resultsDir  = 'Churches.Tests/bin/Release/net10.0/TestResults'
-          $artifactDir = 'Churches.Tests/bin/Release/net10.0/TestResults/PlaywrightArtifacts'
+          $junitPath   = 'playwright-results.xml'
+          $artifactDir = 'playwright-artifacts'
 
-          $trx = Get-ChildItem $resultsDir -Filter *.trx | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-          if (-not $trx) {
-              Write-Warning "No TRX file found in $resultsDir - smoke test produced no results. Skipping ADO publish."
+          if (-not (Test-Path $junitPath)) {
+              Write-Warning "No JUnit XML found at $junitPath - smoke tests produced no results. Skipping ADO publish."
               exit 0
           }
-          [xml] $xml   = Get-Content $trx.FullName
-          $allResults  = @($xml.TestRun.Results.UnitTestResult)
-          $failed      = @($allResults | Where-Object { $_.outcome -ne 'Passed' })
+          [xml]$xml  = Get-Content $junitPath
+          $suites    = @($xml.testsuites.testsuite)
+          $allCases  = @($suites | ForEach-Object { @($_.testcase) } | Where-Object { $_ -ne $null })
+          $failed    = @($allCases | Where-Object { $_.failure -ne $null })
 
-          # Azure DevOps — az devops invoke cannot disambiguate duplicate resource names in the ADO
-          # manifest (github.com/Azure/azure-devops-cli-extension/issues/1012), so use Invoke-RestMethod
-          # with explicit URLs instead.
-          $testsById  = @{}
-          foreach ($t in @($xml.TestRun.TestDefinitions.UnitTest)) { $testsById[$t.id] = $t }
           $adoHeaders = @{ Authorization = "Basic $([Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$env:AZURE_DEVOPS_EXT_PAT")))" }
           $adoBase    = 'https://dev.azure.com/crgolden/Churches/_apis/test'
           $adoVer     = 'api-version=7.1'
@@ -447,25 +373,39 @@ jobs:
                   -ContentType 'application/json' -Body (ConvertTo-Json -InputObject $Body -Depth 20 -Compress)
           }
 
-          $adoResults = foreach ($r in $allResults) {
-              $m = $testsById[$r.testId].TestMethod
-              @{ testCaseTitle = $r.testName; automatedTestName = "$($m.className).$($m.name)"
-                 automatedTestStorage = $appName; automatedTestType = 'Playwright'; outcome = $r.outcome
-                 durationInMs = [int][TimeSpan]::Parse($r.duration).TotalMilliseconds
-                 errorMessage = $r.Output.ErrorInfo.Message; stackTrace = $r.Output.ErrorInfo.StackTrace
-                 state = 'Completed'; comment = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" }
+          $adoResults = foreach ($tc in $allCases) {
+              $outcome    = if ($tc.failure -ne $null) { 'Failed' } else { 'Passed' }
+              $durationMs = [double]([double]$tc.time * 1000)
+              @{ testCaseTitle        = $tc.name
+                 automatedTestName    = "$($tc.classname) > $($tc.name)"
+                 automatedTestStorage = $appName
+                 automatedTestType    = 'Playwright'
+                 outcome              = $outcome
+                 durationInMs         = [int]$durationMs
+                 errorMessage         = $tc.failure.message
+                 stackTrace           = $tc.failure.'#text'
+                 state                = 'Completed'
+                 comment              = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" }
           }
 
+          $totalMs     = ($allCases | ForEach-Object { [double]$_.time * 1000 } | Measure-Object -Sum).Sum
+          $startedDate = [DateTimeOffset]::UtcNow.AddMilliseconds(-$totalMs).ToString('O')
+
           $run = Invoke-Ado POST "$adoBase/runs?$adoVer" @{
-              name = "$appName $suiteName Playwright - $env:GITHUB_RUN_NUMBER"; automated = $true
-              state = 'InProgress'; startedDate = [DateTimeOffset]::Parse($xml.TestRun.Times.start).UtcDateTime.ToString('O')
-              comment = "GitHub Actions run $env:GITHUB_RUN_ID" }
+              name        = "$appName $suiteName Playwright - $env:GITHUB_RUN_NUMBER"
+              automated   = $true
+              state       = 'InProgress'
+              startedDate = $startedDate
+              comment     = "GitHub Actions run $env:GITHUB_RUN_ID" }
           Invoke-Ado POST "$adoBase/runs/$($run.id)/results?$adoVer" @($adoResults) | Out-Null
           Invoke-Ado POST "$adoBase/runs/$($run.id)/attachments?$adoVer" @{
-              stream = [Convert]::ToBase64String([IO.File]::ReadAllBytes($trx.FullName))
-              fileName = $trx.Name; comment = 'TRX'; attachmentType = 'GeneralAttachment' } | Out-Null
+              stream         = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path $junitPath)))
+              fileName       = 'playwright-results.xml'
+              comment        = 'JUnit XML'
+              attachmentType = 'GeneralAttachment' } | Out-Null
           Invoke-Ado PATCH "$adoBase/runs/$($run.id)?$adoVer" @{
-              state = 'Completed'; completedDate = [DateTimeOffset]::UtcNow.ToString('O') } | Out-Null
+              state         = 'Completed'
+              completedDate = [DateTimeOffset]::UtcNow.ToString('O') } | Out-Null
           Write-Host "Published $($adoResults.Count) results to Azure DevOps run $($run.id)."
 
           # Azure Monitor
@@ -474,7 +414,7 @@ jobs:
           $endpoint = ($cs -split ';' | Where-Object { $_ -like 'IngestionEndpoint=*' })   -replace 'IngestionEndpoint=', ''
           $common   = @{ app = $appName; suite = $suiteName; repository = $env:GITHUB_REPOSITORY
               branch = $env:GITHUB_REF; sha = $env:GITHUB_SHA; githubRunId = $env:GITHUB_RUN_ID
-              githubRunUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+              githubRunUrl      = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
               artifactAvailable = (Test-Path $artifactDir).ToString() }
 
           function New-Event {
@@ -483,12 +423,13 @@ jobs:
                  data = @{ baseType = 'EventData'; baseData = @{ ver = 2; name = $Name; properties = $Props; measurements = $Measurements } } }
           }
 
-          $durationMs = ($allResults | ForEach-Object { [TimeSpan]::Parse($_.duration).TotalMilliseconds } | Measure-Object -Sum).Sum
-          $runProps = $common.Clone(); $runProps['trxFile'] = $trx.Name; $runProps['outcome'] = if ($failed.Count) { 'Failed' } else { 'Passed' }
-          $events = @(New-Event 'PlaywrightTestRun' $runProps @{ total = $allResults.Count; failed = $failed.Count; passed = $allResults.Count - $failed.Count; durationMs = [double]$durationMs })
-          $events += $allResults | ForEach-Object {
-              $p = $common.Clone(); $p['testName'] = $_.testName; $p['outcome'] = $_.outcome; $p['failed'] = ($_.outcome -ne 'Passed').ToString()
-              New-Event 'PlaywrightTestCase' $p @{ durationMs = [double][TimeSpan]::Parse($_.duration).TotalMilliseconds }
+          $runProps = $common.Clone()
+          $runProps['junitFile'] = 'playwright-results.xml'
+          $runProps['outcome']   = if ($failed.Count) { 'Failed' } else { 'Passed' }
+          $events  = @(New-Event 'PlaywrightTestRun' $runProps @{ total = $allCases.Count; failed = $failed.Count; passed = ($allCases.Count - $failed.Count); durationMs = [double]$totalMs })
+          $events += $allCases | ForEach-Object {
+              $p = $common.Clone(); $p['testName'] = $_.name; $p['outcome'] = if ($_.failure -ne $null) { 'Failed' } else { 'Passed' }; $p['failed'] = ($_.failure -ne $null).ToString()
+              New-Event 'PlaywrightTestCase' $p @{ durationMs = [double]([double]$_.time * 1000) }
           }
           Invoke-RestMethod -Method Post -Uri ($endpoint.TrimEnd('/') + '/v2/track') -ContentType 'application/json' -Body ($events | ConvertTo-Json -Depth 20) | Out-Null
           Write-Host "Sent $($events.Count) telemetry events to Azure Monitor."

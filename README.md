@@ -1,83 +1,102 @@
 # Churches
 
-[![Build and deploy ASP.Net Core app to Azure Web App - crgolden-churches](https://github.com/crgolden/Churches/actions/workflows/main_crgolden-churches.yml/badge.svg)](https://github.com/crgolden/Churches/actions/workflows/main_crgolden-churches.yml)
+[![Build and deploy Node.js app to Azure Web App - crgolden-churches](https://github.com/crgolden/Churches/actions/workflows/main_crgolden-churches.yml/badge.svg)](https://github.com/crgolden/Churches/actions/workflows/main_crgolden-churches.yml)
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=crgolden_Churches&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=crgolden_Churches)
 
-The end-user surface of a nationwide U.S. church discovery platform: a single-page application built with **Angular 21** and an **ASP.NET Core 10** [Backend-for-Frontend (BFF)](https://www.duendesoftware.com/products/bff). The BFF holds the OIDC session and proxies every data call to the standalone [Directory](https://github.com/crgolden/Directory) API; the SPA never sees an access token directly.
+The end-user surface of a nationwide U.S. church discovery platform: an **Angular 21 SSR** application
+with a **Node.js Express** Backend-for-Frontend (BFF), served by a single Node process. The BFF holds
+the OIDC session and proxies every data call to the standalone [Directory](https://github.com/crgolden/Directory)
+API; the browser never sees an access token directly. Anonymous SEO routes are server-side rendered;
+authenticated routes are client-side.
 
-> **Architecture note:** the church data API (search, crawling, moderation, enrichment) used to live in this repo as `Churches.Api` / `Churches.Domain` / `Churches.Data`. It is now the separate [Directory](https://github.com/crgolden/Directory) repo. This repo is purely the Angular client + BFF, mirroring [Inventory](https://github.com/crgolden/Inventory).
+> **Architecture note:** the church data API (search, crawling, moderation, enrichment) lives in the
+> separate [Directory](https://github.com/crgolden/Directory) repo. This repo is purely the Angular
+> SSR client + Node BFF, mirroring [Inventory](https://github.com/crgolden/Inventory).
 
 ## Sibling Applications
 
 | Repo | Role | How Churches interacts |
 |---|---|---|
-| [Identity](https://github.com/crgolden/Identity) | OIDC Identity Provider | OIDC client — login / logout / silent refresh via Duende BFF |
-| [Directory](https://github.com/crgolden/Directory) | Church directory API | BFF proxies `/directory/api/**` to the Directory API, attaching the user access token (scope `directory`) when present |
-| [Infrastructure](https://github.com/crgolden/Infrastructure) | Health monitoring dashboard | Not yet — `ChurchesHealthCheck` is planned; currently covered by Uptime Kuma |
+| [Identity](https://github.com/crgolden/Identity) | OIDC Identity Provider | OIDC authorization-code flow via `openid-client` in the Node BFF |
+| [Directory](https://github.com/crgolden/Directory) | Church directory API | BFF proxies `/directory/api/**` via `http-proxy-middleware`, attaching the user Bearer token (scope `directory`) when present |
+| [Infrastructure](https://github.com/crgolden/Infrastructure) | Health monitoring dashboard | Polls `GET /health` (returns `Healthy`) |
 
 ## Architecture
 
 ```
-┌─────────────────────┐        ┌──────────────────────────┐
-│  Angular 21 (SPA)   │◄──────►│  ASP.NET Core 10 (BFF)   │
-│  :56432 (dev)       │        │  :7135 (dev)             │
-└─────────────────────┘        └──────────┬───────────────┘
-                                           │ /directory/api/** (YARP + user token)
-                                ┌──────────▼───────────────┐
-                                │   Directory API          │
-                                │   (crgolden-directory)   │
-                                └──────────────────────────┘
+┌────────────────────────────────────┐
+│  Angular 21 SSR + Node.js BFF      │  :4000 (dev SSR) / :4321 (ng serve)
+│  Express middleware stack:         │
+│    session (connect-redis)         │
+│    /bff/* (openid-client)          │
+│    /directory/api/** (proxy)       │
+│    Angular SSR catch-all           │
+└──────────────┬─────────────────────┘
+               │ /directory/api/** (Bearer token from session)
+    ┌──────────▼───────────────┐
+    │   Directory API          │
+    │   (crgolden-directory)   │
+    └──────────────────────────┘
 ```
 
-**Backend (`Churches.Server/`)**
-- [Duende BFF](https://docs.duendesoftware.com/identityserver/v7/bff/) handles OIDC login/logout and remote-API token management
-- `MapRemoteBffApiEndpoint("/directory/api", DirectoryApiAddress)` proxies to the Directory API via YARP, with token type `UserOrNone` (anonymous search works; authenticated requests carry the user token)
-- OIDC scopes requested: `offline_access openid profile email directory`
-- All secrets (OIDC client credentials, Elasticsearch credentials) fetched at startup from **Azure Key Vault**
-- Data protection keys stored in **Azure Blob Storage**, encrypted with an **Azure Key Vault** key
-- Distributed tracing and metrics via **OpenTelemetry** exported to **Azure Monitor**; structured logging via **Serilog** → Elasticsearch (production) / console (development)
+**Backend (`src/server.ts`)**
+- `express-session` + `connect-redis` for session persistence
+- `openid-client` v6 — authorization-code + RP-initiated logout (`/bff/login`, `/bff/logout`, `/bff/user`)
+- `http-proxy-middleware` — `/directory/api/**` proxied with `Authorization: Bearer` from session
+- CSRF guard: `X-CSRF: 1` required on BFF and proxied mutating calls
+- OIDC scopes: `offline_access openid profile email directory`
+- Secrets (`ChurchesClientId`, `ChurchesClientSecret`, Redis password) via Azure Key Vault using Managed Identity
+- Observability: OTLP traces/metrics/logs → Alloy + Azure Monitor; structured logs → Elasticsearch (`pino-elasticsearch`)
+- Health endpoint: `GET /health` → `Healthy`
 
-**Frontend (`churches.client/`)**
+**Frontend (`src/`)**
 - Angular 21 **zoneless** change detection
+- SSR render modes: anonymous routes (`/`, `/churches`, `/churches/:slug`) → `RenderMode.Server`;
+  authenticated routes (`/contribute`, `/admin/moderation`) → `RenderMode.Client`
+- Per-page SEO: `<title>`, `<meta description>`, canonical, Open Graph, JSON-LD (detail pages) — see `src/shared/seo.service.ts`
 - Public church search and detail (anonymous), contributions and moderation tooling (authenticated)
-- Dev server proxies `/bff` and `/directory/api` to the BFF via `src/proxy.conf.js`
+- Map view: Leaflet (dynamic import, browser-only)
 
 **Feature areas**
 
 | Route | Auth | Backed by |
 |---|---|---|
-| Home / search, church detail | anonymous | [Directory API](https://github.com/crgolden/Directory) via BFF (`/directory/api/**`) |
+| Home / search, church detail | anonymous | Directory API via BFF (`/directory/api/**`) |
 | Contributions (submit correction) | authenticated | Directory API `POST /corrections` (scope `directory`) via BFF with user token |
-| Moderation (review, crawl sources, merge) | authenticated + `churches.mod` | Directory API moderation endpoints via BFF with user token |
+| Moderation (review, crawl sources, merge) | authenticated + `churches.mod` claim | Directory API moderation endpoints via BFF with user token |
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Framework | ASP.NET Core 10 (Duende BFF + YARP) |
-| Auth | Duende BFF 7 |
-| Frontend | Angular 21 |
-| Observability | Azure Monitor, OpenTelemetry, Serilog, Elasticsearch |
-| Hosting | Azure App Service |
-| Secrets | Azure Key Vault |
-| Data Protection | Azure Blob Storage + Azure Key Vault |
+| Framework | Node.js 22 / Express 5 |
+| Auth / BFF | `openid-client` v6 + `express-session` + `connect-redis` |
+| Frontend | Angular 21 SSR (`@angular/ssr`) |
+| Observability | Azure Monitor, OpenTelemetry, `pino` → Elasticsearch |
+| Hosting | Azure App Service (Linux, Node 22) |
+| Secrets | Azure Key Vault (Managed Identity) |
 
 ## Getting Started
 
-### 1. Configure User Secrets
+The full local stack needs the Identity server and the Directory API running, plus the local config:
 
-In development, user secrets are used (ID `c7445659-3c3d-4e0e-86ee-d983bd5c741f`). Set the OIDC client credentials, the Directory API address, and the supporting infrastructure URIs:
+**Environment variables (set in your shell):**
 
-```jsonc
-{
-  "OidcAuthority": "https://localhost:7261",
-  "DirectoryApiAddress": "https://localhost:7002/",
-  "ChurchesClientId": "<dev client id>",
-  "ChurchesClientSecret": "<dev client secret>",
-  "ElasticsearchNode": "https://<host>:9200"
-}
 ```
+OidcAuthority=https://localhost:7261
+DirectoryApiAddress=https://localhost:7002
+ChurchesClientId=<dev client id>
+ChurchesClientSecret=<dev client secret>
+SessionSecret=<at-least-32-chars-dev-secret>
+```
+
+Session storage defaults to an in-memory store (fine for local dev — sessions just don't survive a
+restart). To use a local Redis instance instead (e.g. if you already run one for Manuals/
+Infrastructure), export `RedisHost=localhost` and `RedisPort=6379` (the code's own default of `6380`
+assumes Azure's TLS port, not a local non-TLS Redis) — `session.ts` picks Redis automatically once
+`RedisHost` is set. Don't combine `RedisHost` with `SessionStore=memory`: the latter always forces the
+in-memory store regardless of `RedisHost`, so setting both together silently ignores `RedisHost`.
 
 **Key Vault secrets required at runtime (production):**
 
@@ -87,63 +106,60 @@ In development, user secrets are used (ID `c7445659-3c3d-4e0e-86ee-d983bd5c741f`
 | `ChurchesClientSecret` | OIDC client secret |
 | `ElasticsearchUsername` | Elasticsearch basic auth username |
 | `ElasticsearchPassword` | Elasticsearch basic auth password |
+| `RedisPassword` | Redis TLS password |
+| `SessionSecret` | Cookie signing secret (≥ 32 chars) |
 
-### 2. Run
+## Key pieces
 
-The full local stack needs the Identity server, the Directory API, the Churches BFF, and the Angular dev server.
-
-**BFF**
-```bash
-dotnet run --project Churches.Server
-# Available at https://localhost:7135
-```
-
-**Frontend** (separate terminal)
-```bash
-cd churches.client
-npm install
-npm start
-# Available at https://localhost:56432
-```
-
-The Angular dev server proxies `/bff` and `/directory/api` to `https://localhost:7135` via `src/proxy.conf.js`.
-
-## Project Structure
-
-```
-Churches.Server/     # ASP.NET Core 10 BFF — OIDC session, /directory/api proxy, data protection
-churches.client/     # Angular 21 SPA — search, church detail, contributions, moderation
-Churches.Tests/      # xUnit v3 — unit tests (Moq), E2E tests (Playwright/Chromium), smoke tests
-```
+- `src/server.ts` — Express entry: `/health`, request logging, session, `/bff/*`, `/directory/api` proxy, Angular SSR catch-all.
+- `src/bff/*` — `openid-client` auth, session (Redis / in-memory), Directory proxy, CSRF.
+- `src/environments/*` — per-environment config (notably SSR `allowedHosts`), swapped via `fileReplacements`.
+- `instrumentation.mjs` — OpenTelemetry sidecar (OTLP→Alloy + Azure Monitor); `src/telemetry/logging.ts` — pino→Elasticsearch.
 
 ## Commands
 
-```bash
-# Build (Angular + BFF)
-dotnet build
-
-# Backend unit tests (no Azure required)
-dotnet build Churches.Tests --configuration Debug
-.\Churches.Tests\bin\Debug\net10.0\Churches.Tests.exe -trait "Category=Unit" -showLiveOutput
-
-# Backend E2E tests (Playwright; static-file Kestrel + Playwright API mocks for /bff and /directory/api)
-.\Churches.Tests\bin\Debug\net10.0\Churches.Tests.exe -trait "Category=E2E" -showLiveOutput
-
-# Frontend unit tests (Vitest)
-cd churches.client && npx vitest run
-
-# Publish web app
-dotnet publish Churches.Server -c Release -r win-x86 --self-contained false -o ./publish
+```powershell
+npm install
+npm start            # ng serve — SPA/component dev (no SSR/BFF), http://localhost:4200
+npm run build        # SSR production build → dist/churches.client/{server,browser}
+npm run build:ci     # SSR build with the ci environment (allowedHosts=localhost)
+npm run serve:ssr    # run the full SSR + BFF: node --import ./instrumentation.mjs dist/churches.client/server/server.mjs
+npm run lint         # ESLint
+npx vitest run       # unit tests (Vitest); add --coverage for LCOV
+npm run e2e          # build:ci + Playwright E2E vs the real Node server + mock Directory/OIDC (self-builds)
+npm run e2e:smoke    # Playwright smoke tests against a deployed stack (SmokeBaseUrl)
+.\Invoke-SmokeTests.ps1 -BaseUrl https://crgolden-churches.azurewebsites.net
 ```
 
 See [TESTING.md](TESTING.md) for the full E2E / smoke test guide and CI configuration.
 
+## Project Structure
+
+```
+src/
+  server.ts        # Express app: session, BFF routes, SSR catch-all
+  bff/              # openid-client auth, session, Directory proxy, CSRF
+  app/              # Angular application
+  environments/     # per-environment config (allowedHosts, etc.)
+  telemetry/        # pino → Elasticsearch logging
+e2e/                # TypeScript Playwright E2E + smoke tests
+instrumentation.mjs # OpenTelemetry Node SDK init (loaded via --import)
+```
+
 ## Deployment
 
-The GitHub Actions workflow (`.github/workflows/main_crgolden-churches.yml`) triggers on pushes to `main` and pull requests.
+The GitHub Actions workflow (`.github/workflows/main_crgolden-churches.yml`) triggers on pushes to
+`main` and pull requests.
 
-**Build job** — builds the Angular frontend and the BFF, runs backend unit tests with coverage and frontend unit tests (Vitest), runs SonarCloud analysis, and publishes the web app.
+**Build job** — `npm ci` → lint → `npm run build:ci` (SSR, ci config) → Vitest coverage →
+Playwright E2E → SonarCloud (JS LCOV) → `npm run build` (production) → `npm prune --omit=dev` →
+upload deployment artifact.
 
-**Deploy job** — deploys the web app to **Azure App Service** `crgolden-churches` (Production slot) via Azure OIDC.
+**Deploy job** — deploys the Node bundle to **Linux Azure App Service** `crgolden-churches`
+(Production slot) via Azure OIDC. Startup command:
+`node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`
 
-This repo deploys only the frontend + BFF; the Directory API and its SQL schema deploy from the [Directory](https://github.com/crgolden/Directory) repo (`crgolden-directory`).
+**Smoke job** — `npm run e2e:smoke` against the deployed `webapp-url` (post-deploy, `main` only).
+
+This repo deploys only the frontend + Node BFF; the Directory API and its SQL schema deploy from the
+[Directory](https://github.com/crgolden/Directory) repo (`crgolden-directory`).
