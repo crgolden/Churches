@@ -19,7 +19,17 @@ const app = express();
 // Angular SSR rejects requests whose Host header is not allow-listed (SSRF protection) and SILENTLY
 // falls back to client-side rendering — which would defeat the entire SSR/SEO goal. The allow-list is
 // per-environment (see src/environments/*), swapped at build time via fileReplacements.
-const angularApp = new AngularNodeAppEngine({ allowedHosts: environment.allowedHosts });
+//
+// trustProxyHeaders: true is required because Azure App Service's edge always injects X-Forwarded-For
+// (and other X-Forwarded-* headers) on every request. Angular's default trusted set only covers
+// x-forwarded-host/x-forwarded-proto; any other X-Forwarded-* header present without being explicitly
+// trusted causes Angular to silently deopt to client-side-only rendering (serveClientSidePage()) —
+// this broke SSR/SEO for every production request behind Azure's proxy until this was set. Safe here
+// since Azure App Service's edge is the only entity that can reach this Node process directly.
+const angularApp = new AngularNodeAppEngine({
+  allowedHosts: environment.allowedHosts,
+  trustProxyHeaders: true,
+});
 
 // Health endpoint — mounted first so it is anonymous and untraced (the instrumentation.mjs http
 // instrumentation ignores /health). The post-deploy smoke job and the Infrastructure dashboard both
