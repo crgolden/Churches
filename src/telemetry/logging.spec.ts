@@ -22,7 +22,7 @@ function makeReq(url: string): Request {
 }
 
 function makeFinishableRes(statusCode = 200) {
-  const listeners: Record<string, Array<() => void>> = {};
+  const listeners: Record<string, (() => void)[]> = {};
   return {
     statusCode,
     on: vi.fn((event: string, cb: () => void) => {
@@ -58,7 +58,7 @@ describe('requestLogger', () => {
     const next = vi.fn();
     const res = makeFinishableRes();
 
-    requestLogger(makeReq('/health'), res as unknown as Response, next as unknown as NextFunction);
+    requestLogger(makeReq('/health'), res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledOnce();
     expect(res.on).not.toHaveBeenCalled();
@@ -68,7 +68,7 @@ describe('requestLogger', () => {
     const next = vi.fn();
     const res = makeFinishableRes();
 
-    requestLogger(makeReq('/health/live'), res as unknown as Response, next as unknown as NextFunction);
+    requestLogger(makeReq('/health/live'), res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledOnce();
     expect(res.on).not.toHaveBeenCalled();
@@ -78,7 +78,7 @@ describe('requestLogger', () => {
     const next = vi.fn();
     const res = makeFinishableRes(200);
 
-    requestLogger(makeReq('/bff/user'), res as unknown as Response, next as unknown as NextFunction);
+    requestLogger(makeReq('/bff/user'), res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledOnce();
     expect(res.on).toHaveBeenCalledWith('finish', expect.any(Function));
@@ -88,7 +88,7 @@ describe('requestLogger', () => {
     const next = vi.fn();
     const res = makeFinishableRes(204);
 
-    requestLogger(makeReq('/api/churches'), res as unknown as Response, next as unknown as NextFunction);
+    requestLogger(makeReq('/api/churches'), res as unknown as Response, next);
     res.emit('finish');
 
     expect(loggerInfo).toHaveBeenCalledWith(
@@ -145,7 +145,7 @@ describe('logger construction', () => {
     // Now get the same cached pino instance.
     const { default: pino } = await import('pino');
     const transportArg = vi.mocked(pino.transport).mock.calls[0][0] as {
-      targets: Array<{ target: string }>;
+      targets: { target: string }[];
     };
     const esTargets = transportArg.targets.filter(t => t.target === 'pino-elasticsearch');
 
@@ -163,7 +163,7 @@ describe('logger construction', () => {
     const { default: pino } = await import('pino');
 
     const transportArg = vi.mocked(pino.transport).mock.calls[0][0] as {
-      targets: Array<{ target: string; options: Record<string, unknown> }>;
+      targets: { target: string; options: Record<string, unknown> }[];
     };
     const esTarget = transportArg.targets.find(t => t.target === 'pino-elasticsearch');
 
@@ -198,7 +198,7 @@ describe('logger construction', () => {
       throw new Error('transport construction failed');
     });
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await import('./logging');
 
     expect(consoleSpy).toHaveBeenCalledWith(

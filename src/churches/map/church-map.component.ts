@@ -20,7 +20,7 @@ import type { SearchResult } from '../../shared/models';
   selector: 'app-church-map',
   standalone: true,
   template: `
-    <div #mapEl class="leaflet-container" style="width:100%;height:480px"></div>
+    <div #mapEl class="leaflet-container" style="width:100%;height:480px;isolation:isolate"></div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

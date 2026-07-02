@@ -88,22 +88,26 @@ const loggerProvider = new LoggerProvider({ resource, processors: logProcessors 
 logs.setGlobalLoggerProvider(loggerProvider);
 
 // ── Auto-instrumentation ────────────────────────────────────────────────────────
-registerInstrumentations({
-  tracerProvider,
-  meterProvider,
-  loggerProvider,
-  instrumentations: [
-    getNodeAutoInstrumentations({
-      // /health is polled constantly by the smoke job + Infrastructure dashboard — don't trace it
-      // (mirrors the AspNetCore trace filter in Program.cs).
-      '@opentelemetry/instrumentation-http': {
-        ignoreIncomingRequestHook: (req) => (req.url ?? '').startsWith('/health'),
-      },
-      // fs instrumentation is extremely noisy and adds no value for an SSR app.
-      '@opentelemetry/instrumentation-fs': { enabled: false },
-    }),
-  ],
-});
+// Only patch http/fetch/Express when there's an OTLP backend to send spans to — in local dev
+// (no AlloyEndpoint) the monkey-patching is pure overhead/risk with nowhere for the data to go.
+if (alloyEndpoint) {
+  registerInstrumentations({
+    tracerProvider,
+    meterProvider,
+    loggerProvider,
+    instrumentations: [
+      getNodeAutoInstrumentations({
+        // /health is polled constantly by the smoke job + Infrastructure dashboard — don't trace it
+        // (mirrors the AspNetCore trace filter in Program.cs).
+        '@opentelemetry/instrumentation-http': {
+          ignoreIncomingRequestHook: (req) => (req.url ?? '').startsWith('/health'),
+        },
+        // fs instrumentation is extremely noisy and adds no value for an SSR app.
+        '@opentelemetry/instrumentation-fs': { enabled: false },
+      }),
+    ],
+  });
+}
 
 // Flush on shutdown so buffered telemetry isn't lost.
 async function shutdown() {

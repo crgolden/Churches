@@ -10,18 +10,17 @@ vi.mock('openid-client', () => ({
   refreshTokenGrant: vi.fn(),
 }));
 
-import { getOidcConfig } from './oidc';
 import { refreshTokenGrant } from 'openid-client';
 import { csrfForMutating, directoryProxy } from './proxy';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-type SessionLike = {
+interface SessionLike {
   accessToken?: string;
   refreshToken?: string;
   tokenExpiresAt?: number;
   save: (cb: (err: unknown) => void) => void;
-};
+}
 
 function makeReq(overrides: {
   method?: string;
@@ -34,10 +33,16 @@ function makeReq(overrides: {
   const hasBody = !['GET', 'HEAD'].includes(method);
   const bodyChunk = overrides.body ?? (hasBody ? Buffer.from('{}') : undefined);
 
+  const originalUrl = overrides.originalUrl ?? '/directory/api/churches';
+  // Mirrors real Express behaviour for middleware mounted via app.use('/directory/api', ...):
+  // req.url is the original path with the mount prefix stripped.
+  const url = originalUrl.replace(/^\/directory\/api/, '') || '/';
+
   const req: Record<string, unknown> = {
     method,
     headers: overrides.headers ?? {},
-    originalUrl: overrides.originalUrl ?? '/directory/api/churches',
+    originalUrl,
+    url,
     session: {
       accessToken: undefined,
       refreshToken: undefined,
@@ -65,7 +70,7 @@ function makeRes() {
 
 const mockNext = vi.fn() as unknown as NextFunction;
 
-function stubFetch(responses: Array<{ status: number; headers?: Headers; body?: ArrayBuffer }>) {
+function stubFetch(responses: { status: number; headers?: Headers; body?: ArrayBuffer }[]) {
   const mocks = responses.map(r => ({
     status: r.status,
     headers: r.headers ?? new Headers({ 'content-type': 'application/json' }),
@@ -284,7 +289,7 @@ describe('directoryProxy', () => {
     process.env['DirectoryApiAddress'] = 'https://directory.example.com';
     stubFetch([{ status: 401 }]);
     vi.mocked(refreshTokenGrant).mockRejectedValueOnce(new Error('refresh failed'));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const req = makeReq({
       session: {

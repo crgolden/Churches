@@ -3,11 +3,11 @@ import type { Request, Response, NextFunction } from 'express';
 // ── Handler capture ───────────────────────────────────────────────────────────
 // The Router mock stores every registered handler so tests can invoke them directly.
 
-const capturedHandlers = new Map<string, Array<(...args: unknown[]) => unknown>>();
+const capturedHandlers = new Map<string, ((...args: unknown[]) => unknown)[]>();
 
 vi.mock('express', () => ({
   Router: vi.fn(() => ({
-    get: vi.fn((path: string, ...fns: Array<(...args: unknown[]) => unknown>) => {
+    get: vi.fn((path: string, ...fns: ((...args: unknown[]) => unknown)[]) => {
       capturedHandlers.set(path, fns);
     }),
   })),
@@ -43,17 +43,17 @@ import { buildBffRouter, requireCsrf } from './routes';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-type Session = {
+interface Session {
   pkceCodeVerifier?: string;
   oauthState?: string;
   accessToken?: string;
   refreshToken?: string;
   idToken?: string;
   tokenExpiresAt?: number;
-  claims?: Array<{ type: string; value: string }>;
+  claims?: { type: string; value: string }[];
   save: ReturnType<typeof vi.fn>;
   destroy: ReturnType<typeof vi.fn>;
-};
+}
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -151,7 +151,7 @@ describe('/bff/login', () => {
 
   it('responds 500 when OIDC configuration fails', async () => {
     vi.mocked(getOidcConfig).mockRejectedValueOnce(new Error('discovery failed'));
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const req = makeReq();
     const res = makeRes();
 
@@ -189,7 +189,7 @@ describe('/bff/callback', () => {
       expires_in: 3600,
       claims: () => ({ iss: 'https://identity.example.com' }), // no sub
     } as never);
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const req = makeReq({
       session: { pkceCodeVerifier: 'pkce-verifier', oauthState: 'oauth-state' },
     });
@@ -210,7 +210,7 @@ describe('/bff/callback', () => {
       expires_in: 3600,
       claims: () => ({ sub: 'user-123', email: 'user@example.com' }),
     } as never);
-    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ sub: 'user-123', name: 'Alice' } as never);
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ sub: 'user-123', name: 'Alice' });
 
     const req = makeReq({
       session: { pkceCodeVerifier: 'pkce-verifier', oauthState: 'oauth-state' },
@@ -231,7 +231,7 @@ describe('/bff/callback', () => {
 
   it('responds 500 when authorizationCodeGrant throws', async () => {
     vi.mocked(authorizationCodeGrant).mockRejectedValueOnce(new Error('code exchange failed'));
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const req = makeReq({
       session: { pkceCodeVerifier: 'pkce-verifier', oauthState: 'oauth-state' },
     });
@@ -252,7 +252,7 @@ describe('/bff/callback', () => {
       expires_in: 3600,
       claims: () => ({ sub: 'user-123', role: ['admin', 'user'] }),
     } as never);
-    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ sub: 'user-123' } as never);
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ sub: 'user-123' });
 
     const req = makeReq({
       session: { pkceCodeVerifier: 'pkce-verifier', oauthState: 'oauth-state' },
@@ -364,7 +364,7 @@ describe('/bff/logout', () => {
 
   it('falls back to redirect("/") when OIDC configuration throws during logout', async () => {
     vi.mocked(getOidcConfig).mockRejectedValueOnce(new Error('oidc down'));
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const req = makeReq({
       sessionID: 'valid-session-id',

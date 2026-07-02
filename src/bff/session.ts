@@ -21,7 +21,7 @@ declare module 'express-session' {
     /** Unix ms at which the access token expires (undefined = unknown). */
     tokenExpiresAt?: number;
     /** Claims returned by the userinfo endpoint, formatted for /bff/user. */
-    claims?: Array<{ type: string; value: string }>;
+    claims?: { type: string; value: string }[];
   }
 }
 
@@ -99,7 +99,13 @@ export function applySession(app: Express): void {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        sameSite: 'strict',
+        // Lax (not Strict): the OIDC callback is a top-level GET navigation initiated by a
+        // redirect from Identity (a different origin). SameSite=Strict withholds the cookie on
+        // that navigation, so pkceCodeVerifier/oauthState never reach /bff/callback and login
+        // always 400s. Lax still blocks cross-site subrequests (CSRF protection intact) while
+        // allowing the cookie on top-level GET redirects — the standard choice for OIDC/OAuth
+        // correlation cookies.
+        sameSite: 'lax',
         secure: isProd,
       },
     }),

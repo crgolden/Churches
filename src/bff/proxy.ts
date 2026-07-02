@@ -57,7 +57,9 @@ async function refreshAndSave(req: Request): Promise<void> {
       : undefined;
 
   await new Promise<void>((resolve, reject) =>
-    req.session.save((err: unknown) => (err ? reject(err) : resolve())),
+    req.session.save((err: unknown) =>
+      err ? reject(err instanceof Error ? err : new Error('Session save failed', { cause: err })) : resolve(),
+    ),
   );
 }
 
@@ -89,7 +91,11 @@ export async function directoryProxy(
     return;
   }
 
-  const targetUrl = `${base}${req.originalUrl}`;
+  // req.url (not req.originalUrl) is relative to the mount point ('/directory/api'), since
+  // Express strips the mount prefix for middleware registered via app.use('/directory/api', ...).
+  // Using originalUrl here would forward the full '/directory/api/...' path to Directory, whose
+  // real routes have no such prefix (e.g. '/denominations', '/search').
+  const targetUrl = `${base}${req.url}`;
 
   // Proactively refresh if the token is within 60 s of expiry.
   const { accessToken, refreshToken, tokenExpiresAt } = req.session;
@@ -116,7 +122,7 @@ export async function directoryProxy(
   let bodyBuffer: Uint8Array<ArrayBuffer> | undefined;
 
   if (hasBody) {
-    const chunks: Array<Uint8Array<ArrayBuffer>> = [];
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
     for await (const chunk of req as AsyncIterable<unknown>) {
       if (Buffer.isBuffer(chunk)) {
         // Copy the slice into a fresh ArrayBuffer to satisfy the generic bound.

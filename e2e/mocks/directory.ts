@@ -1,10 +1,10 @@
 /**
  * Mock Directory API — mirrors ChurchStore + CorrectionStore from the C# test harness.
  *
- * Serves real HTTP routes at /directory/api/* so the Node SSR server can proxy
- * to it server-side (Playwright page.route() only intercepts browser requests,
- * not outbound Node fetch calls).  Tests manipulate state via the control API
- * at /_test/*.
+ * Serves real HTTP routes matching the real Directory API's actual shape (no path prefix — the
+ * Node SSR server's directoryProxy strips the '/directory/api' mount prefix before forwarding) so
+ * the server can proxy to it server-side (Playwright page.route() only intercepts browser
+ * requests, not outbound Node fetch calls).  Tests manipulate state via the control API at /_test/*.
  */
 
 import express, { type Express, type Request, type Response } from 'express';
@@ -255,15 +255,15 @@ export function createDirectoryApp(): Express {
     res.status(201).json({ id: correction.id });
   });
 
-  // ── Directory API routes (/directory/api/*) ──────────────────────────────
+  // ── Directory API routes (no path prefix, matches the real upstream API) ────
 
-  /** GET /directory/api/denominations — always returns empty array. */
-  app.get('/directory/api/denominations', (_req: Request, res: Response) => {
+  /** GET /denominations — always returns empty array. */
+  app.get('/denominations', (_req: Request, res: Response) => {
     res.json([]);
   });
 
-  /** GET /directory/api/search — filtered, paginated search. */
-  app.get('/directory/api/search', (req: Request, res: Response) => {
+  /** GET /search — filtered, paginated search. */
+  app.get('/search', (req: Request, res: Response) => {
     const q = (req.query['q'] as string | undefined)?.toLowerCase();
     const state = req.query['state'] as string | undefined;
     const worshipStyle = req.query['worshipStyle']
@@ -307,8 +307,8 @@ export function createDirectoryApp(): Express {
     });
   });
 
-  /** GET /directory/api/churches — paginated list. */
-  app.get('/directory/api/churches', (req: Request, res: Response) => {
+  /** GET /churches — paginated list. */
+  app.get('/churches', (req: Request, res: Response) => {
     const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10));
     const pageSize = Math.min(50, Math.max(1, parseInt((req.query['pageSize'] as string) ?? '20', 10)));
 
@@ -321,8 +321,8 @@ export function createDirectoryApp(): Express {
     res.json({ items, totalCount: total, page, pageSize });
   });
 
-  /** POST /directory/api/churches/:churchId/schedules — add a schedule. */
-  app.post('/directory/api/churches/:churchId/schedules', (req: Request, res: Response) => {
+  /** POST /churches/:churchId/schedules — add a schedule. */
+  app.post('/churches/:churchId/schedules', (req: Request, res: Response) => {
     const church = churches.get(req.params['churchId'] ?? '');
     if (!church) { res.status(404).end(); return; }
 
@@ -340,8 +340,8 @@ export function createDirectoryApp(): Express {
     res.status(201).json({ id: record.id });
   });
 
-  /** DELETE /directory/api/schedules/:id — remove a schedule. */
-  app.delete('/directory/api/schedules/:id', (req: Request, res: Response) => {
+  /** DELETE /schedules/:id — remove a schedule. */
+  app.delete('/schedules/:id', (req: Request, res: Response) => {
     let found = false;
     for (const church of churches.values()) {
       const idx = church.schedules.findIndex(s => s.id === req.params['id']);
@@ -354,8 +354,8 @@ export function createDirectoryApp(): Express {
     res.status(found ? 204 : 404).end();
   });
 
-  /** POST /directory/api/churches/:churchId/ministries — add a ministry. */
-  app.post('/directory/api/churches/:churchId/ministries', (req: Request, res: Response) => {
+  /** POST /churches/:churchId/ministries — add a ministry. */
+  app.post('/churches/:churchId/ministries', (req: Request, res: Response) => {
     const church = churches.get(req.params['churchId'] ?? '');
     if (!church) { res.status(404).end(); return; }
 
@@ -371,8 +371,8 @@ export function createDirectoryApp(): Express {
     res.status(201).json({ id: record.id });
   });
 
-  /** DELETE /directory/api/ministries/:id — remove a ministry. */
-  app.delete('/directory/api/ministries/:id', (req: Request, res: Response) => {
+  /** DELETE /ministries/:id — remove a ministry. */
+  app.delete('/ministries/:id', (req: Request, res: Response) => {
     let found = false;
     for (const church of churches.values()) {
       const idx = church.ministries.findIndex(m => m.id === req.params['id']);
@@ -385,8 +385,8 @@ export function createDirectoryApp(): Express {
     res.status(found ? 204 : 404).end();
   });
 
-  /** POST /directory/api/churches/:churchId/campuses — add a campus. */
-  app.post('/directory/api/churches/:churchId/campuses', (req: Request, res: Response) => {
+  /** POST /churches/:churchId/campuses — add a campus. */
+  app.post('/churches/:churchId/campuses', (req: Request, res: Response) => {
     const church = churches.get(req.params['churchId'] ?? '');
     if (!church) { res.status(404).end(); return; }
 
@@ -407,8 +407,8 @@ export function createDirectoryApp(): Express {
     res.status(201).json({ id: record.id });
   });
 
-  /** DELETE /directory/api/campuses/:id — remove a campus. */
-  app.delete('/directory/api/campuses/:id', (req: Request, res: Response) => {
+  /** DELETE /campuses/:id — remove a campus. */
+  app.delete('/campuses/:id', (req: Request, res: Response) => {
     let found = false;
     for (const church of churches.values()) {
       const idx = church.campuses.findIndex(c => c.id === req.params['id']);
@@ -421,8 +421,8 @@ export function createDirectoryApp(): Express {
     res.status(found ? 204 : 404).end();
   });
 
-  /** GET /directory/api/corrections — pending corrections list. */
-  app.get('/directory/api/corrections', (req: Request, res: Response) => {
+  /** GET /corrections — pending corrections list. */
+  app.get('/corrections', (req: Request, res: Response) => {
     const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10));
     const pageSize = Math.min(50, Math.max(1, parseInt((req.query['pageSize'] as string) ?? '20', 10)));
 
@@ -435,8 +435,8 @@ export function createDirectoryApp(): Express {
     res.json({ items, totalCount: total, page, pageSize });
   });
 
-  /** POST /directory/api/corrections — submit a correction. */
-  app.post('/directory/api/corrections', (req: Request, res: Response) => {
+  /** POST /corrections — submit a correction. */
+  app.post('/corrections', (req: Request, res: Response) => {
     const body = req.body as Record<string, unknown>;
     const churchId = body['churchId'] as string | undefined;
     if (!churchId) { res.status(400).end(); return; }
@@ -465,8 +465,8 @@ export function createDirectoryApp(): Express {
     res.status(201).json(record);
   });
 
-  /** PATCH /directory/api/corrections/:id/approve. */
-  app.patch('/directory/api/corrections/:id/approve', (req: Request, res: Response) => {
+  /** PATCH /corrections/:id/approve. */
+  app.patch('/corrections/:id/approve', (req: Request, res: Response) => {
     const correction = corrections.get(req.params['id'] ?? '');
     if (!correction || correction.status !== 0) { res.status(404).end(); return; }
     corrections.set(correction.id, {
@@ -478,8 +478,8 @@ export function createDirectoryApp(): Express {
     res.status(204).end();
   });
 
-  /** PATCH /directory/api/corrections/:id/reject. */
-  app.patch('/directory/api/corrections/:id/reject', (req: Request, res: Response) => {
+  /** PATCH /corrections/:id/reject. */
+  app.patch('/corrections/:id/reject', (req: Request, res: Response) => {
     const correction = corrections.get(req.params['id'] ?? '');
     if (!correction || correction.status !== 0) { res.status(404).end(); return; }
     corrections.set(correction.id, {
@@ -492,10 +492,10 @@ export function createDirectoryApp(): Express {
   });
 
   /**
-   * GET /directory/api/churches/:slug — church detail (must come AFTER all
+   * GET /churches/:slug — church detail (must come AFTER all
    * /churches/:churchId/* routes to avoid slug matching a UUID segment).
    */
-  app.get('/directory/api/churches/:slug', (req: Request, res: Response) => {
+  app.get('/churches/:slug', (req: Request, res: Response) => {
     const slug = req.params['slug'] ?? '';
     const church = [...churches.values()].find(
       c => c.slug === slug && c.isActive,

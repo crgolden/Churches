@@ -93,7 +93,7 @@ describe('applySession', () => {
 
   it('logs a warning when MemoryStore is used in production', () => {
     process.env['NODE_ENV'] = 'production';
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     applySession(makeApp() as unknown as Express);
 
@@ -156,7 +156,7 @@ describe('applySession', () => {
 
     expect(session).toHaveBeenCalledWith(
       expect.objectContaining({
-        cookie: expect.objectContaining({ secure: false, httpOnly: true, sameSite: 'strict' }),
+        cookie: expect.objectContaining({ secure: false, httpOnly: true, sameSite: 'lax' }),
       }),
     );
     expect(app.use).toHaveBeenCalledOnce();
@@ -196,7 +196,7 @@ describe('applySession', () => {
 
   it('logs a connection error when Redis emits an "error" event', () => {
     process.env['RedisHost'] = 'redis.dev.local';
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     // Capture the listener registered via redisClient.on('error', listener)
     let errorListener: ((err: unknown) => void) | undefined;
@@ -219,7 +219,7 @@ describe('applySession', () => {
 
   it('logs a connect error when Redis initial connect rejects', async () => {
     process.env['RedisHost'] = 'redis.dev.local';
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const connectError = new Error('initial connect failed');
 
     vi.mocked(createClient).mockReturnValue({

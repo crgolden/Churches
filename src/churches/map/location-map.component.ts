@@ -27,7 +27,7 @@ export interface MapPoint {
   selector: 'app-location-map',
   standalone: true,
   template: `
-    <div #mapEl class="leaflet-container" style="width:100%;height:320px"></div>
+    <div #mapEl class="leaflet-container" style="width:100%;height:320px;isolation:isolate"></div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

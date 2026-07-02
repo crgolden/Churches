@@ -22,25 +22,41 @@ const CALLBACK_PATH =
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function stringifyClaimValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
 function getOrigin(req: Request): string {
   const proto =
     (req.headers['x-forwarded-proto'] as string | undefined) ?? req.protocol;
   const host =
     (req.headers['x-forwarded-host'] as string | undefined) ??
-    (req.headers['host'] as string | undefined) ??
+    (req.headers.host) ??
     'localhost';
   return `${proto}://${host}`;
 }
 
 function saveSession(req: Request): Promise<void> {
   return new Promise((resolve, reject) =>
-    req.session.save((err) => (err ? reject(err) : resolve())),
+    req.session.save((err) =>
+      err ? reject(err instanceof Error ? err : new Error('Session save failed', { cause: err })) : resolve(),
+    ),
   );
 }
 
 function destroySession(req: Request): Promise<void> {
   return new Promise((resolve, reject) =>
-    req.session.destroy((err) => (err ? reject(err) : resolve())),
+    req.session.destroy((err) =>
+      err ? reject(err instanceof Error ? err : new Error('Session destroy failed', { cause: err })) : resolve(),
+    ),
   );
 }
 
@@ -120,8 +136,8 @@ export function buildBffRouter(): Router {
       // GetClaimsFromUserInfoEndpoint = true in the .NET BFF.
       const idClaims = tokens.claims();
       const sub =
-        idClaims && typeof idClaims['sub'] === 'string'
-          ? idClaims['sub']
+        idClaims && typeof idClaims.sub === 'string'
+          ? idClaims.sub
           : null;
 
       if (!sub) {
@@ -140,15 +156,15 @@ export function buildBffRouter(): Router {
         ...userInfo,
       };
 
-      const claims: Array<{ type: string; value: string }> = [];
+      const claims: { type: string; value: string }[] = [];
       for (const [key, raw] of Object.entries(merged)) {
         if (raw === undefined || raw === null) continue;
         if (Array.isArray(raw)) {
           for (const item of raw) {
-            claims.push({ type: key, value: String(item) });
+            claims.push({ type: key, value: stringifyClaimValue(item) });
           }
         } else {
-          claims.push({ type: key, value: String(raw) });
+          claims.push({ type: key, value: stringifyClaimValue(raw) });
         }
       }
 
