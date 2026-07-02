@@ -57,7 +57,10 @@ export default defineConfig({
   // Playwright manages both servers during the test run.  The mock directory
   // server must be up before the SSR server starts (SSR's warmup request hits
   // it during Angular bootstrap).
-  webServer: [
+  // When SmokeBaseUrl is set (post-deploy smoke against a real deployed instance),
+  // skip starting any local server entirely — there is nothing to build/run locally,
+  // and the post-deploy CI job never runs `npm run build` before this config loads.
+  webServer: smokeBaseUrl ? undefined : [
     {
       // Mock Directory API — handles /directory/api/* routes and /_test/* control API.
       command: 'npx tsx e2e/mocks/directory-server.ts',

@@ -18,6 +18,12 @@ const DROP_RESPONSE_HEADERS = new Set([
   'connection',
   'keep-alive',
   'transfer-encoding',
+  // fetch() transparently decompresses gzip/br/deflate bodies (apiResponse.arrayBuffer()
+  // returns the decompressed bytes), so forwarding the upstream Content-Encoding/Content-Length
+  // would make the client try to decompress an already-decompressed body. Node recalculates
+  // Content-Length itself from the buffer passed to res.end().
+  'content-encoding',
+  'content-length',
 ]);
 
 // ── CSRF guard ────────────────────────────────────────────────────────────────

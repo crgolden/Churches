@@ -251,6 +251,29 @@ describe('directoryProxy', () => {
     expect(res.setHeader).not.toHaveBeenCalledWith('connection', expect.anything());
   });
 
+  it('strips Content-Encoding and Content-Length since fetch() already decompressed the body', async () => {
+    // Regression test: fetch() transparently decompresses gzip/br/deflate bodies, so
+    // apiResponse.arrayBuffer() returns plain bytes. Forwarding the upstream
+    // Content-Encoding/Content-Length made clients try to decompress an already-decompressed
+    // body ("incorrect header check" gzip errors against the real deployed Directory API).
+    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
+    const responseHeaders = new Headers({
+      'content-type': 'application/json',
+      'content-encoding': 'gzip',
+      'content-length': '12345',
+    });
+    stubFetch([{ status: 200, headers: responseHeaders }]);
+
+    const req = makeReq();
+    const res = makeRes();
+
+    await directoryProxy(req, res as unknown as Response, mockNext);
+
+    expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+    expect(res.setHeader).not.toHaveBeenCalledWith('content-encoding', expect.anything());
+    expect(res.setHeader).not.toHaveBeenCalledWith('content-length', expect.anything());
+  });
+
   it('removes stale Authorization from forwarded headers when no session token', async () => {
     process.env['DirectoryApiAddress'] = 'https://directory.example.com';
     stubFetch([{ status: 200 }]);
