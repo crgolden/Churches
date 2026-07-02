@@ -16,6 +16,18 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
 
+// Azure App Service terminates TLS at its edge and forwards plain HTTP internally, so without this,
+// Express's own req.secure/req.protocol always resolve to "http" regardless of the real
+// X-Forwarded-Proto header. express-session's cookie.secure=true (production) then silently refuses
+// to ever emit Set-Cookie (see express-session's onHeaders hook: `cookie.secure && !issecure(req,
+// trustProxy)` short-circuits before writing the header) — this broke every login in production, with
+// no error thrown, because the redirect to Identity still succeeds; only the session cookie is missing,
+// so /bff/callback always finds an empty session ("Invalid or expired session state"). `1` (not `true`)
+// trusts exactly one hop, matching Azure App Service's edge — the only proxy that can reach this
+// process directly. This is Express's own trust-proxy setting and is independent of Angular SSR's
+// separate `trustProxyHeaders` option below.
+app.set('trust proxy', 1);
+
 // Angular SSR rejects requests whose Host header is not allow-listed (SSRF protection) and SILENTLY
 // falls back to client-side rendering — which would defeat the entire SSR/SEO goal. The allow-list is
 // per-environment (see src/environments/*), swapped at build time via fileReplacements.
