@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
-import pino, { type Logger } from 'pino';
+import pino, { type Logger, type StreamEntry } from 'pino';
+import pinoElasticsearch from 'pino-elasticsearch';
 
 // Structured application logging for the Churches Node server — the Serilog→Elasticsearch equivalent
 // from the retired .NET BFF. Logs are written to stdout always, and shipped directly to
@@ -7,8 +8,16 @@ import pino, { type Logger } from 'pino';
 // crgolden fleet so the Grafana Logs/Fleet dashboards line up: `service.name` (= WEBSITE_SITE_NAME)
 // and a flat, capitalised `log.level` (Information/Warning/Error/Fatal).
 //
-// pino + pino-elasticsearch are marked `externalDependencies` in angular.json so esbuild does not try
-// to bundle the transport's worker thread; they resolve from node_modules at runtime.
+// The sinks MUST be wired with `pino.multistream`, never as `pino.transport()` targets: pino forbids
+// custom level formatters (our flat `log.level`) with multiple transport targets, because targets
+// serialize in a worker thread the formatter function cannot reach (pino/lib/tools.js throws
+// 'option.transport.targets do not allow custom level formatters'). Passing the transport as the
+// second pino() argument bypasses that guard and fails silently instead: all logging dies (including
+// stdout) while the app keeps serving traffic. multistream runs the formatters once on the main
+// thread, then writes the serialized line to every stream — the supported configuration.
+//
+// pino + pino-elasticsearch are marked `externalDependencies` in angular.json so esbuild leaves them
+// in node_modules at runtime instead of bundling the ES client.
 
 const serviceName = process.env['WEBSITE_SITE_NAME'] ?? 'crgolden-churches';
 const esNode = process.env['ElasticsearchNode'];
@@ -26,25 +35,32 @@ const LEVEL_NAMES: Record<string, string> = {
 };
 
 function buildLogger(): Logger {
-  const stdout = { target: 'pino/file', options: { destination: 1 } };
+  const streams: StreamEntry[] = [{ stream: pino.destination(1) }];
 
-  const targets = [stdout];
   if (esNode) {
-    targets.push({
-      target: 'pino-elasticsearch',
-      // pino-elasticsearch writes to a data stream when op_type is 'create'. The index name must
-      // match the Grafana Elasticsearch datasource pattern (`logs-dotnet-*`, see
-      // Tools/Grafana/01-bootstrap.sh) so Churches logs appear in the Logs/Fleet dashboards
-      // alongside the sibling apps — `dotnet` here is the fleet's app-logs dataset convention.
-      options: {
-        node: esNode,
-        auth: esUsername && esPassword ? { username: esUsername, password: esPassword } : undefined,
-        index: 'logs-dotnet-churches',
-        esVersion: 8,
-        op_type: 'create',
-        flushBytes: 1000,
-      },
-    } as unknown as typeof stdout);
+    // pino-elasticsearch writes to a data stream when opType is 'create'. The index name must
+    // match the Grafana Elasticsearch datasource pattern (`logs-dotnet-*`, see
+    // Tools/Grafana/01-bootstrap.sh) so Churches logs appear in the Logs/Fleet dashboards
+    // alongside the sibling apps — `dotnet` here is the fleet's app-logs dataset convention.
+    const streamToElastic = pinoElasticsearch({
+      node: esNode,
+      auth: esUsername && esPassword ? { username: esUsername, password: esPassword } : undefined,
+      index: 'logs-dotnet-churches',
+      esVersion: 8,
+      opType: 'create',
+      flushBytes: 1000,
+    });
+
+    // pino-elasticsearch reports failures only through events; without these listeners a rejected
+    // bulk document or a connection error is swallowed and log documents vanish with no trace.
+    streamToElastic.on('error', (err) =>
+      console.error('[logging] Elasticsearch connection error:', err),
+    );
+    streamToElastic.on('insertError', (err) =>
+      console.error('[logging] Elasticsearch insert error:', err),
+    );
+
+    streams.push({ stream: streamToElastic });
   }
 
   return pino(
@@ -58,7 +74,7 @@ function buildLogger(): Logger {
         level: (label) => ({ 'log.level': LEVEL_NAMES[label] ?? label }),
       },
     },
-    pino.transport({ targets }),
+    pino.multistream(streams),
   );
 }
 

@@ -114,4 +114,11 @@
     grid-template-columns: 1fr;
     gap: 0.15rem;
   }
+
+  /* auto-fit's minmax(150px, 1fr) still fits 3 columns at this card width by the numbers, but 150px
+     is too narrow for real placeholder text (e.g. "e.g. Traditional service", "e.g. North Campus"),
+     so labels and inputs clip. Force a single column instead of relying on auto-fit math. */
+  .mod-add-grid {
+    grid-template-columns: 1fr;
+  }
 }

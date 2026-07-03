@@ -6,14 +6,22 @@ import type { Request, Response, NextFunction } from 'express';
 
 vi.mock('pino', () => {
   const mockLogger = { info: vi.fn(), error: vi.fn(), warn: vi.fn() };
-  const mockTransport = vi.fn(() => ({ _transport: true }));
+  const mockMultistream = vi.fn(() => ({ _multistream: true }));
+  const mockDestination = vi.fn(() => ({ _stdout: true }));
   const mockStdTimeFunctions = { isoTime: vi.fn() };
   const pinoFn = Object.assign(vi.fn(() => mockLogger), {
-    transport: mockTransport,
+    multistream: mockMultistream,
+    destination: mockDestination,
     stdTimeFunctions: mockStdTimeFunctions,
   });
   return { default: pinoFn };
 });
+
+// pino-elasticsearch is mocked so unit tests never construct a real ES client; each call returns a
+// fresh stream stub whose `on` spy lets tests assert the error listeners are attached.
+vi.mock('pino-elasticsearch', () => ({
+  default: vi.fn(() => ({ on: vi.fn() })),
+}));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -135,7 +143,7 @@ describe('logger construction', () => {
     });
   });
 
-  it('builds with stdout target only when ElasticsearchNode is not set', async () => {
+  it('builds with the stdout stream only when ElasticsearchNode is not set', async () => {
     // ElasticsearchNode is absent (cleared by beforeEach).
     vi.resetModules();
 
@@ -144,16 +152,15 @@ describe('logger construction', () => {
 
     // Now get the same cached pino instance.
     const { default: pino } = await import('pino');
-    const transportArg = vi.mocked(pino.transport).mock.calls[0][0] as {
-      targets: { target: string }[];
-    };
-    const esTargets = transportArg.targets.filter(t => t.target === 'pino-elasticsearch');
+    const { default: pinoElasticsearch } = await import('pino-elasticsearch');
+    const streams = vi.mocked(pino.multistream).mock.calls[0][0] as { stream: unknown }[];
 
-    expect(esTargets).toHaveLength(0);
-    expect(transportArg.targets.some(t => t.target === 'pino/file')).toBe(true);
+    expect(pinoElasticsearch).not.toHaveBeenCalled();
+    expect(streams).toHaveLength(1);
+    expect(streams[0].stream).toEqual({ _stdout: true });
   });
 
-  it('includes the Elasticsearch target when ElasticsearchNode is configured', async () => {
+  it('adds the Elasticsearch stream when ElasticsearchNode is configured', async () => {
     process.env['ElasticsearchNode'] = 'https://es.example.com:9200';
     process.env['ElasticsearchUsername'] = 'elastic-user';
     process.env['ElasticsearchPassword'] = 'elastic-pass';
@@ -161,19 +168,34 @@ describe('logger construction', () => {
     vi.resetModules();
     await import('./logging');
     const { default: pino } = await import('pino');
+    const { default: pinoElasticsearch } = await import('pino-elasticsearch');
 
-    const transportArg = vi.mocked(pino.transport).mock.calls[0][0] as {
-      targets: { target: string; options: Record<string, unknown> }[];
-    };
-    const esTarget = transportArg.targets.find(t => t.target === 'pino-elasticsearch');
-
-    expect(esTarget).toBeDefined();
-    expect(esTarget?.options['node']).toBe('https://es.example.com:9200');
-    expect(esTarget?.options['auth']).toEqual({
-      username: 'elastic-user',
-      password: 'elastic-pass',
+    expect(pinoElasticsearch).toHaveBeenCalledWith({
+      node: 'https://es.example.com:9200',
+      auth: { username: 'elastic-user', password: 'elastic-pass' },
+      index: 'logs-dotnet-churches',
+      esVersion: 8,
+      opType: 'create',
+      flushBytes: 1000,
     });
-    expect(esTarget?.options['index']).toBe('logs-dotnet-churches');
+
+    const streams = vi.mocked(pino.multistream).mock.calls[0][0] as { stream: unknown }[];
+    expect(streams).toHaveLength(2);
+    expect(streams[1].stream).toBe(vi.mocked(pinoElasticsearch).mock.results[0].value);
+  });
+
+  it('attaches error and insertError listeners to the Elasticsearch stream', async () => {
+    process.env['ElasticsearchNode'] = 'https://es.example.com:9200';
+
+    vi.resetModules();
+    await import('./logging');
+    const { default: pinoElasticsearch } = await import('pino-elasticsearch');
+
+    const esStream = vi.mocked(pinoElasticsearch).mock.results[0].value as {
+      on: ReturnType<typeof vi.fn>;
+    };
+    expect(esStream.on).toHaveBeenCalledWith('error', expect.any(Function));
+    expect(esStream.on).toHaveBeenCalledWith('insertError', expect.any(Function));
   });
 
   it('uses the WEBSITE_SITE_NAME env var as the service.name base field', async () => {
@@ -189,13 +211,13 @@ describe('logger construction', () => {
     expect(pinoOptions.base['service.name']).toBe('test-churches-app');
   });
 
-  it('falls back to plain stdout pino when the transport build throws', async () => {
+  it('falls back to plain stdout pino when the stream build throws', async () => {
     vi.resetModules();
 
-    // Import pino BEFORE logging so we can configure the transport mock.
+    // Import pino BEFORE logging so we can configure the multistream mock.
     const { default: pino } = await import('pino');
-    vi.mocked(pino.transport).mockImplementationOnce(() => {
-      throw new Error('transport construction failed');
+    vi.mocked(pino.multistream).mockImplementationOnce(() => {
+      throw new Error('stream construction failed');
     });
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
