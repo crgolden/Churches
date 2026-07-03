@@ -106,7 +106,6 @@ export class ChurchListComponent implements OnInit {
       this.hasGeo.set(params['lat'] != null && params['lng'] != null);
       this.view.set((String(params['view'] ?? 'grid') as ViewMode));
       this.load(params);
-      this.viewportScroller.scrollToPosition([0, 0]);
     });
   }
 
@@ -135,6 +134,10 @@ export class ChurchListComponent implements OnInit {
       next: result => {
         this.results.set(result);
         this.loading.set(false);
+        // Scroll only after the new (possibly shorter/taller) result set has actually
+        // rendered — resetting scroll before the async response lands races the DOM
+        // update and can leave the viewport well below the top on the next page.
+        this.viewportScroller.scrollToPosition([0, 0]);
       },
       error: () => {
         this.error.set('Failed to load results. Please try again.');
