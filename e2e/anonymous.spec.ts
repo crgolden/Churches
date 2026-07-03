@@ -243,8 +243,8 @@ test.describe('ChurchList', () => {
     }
 
     await page.goto('/churches?q=Church&page=1&pageSize=20');
-    await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Previous' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Previous' })).toBeDisabled();
   });
 
   test('on final page, shows Previous button only', async ({ anonymousPage: page, store }) => {
@@ -283,8 +283,8 @@ test.describe('ChurchList', () => {
     }
 
     await page.goto('/churches?q=Church&page=2&pageSize=20');
-    await expect(page.getByRole('button', { name: 'Previous' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Next' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Previous' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled();
   });
 
   test('toggling map view renders Leaflet map with markers and CSS applied', async ({
@@ -295,7 +295,7 @@ test.describe('ChurchList', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/churches?q=Baptist&page=1&pageSize=20');
-    await page.getByRole('button', { name: 'Map view' }).click();
+    await page.getByRole('button', { name: 'Map', exact: true }).click();
     await expect(page.locator('.leaflet-container')).toBeVisible();
     await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible();
     await expect(page.locator('.leaflet-tile').first()).toBeVisible();
