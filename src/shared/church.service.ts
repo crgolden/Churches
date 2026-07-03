@@ -56,6 +56,7 @@ export class ChurchApiService {
     if (params.dayOfWeek != null) httpParams = httpParams.set('dayOfWeek', params.dayOfWeek);
     if (params.startTimeBefore) httpParams = httpParams.set('startTimeBefore', params.startTimeBefore);
     if (params.startTimeAfter) httpParams = httpParams.set('startTimeAfter', params.startTimeAfter);
+    if (params.sort) httpParams = httpParams.set('sort', params.sort);
     httpParams = httpParams.set('page', params.page ?? 1);
     httpParams = httpParams.set('pageSize', params.pageSize ?? 20);
     return this.http.get<SearchPagedResult>(`${this.base}/search`, { params: httpParams });

@@ -46,7 +46,7 @@
             />
             <datalist id="us-states">
               @for (s of usStates; track s.code) {
-                <option [value]="s.name">{{ s.code }}</option>
+                <option [value]="s.code" label="{{ s.name }}"></option>
               }
             </datalist>
           </div>

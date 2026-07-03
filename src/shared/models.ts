@@ -110,6 +110,7 @@ export interface SearchParams {
   startTimeAfter?: string;
   page?: number;
   pageSize?: number;
+  sort?: string;
 }
 
 export interface Denomination {

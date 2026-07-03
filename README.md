@@ -47,7 +47,7 @@ authenticated routes are client-side.
 - CSRF guard: `X-CSRF: 1` required on BFF and proxied mutating calls
 - OIDC scopes: `offline_access openid profile email directory`
 - Secrets (`ChurchesClientId`, `ChurchesClientSecret`, Redis password) via Azure Key Vault using Managed Identity
-- Observability: OTLP traces/metrics/logs → Alloy + Azure Monitor; structured logs → Elasticsearch (`pino-elasticsearch`)
+- Observability: OTLP traces/metrics → Grafana Alloy only (Azure Monitor/Application Insights removed); structured logs → Elasticsearch (`pino-elasticsearch`)
 - Health endpoint: `GET /health` → `Healthy`
 
 **Frontend (`src/`)**
@@ -73,7 +73,7 @@ authenticated routes are client-side.
 | Framework | Node.js 22 / Express 5 |
 | Auth / BFF | `openid-client` v6 + `express-session` + `connect-redis` |
 | Frontend | Angular 21 SSR (`@angular/ssr`) |
-| Observability | Azure Monitor, OpenTelemetry, `pino` → Elasticsearch |
+| Observability | OpenTelemetry → Grafana Alloy (OTLP), `pino` → Elasticsearch |
 | Hosting | Azure App Service (Linux, Node 22) |
 | Secrets | Azure Key Vault (Managed Identity) |
 
@@ -114,7 +114,7 @@ in-memory store regardless of `RedisHost`, so setting both together silently ign
 - `src/server.ts` — Express entry: `/health`, request logging, session, `/bff/*`, `/directory/api` proxy, Angular SSR catch-all.
 - `src/bff/*` — `openid-client` auth, session (Redis / in-memory), Directory proxy, CSRF.
 - `src/environments/*` — per-environment config (notably SSR `allowedHosts`), swapped via `fileReplacements`.
-- `instrumentation.mjs` — OpenTelemetry sidecar (OTLP→Alloy + Azure Monitor); `src/telemetry/logging.ts` — pino→Elasticsearch.
+- `instrumentation.mjs` — OpenTelemetry sidecar (OTLP→Alloy); `src/telemetry/logging.ts` — pino→Elasticsearch.
 
 ## Commands
 

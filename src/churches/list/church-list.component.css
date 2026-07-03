@@ -20,6 +20,32 @@
   margin: 0;
 }
 
+.searched-term {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.sort-field,
+.page-size-field {
+  display: flex;
+  align-items: center;
+}
+
+.sort-field select,
+.page-size-field select {
+  font-size: 0.85rem;
+}
+
+.view-toggle {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.view-toggle .btn-ghost.active {
+  background: rgba(var(--color-primary-rgb), .08);
+  color: var(--color-primary);
+}
+
 /* minmax(min(100%, 300px), 1fr) lets a single column shrink below 300px on narrow viewports —
    plain minmax(300px, 1fr) forces a 300px floor that overflows the padded container on phones,
    which made cards render edge-to-edge with no side padding. */
@@ -95,12 +121,71 @@
 
 .pagination {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   margin-top: var(--space-7);
 }
 
 .page-indicator {
   font-size: 0.9rem;
+}
+
+.showing-indicator {
+  font-size: 0.9rem;
+}
+
+.page-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.page-number.active {
+  background: rgba(var(--color-primary-rgb), .08);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* Compact single-column row layout for the List view — denser than .church-grid cards. */
+.church-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.church-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.church-row .church-name {
+  font-size: 1rem;
+  color: var(--color-primary);
+  font-weight: 500;
+  flex: 0 0 auto;
+  min-width: 200px;
+}
+
+.church-row .church-name:hover {
+  text-decoration: underline;
+}
+
+.church-row .church-location {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  flex: 1 1 auto;
+}
+
+.row-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex: 0 0 auto;
 }

@@ -12,19 +12,84 @@
       <p class="count">
         {{ results()!.totalCount | number }}
         {{ results()!.totalCount === 1 ? 'church' : 'churches' }} found
+        @if (q()) {
+          <span class="searched-term">for "{{ q() }}"</span>
+        }
       </p>
       <div class="list-actions">
-        <button class="btn-ghost" (click)="toggleView()">
-          {{ showMap() ? 'List view' : 'Map view' }}
-        </button>
+        <div class="filter-field sort-field">
+          <label for="sort-select" class="sr-only">Sort by</label>
+          <select id="sort-select" #sortSelect (change)="changeSort(sortSelect.value)">
+            <option value="relevance" [selected]="sort() === '' || sort() === 'relevance'">Relevance</option>
+            <option value="name" [selected]="sort() === 'name'">Name (A&ndash;Z)</option>
+            @if (hasGeo()) {
+              <option value="distance" [selected]="sort() === 'distance'">Distance</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field page-size-field">
+          <label for="page-size-select" class="sr-only">Results per page</label>
+          <select id="page-size-select" #pageSizeSelect (change)="changePageSize(+pageSizeSelect.value)">
+            <option value="10" [selected]="pageSize() === 10">10 per page</option>
+            <option value="20" [selected]="pageSize() === 20">20 per page</option>
+            <option value="50" [selected]="pageSize() === 50">50 per page</option>
+          </select>
+        </div>
+        <div class="view-toggle" role="group" aria-label="Result view">
+          <button
+            type="button"
+            class="btn-ghost"
+            [class.active]="view() === 'grid'"
+            (click)="setView('grid')">
+            Grid
+          </button>
+          <button
+            type="button"
+            class="btn-ghost"
+            [class.active]="view() === 'list'"
+            (click)="setView('list')">
+            List
+          </button>
+          <button
+            type="button"
+            class="btn-ghost"
+            [class.active]="view() === 'map'"
+            (click)="setView('map')">
+            Map
+          </button>
+        </div>
         <a routerLink="/" class="btn-ghost">&larr; Refine search</a>
       </div>
     </div>
-    @if (showMap()) {
+    @if (view() === 'map') {
       <app-church-map
         [items]="results()!.items"
         (markerClick)="null">
       </app-church-map>
+    } @else if (view() === 'list') {
+      <div class="church-list">
+        @for (item of results()!.items; track item.church.id) {
+          <article class="church-row">
+            <a [routerLink]="['/churches', item.church.slug]" class="church-name">
+              {{ item.church.canonicalName }}
+            </a>
+            <span class="church-location">
+              {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
+            </span>
+            <div class="row-tags">
+              @if (item.distanceMiles !== null) {
+                <span class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
+              }
+              @if (item.church.worshipStyle) {
+                <span class="tag">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
+              }
+              @if (item.church.wheelchairAccessible) {
+                <span class="tag tag-muted">Accessible</span>
+              }
+            </div>
+          </article>
+        }
+      </div>
     } @else {
       <div class="church-grid">
         @for (item of results()!.items; track item.church.id) {
@@ -58,17 +123,27 @@
           </article>
         }
       </div>
-      @if (results()!.totalCount > 20) {
-        <nav class="pagination" aria-label="Pagination">
-          @if (page() > 1) {
-            <button class="btn-ghost" (click)="goToPage(page() - 1)">&larr; Previous</button>
-          }
-          <span class="page-indicator text-muted">Page {{ page() }}</span>
-          @if (page() * 20 < results()!.totalCount) {
-            <button class="btn-ghost" (click)="goToPage(page() + 1)">Next &rarr;</button>
-          }
-        </nav>
-      }
+    }
+    @if (view() !== 'map' && results()!.totalCount > 0) {
+      <nav class="pagination" aria-label="Pagination">
+        <span class="showing-indicator text-muted">
+          Showing {{ showingFrom() }}&ndash;{{ showingTo() }} of {{ results()!.totalCount }}
+        </span>
+        @if (totalPages() > 1) {
+          <div class="page-buttons">
+            <button class="btn-ghost" [disabled]="page() === 1" (click)="goToPage(page() - 1)">&larr; Previous</button>
+            @for (p of pageWindow(); track p) {
+              <button
+                class="btn-ghost page-number"
+                [class.active]="p === page()"
+                (click)="goToPage(p)">
+                {{ p }}
+              </button>
+            }
+            <button class="btn-ghost" [disabled]="page() >= totalPages()" (click)="goToPage(page() + 1)">Next &rarr;</button>
+          </div>
+        }
+      </nav>
     }
   </div>
 } @else {
