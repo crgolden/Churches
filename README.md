@@ -10,61 +10,31 @@ the OIDC session and proxies every data call to the standalone [Directory](https
 API; the browser never sees an access token directly. Anonymous SEO routes are server-side rendered;
 authenticated routes are client-side.
 
-> **Architecture note:** the church data API (search, crawling, moderation, enrichment) lives in the
-> separate [Directory](https://github.com/crgolden/Directory) repo. This repo is purely the Angular
-> SSR client + Node BFF, mirroring [Inventory](https://github.com/crgolden/Inventory).
+> **Architecture:** the full end-to-end platform architecture — Churches UI + BFF, the
+> [Directory](https://github.com/crgolden/Directory) API, and the
+> [Functions](https://github.com/crgolden/Functions) data pipeline — is documented in
+> **[ARCHITECTURE.md](ARCHITECTURE.md)**. This README covers only how to run and deploy this repo.
 
 ## Sibling Applications
 
 | Repo | Role | How Churches interacts |
 |---|---|---|
 | [Identity](https://github.com/crgolden/Identity) | OIDC Identity Provider | OIDC authorization-code flow via `openid-client` in the Node BFF |
-| [Directory](https://github.com/crgolden/Directory) | Church directory API | BFF proxies `/directory/api/**` via `http-proxy-middleware`, attaching the user Bearer token (scope `directory`) when present |
+| [Directory](https://github.com/crgolden/Directory) | Church directory API | BFF proxies `/directory/api/**` via a `fetch`-based proxy (`src/bff/proxy.ts`), attaching the user Bearer token (scope `directory`) when present |
 | [Infrastructure](https://github.com/crgolden/Infrastructure) | Health monitoring dashboard | Polls `GET /health` (returns `Healthy`) |
 
 ## Architecture
 
-```
-┌────────────────────────────────────┐
-│  Angular 21 SSR + Node.js BFF      │  :4000 (dev SSR) / :4321 (ng serve)
-│  Express middleware stack:         │
-│    session (connect-redis)         │
-│    /bff/* (openid-client)          │
-│    /directory/api/** (proxy)       │
-│    Angular SSR catch-all           │
-└──────────────┬─────────────────────┘
-               │ /directory/api/** (Bearer token from session)
-    ┌──────────▼───────────────┐
-    │   Directory API          │
-    │   (crgolden-directory)   │
-    └──────────────────────────┘
-```
+See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the end-to-end platform architecture (request flow through the Express/SSR stack, OIDC + proxy sequence diagrams, the Directory API, and the Functions data pipeline). In one paragraph:
 
-**Backend (`src/server.ts`)**
-- `express-session` + `connect-redis` for session persistence
-- `openid-client` v6 — authorization-code + RP-initiated logout (`/bff/login`, `/bff/logout`, `/bff/user`)
-- `http-proxy-middleware` — `/directory/api/**` proxied with `Authorization: Bearer` from session
-- CSRF guard: `X-CSRF: 1` required on BFF and proxied mutating calls
-- OIDC scopes: `offline_access openid profile email directory`
-- Secrets (`ChurchesClientId`, `ChurchesClientSecret`, Redis password) via Azure Key Vault using Managed Identity
-- Observability: OTLP traces/metrics → Grafana Alloy only (Azure Monitor/Application Insights removed); structured logs → Elasticsearch (`pino-elasticsearch`)
-- Health endpoint: `GET /health` → `Healthy`
-
-**Frontend (`src/`)**
-- Angular 21 **zoneless** change detection
-- SSR render modes: anonymous routes (`/`, `/churches`, `/churches/:slug`) → `RenderMode.Server`;
-  authenticated routes (`/contribute`, `/admin/moderation`) → `RenderMode.Client`
-- Per-page SEO: `<title>`, `<meta description>`, canonical, Open Graph, JSON-LD (detail pages) — see `src/shared/seo.service.ts`
-- Public church search and detail (anonymous), contributions and moderation tooling (authenticated)
-- Map view: Leaflet (dynamic import, browser-only)
-
-**Feature areas**
-
-| Route | Auth | Backed by |
-|---|---|---|
-| Home / search, church detail | anonymous | Directory API via BFF (`/directory/api/**`) |
-| Contributions (submit correction) | authenticated | Directory API `POST /corrections` (scope `directory`) via BFF with user token |
-| Moderation (review, crawl sources, merge) | authenticated + `churches.mod` claim | Directory API moderation endpoints via BFF with user token |
+A single Node process runs both the Angular 21 SSR renderer and an Express BFF. The BFF owns the
+OIDC session (`openid-client` v6, PKCE; scopes `offline_access openid profile email directory`),
+proxies `/directory/api/**` to the Directory API with the session's Bearer token (or anonymously),
+and requires `X-CSRF: 1` on mutating calls. Anonymous routes (`/`, `/churches`, `/churches/:slug`)
+are server-rendered for SEO; authenticated routes (`/contribute/:slug`, `/admin/moderation`) are
+client-rendered. Frontend is zoneless Angular; maps are Leaflet, browser-only. Observability: OTLP
+traces/metrics → Grafana Alloy; structured logs → Elasticsearch (`pino-elasticsearch`).
+`GET /health` → `Healthy`.
 
 ## Tech Stack
 

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://crgolden.com/sitemap.xml
+Sitemap: https://crgolden.z13.web.core.windows.net/sitemap.xml
