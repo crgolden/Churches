@@ -98,7 +98,7 @@ npm run lint         # ESLint
 npx vitest run       # unit tests (Vitest); add --coverage for LCOV
 npm run e2e          # build:ci + Playwright E2E vs the real Node server + mock Directory/OIDC (self-builds)
 npm run e2e:smoke    # Playwright smoke tests against a deployed stack (SmokeBaseUrl)
-.\Invoke-SmokeTests.ps1 -BaseUrl https://crgolden-churches.azurewebsites.net
+.\Invoke-SmokeTests.ps1 -BaseUrl https://your-churches-app.azurewebsites.net
 ```
 
 See [TESTING.md](TESTING.md) for the full E2E / smoke test guide and CI configuration.

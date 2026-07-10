@@ -1,5 +1,17 @@
 # Church Platform Architecture
 
+<!--
+Mermaid maintenance note: never put labels ON edges in flowchart/graph diagrams
+(`-->|text|`, `-- text -->`) or on erDiagram relationships. GitHub renders diagrams
+in lazy iframes, and Mermaid 11.16.0 throws "Could not find a suitable point for the
+given distance" whenever a labeled edge is laid out while the iframe is hidden —
+diagrams then randomly show as raw source. Instead use borderless label nodes:
+    A --- LBL["label text"] --> B
+    classDef edgeLabel fill:none,stroke:none
+    class LBL edgeLabel
+Sequence diagrams are unaffected.
+-->
+
 This document describes the nationwide U.S. church-discovery platform end-to-end: how a page request travels through the **Churches** app (Angular SSR + Node BFF), how the **Directory** API serves and curates the data, and how the **Functions** pipeline discovers, scrapes, enriches, geocodes, and scores churches in the background. It is the authoritative architecture reference for the platform; the per-repo READMEs keep only operational reference (commands, config keys, deployment steps).
 
 | Repo | Role | Reference docs |
@@ -23,7 +35,7 @@ graph TB
 
     Identity["Identity<br/>(Duende IdentityServer)"]
     DirectoryAPI["Directory API<br/>(ASP.NET Core Minimal API)"]
-    SQL[("SQL Server<br/>catalog: Directory<br/>(self-hosted, crgolden.com)")]
+    SQL[("SQL Server<br/>catalog: Directory<br/>(self-hosted)")]
     Redis[("Redis<br/>(sessions, self-hosted)")]
 
     subgraph Pipeline["Functions — isolated worker"]
@@ -42,12 +54,12 @@ graph TB
     Obs["Grafana Alloy (OTLP) + Elasticsearch<br/>(self-hosted observability)"]
     Infra["Infrastructure dashboard<br/>polls /health"]
 
-    Browser -->|"HTTPS"| ChurchesApp
-    BFF -->|"OIDC code flow"| Identity
-    BFF -->|"/directory/api/** (Bearer or anon)"| DirectoryAPI
+    Browser --> ChurchesApp
+    BFF --- L1["OIDC code flow"] --> Identity
+    BFF --- L2["/directory/api/**<br/>(Bearer or anon)"] --> DirectoryAPI
     BFF --> Redis
     DirectoryAPI --> SQL
-    DirectoryAPI -->|"publish"| ServiceBus
+    DirectoryAPI --> ServiceBus
     ServiceBus <--> Workers
     Workers --> SQL
     Workers --> Blob
@@ -60,8 +72,11 @@ graph TB
     ChurchesApp -.-> Obs
     DirectoryAPI -.-> Obs
     Pipeline -.-> Obs
-    Infra -.->|"GET /health"| ChurchesApp
-    Infra -.->|"GET /health"| DirectoryAPI
+    Infra -.-> ChurchesApp
+    Infra -.-> DirectoryAPI
+
+    classDef edgeLabel fill:none,stroke:none
+    class L1,L2 edgeLabel
 ```
 
 The browser only ever talks to the Churches app. The Directory API is the single interactive data service, consumed exclusively through the Churches BFF. All background data acquisition flows through Azure Service Bus queues into the Functions workers, which write to the same SQL database the Directory API reads — but through exactly one gate (`ChurchWriter`, described below).
@@ -79,23 +94,26 @@ Middleware mounts in this exact order (`src/server.ts`):
 ```mermaid
 flowchart TD
     A["Incoming request<br/>(trust proxy = 1)"] --> B{"Host allowed?<br/>AngularNodeAppEngine allowedHosts"}
-    B -- no --> B1["Rejected — prevents SSRF /<br/>silent CSR fallback"]
-    B -- yes --> C{"GET /health?"}
-    C -- yes --> C1["200 'Healthy'<br/>(before logging — keeps logs clean)"]
-    C -- no --> D["requestLogger (pino)"]
+    B --- BN["no"] --> B1["Rejected — prevents SSRF /<br/>silent CSR fallback"]
+    B --- BY["yes"] --> C{"GET /health?"}
+    C --- CY["yes"] --> C1["200 'Healthy'<br/>(before logging — keeps logs clean)"]
+    C --- CN["no"] --> D["requestLogger (pino)"]
     D --> E["applySession<br/>(connect-redis, or in-memory when RedisHost unset)"]
     E --> F{"/bff/* ?"}
-    F -- yes --> F1["BFF router<br/>login / callback / user / logout"]
-    F -- no --> G{"/directory/api/** ?"}
-    G -- yes --> H["csrfForMutating<br/>(X-CSRF: 1 on POST/PUT/PATCH/DELETE)"]
+    F --- FY["yes"] --> F1["BFF router<br/>login / callback / user / logout"]
+    F --- FN["no"] --> G{"/directory/api/** ?"}
+    G --- GY["yes"] --> H["csrfForMutating<br/>(X-CSRF: 1 on POST/PUT/PATCH/DELETE)"]
     H --> I["directoryProxy<br/>(fetch-based, Bearer from session or anonymous)"]
-    G -- no --> J["Static files<br/>(1-year cache)"]
+    G --- GN["no"] --> J["Static files<br/>(1-year cache)"]
     J --> K["Angular SSR catch-all"]
+
+    classDef edgeLabel fill:none,stroke:none
+    class BN,BY,CY,CN,FY,FN,GY,GN edgeLabel
 ```
 
-Two details here are load-bearing:
+Two details here matter more than they look:
 
-- **`allowedHosts` is an SSRF guard with an SEO failure mode.** Angular SSR rejects requests whose `Host` header isn't allow-listed — but the rejection is a *silent fallback to client-side rendering*, which defeats server-rendered SEO without any error. The allow-list is sourced per environment via `fileReplacements` (`src/environments/`): production allows `crgolden.com`, `*.crgolden.com`, and `*.azurewebsites.net`; dev and CI allow only `localhost`. Any new production hostname must be added there.
+- **`allowedHosts` is an SSRF guard with an SEO failure mode.** Angular SSR rejects requests whose `Host` header isn't allow-listed — but the rejection is a *silent fallback to client-side rendering*, which defeats server-rendered SEO without any error. The allow-list is sourced per environment via `fileReplacements` (`src/environments/`); dev and CI allow only `localhost`. Any new production hostname must be added there.
 - **The proxy is hand-rolled, not `http-proxy-middleware`.** `src/bff/proxy.ts` uses `fetch` directly because it needs token-aware behavior a generic proxy doesn't have (next section).
 
 ### Authentication
@@ -180,7 +198,7 @@ The split is deliberate: anonymous routes are `RenderMode.Server` because they a
 
 `SeoService` (`src/shared/seo.service.ts`) sets title, meta description, canonical, Open Graph, and Twitter tags per page; detail pages additionally emit a JSON-LD `@graph` containing schema.org `Church` and `BreadcrumbList`. All of it renders server-side on the public routes. The sitemap is *not* generated by this app — the Functions `SitemapGenerator` timer writes it to blob static hosting nightly (see the pipeline section), and `public/robots.txt` points crawlers at it.
 
-> **Hostname note:** `robots.txt` points at the sitemap's real location — the storage static-web endpoint (`https://crgolden.z13.web.core.windows.net/sitemap.xml`, i.e. the `$web` container `SitemapGenerator` writes to). The URLs *inside* the sitemap use `ChurchesBaseUrl` (`https://crgolden-churches.azurewebsites.net`) — no custom domain is bound to the Churches App Service yet. When one lands (the prod `allowedHosts` entries for `crgolden.com` already anticipate it), align `ChurchesBaseUrl`, `robots.txt`, and canonical URLs to it.
+> **Hostname note:** `robots.txt` points at the sitemap's real location — the storage account's static-website endpoint (the `$web` container `SitemapGenerator` writes to). The URLs *inside* the sitemap are built from `ChurchesBaseUrl`. Once a custom domain is bound to the app, `ChurchesBaseUrl`, `robots.txt`, and the canonical URLs should all move to it together.
 
 ---
 
@@ -208,7 +226,7 @@ JWT Bearer validation against Identity with `ValidateAudience = false` and `MapI
 | `Admin/` | `POST /admin/import` (CSV), `GET /admin/export` (CSV stream) | `ChurchesMod` |
 | `User/` | `GET /me` | Anonymous |
 
-> **Known quirk:** `GET /me` computes its `HasModerationScope` field by looking for a `scope = churches.mod` claim, while the `ChurchesMod` policy that actually gates moderation endpoints checks the claim `churches.mod = true`. These are different claim shapes; the two can disagree depending on how the token is minted. Documented here rather than silently papered over.
+> **Known quirk:** `GET /me` computes its `HasModerationScope` field by looking for a `scope = churches.mod` claim, while the `ChurchesMod` policy that actually gates moderation endpoints checks the claim `churches.mod = true`. These are different claim shapes; the two can disagree depending on how the token is minted.
 
 ### Search internals
 
@@ -225,13 +243,13 @@ Schema is owned by `Directory.Data` (a `Microsoft.Build.Sql` SQL project, deploy
 
 ```mermaid
 erDiagram
-    Denominations ||--o{ Churches : "classifies"
-    Churches ||--o{ Campuses : "has (cascade delete)"
-    Churches ||--o{ Ministries : "has (cascade delete)"
-    Churches ||--o{ ServiceSchedules : "has (cascade delete)"
-    Churches ||--o{ ChurchAttributes : "has (cascade delete)"
-    Churches ||--o{ UserCorrections : "receives (cascade delete)"
-    Churches |o--o{ CrawlSources : "linked after first successful crawl"
+    Denominations ||--o{ Churches : ""
+    Churches ||--o{ Campuses : ""
+    Churches ||--o{ Ministries : ""
+    Churches ||--o{ ServiceSchedules : ""
+    Churches ||--o{ ChurchAttributes : ""
+    Churches ||--o{ UserCorrections : ""
+    Churches |o--o{ CrawlSources : ""
 
     Churches {
         uniqueidentifier Id PK
@@ -272,6 +290,8 @@ erDiagram
     }
 ```
 
+All `Churches` child relationships (`Campuses`, `Ministries`, `ServiceSchedules`, `ChurchAttributes`, `UserCorrections`) cascade-delete with their church. `CrawlSources.ChurchId` is nullable — a crawl source is only linked to a church after its first successful crawl produces a write.
+
 ### What Directory writes vs. what it delegates
 
 The API writes churches and their children directly only for **moderator-initiated** operations: church CRUD, child curation, correction approve/reject, and merge. Merge is a single ADO.NET transaction that repoints all child FKs (CrawlSources, ChurchAttributes, ServiceSchedules, Ministries, Campuses, UserCorrections) to the surviving church, soft-deletes the absorbed one, and inserts a `MergeAuditLog` row.
@@ -284,7 +304,7 @@ Everything else it **delegates to the pipeline** by publishing Service Bus messa
 | `POST /crawl-sources/{id}/trigger` | `scrape-requests` | `ScraperWorker` |
 | `POST /corrections` | `contributions` | `ContributionProcessor` |
 
-Note the corrections asymmetry: submitting a correction does **not** write to SQL — the message goes to the `contributions` queue and the Functions `ContributionProcessor` inserts the pending row. Only the approve/reject moderation step is a direct API write.
+Submitting a correction does **not** write to SQL — the message goes to the `contributions` queue and the Functions `ContributionProcessor` inserts the pending row. Only the approve/reject moderation step is a direct API write.
 
 ---
 
@@ -316,11 +336,14 @@ flowchart TD
     CS --> Q1
     TRG --> Q1
     Q1 --> SW --> Q2 --> EX
-    EX -- "confidence ≥ 0.5 AND city present" --> Q4
-    EX -- "otherwise" --> Q3 --> EN --> Q4
-    BIJ -- "dedup by name+state, Chunk(100)" --> Q4
+    EX --- EXT["confidence ≥ 0.5 AND city present"] --> Q4
+    EX --- EXO["otherwise"] --> Q3 --> EN --> Q4
+    BIJ --- BIL["dedup by name+state, Chunk(100)"] --> Q4
     Q4 --> GW --> CW --> DB
-    CW -- "after commit" --> Q5 --> CC --> DB
+    CW --- CWL["after commit"] --> Q5 --> CC --> DB
+
+    classDef edgeLabel fill:none,stroke:none
+    class EXT,EXO,BIL,CWL edgeLabel
 ```
 
 The extractor branch is the cost gate: pages the deterministic extractor can read with confidence ≥ 0.5 (`Tier2Threshold`) *and* a city skip the LLM entirely; only ambiguous pages pay for an OpenAI call. The enrichment worker deliberately re-downloads the original HTML blob and prompts against the raw page — not the extractor's already-incomplete partial fields.
@@ -395,7 +418,7 @@ The pipeline distinguishes *expected* failures (dead websites, unparseable addre
 
 `Shared.Domain` (from the private `Shared` NuGet package) provides self-validating entities — `Church`, `Campus`, `Ministry`, `ServiceSchedule`, `ChurchAttribute` — with private constructors and static factories that enforce every NOT NULL/range invariant at construction, mirroring the SQL schema exactly. The one intentional exception: `(0,0)` coordinates are valid, as the pipeline's not-yet-geocoded marker.
 
-**Current adoption is validation-gate-only, stated honestly:** Directory's `ChurchService`/`ScheduleService`/`MinistryService`/`CampusService` and Functions' `ChurchWriter` build a `Shared.Domain` entity to *validate* input (`EnsureValid`-style build-and-discard) before writing, but the wire models and persisted shapes are still local DTOs. Migrating those to the shared entities is a known follow-up, not a done thing.
+Adoption is currently validation-only: Directory's `ChurchService`/`ScheduleService`/`MinistryService`/`CampusService` and Functions' `ChurchWriter` build a `Shared.Domain` entity to *validate* input before writing, then discard it — the wire models and persisted shapes are still local DTOs. Migrating those to the shared entities is a planned follow-up.
 
 ---
 
@@ -407,29 +430,29 @@ Identity (Duende IdentityServer) issues every token. The Churches BFF is a confi
 
 ### Telemetry
 
-All three services export OTLP traces and metrics to a self-hosted Grafana Alloy (gated on `AlloyEndpoint`; `/health` excluded from tracing), and structured logs to self-hosted Elasticsearch — pino (`pino-elasticsearch` multistream, index `logs-dotnet-churches`) for the Node app, Serilog data streams for the .NET services. The Churches OTLP SDK loads as a `node --import ./instrumentation.mjs` sidecar before the app. Fleet-wide telemetry conventions live in the workspace-level TELEMETRY.md (not part of any single repo).
+All three services export OTLP traces and metrics to a self-hosted Grafana Alloy (gated on `AlloyEndpoint`; `/health` excluded from tracing), and structured logs to self-hosted Elasticsearch — pino (`pino-elasticsearch` multistream, index `logs-dotnet-churches`) for the Node app, Serilog data streams for the .NET services. The Churches OTLP SDK loads as a `node --import ./instrumentation.mjs` sidecar before the app.
 
-### Azure hosting (live-verified 2026-07-10)
+### Azure hosting
 
-Everything sits in one resource group (`crgolden`, East US). Data stores and observability are deliberately **not** Azure — SQL Server, Redis, Elasticsearch, and Grafana Alloy are self-hosted at `crgolden.com`.
+Everything sits in one resource group. The data stores and observability stack are not Azure — SQL Server, Redis, Elasticsearch, and Grafana Alloy are self-hosted.
 
 ```mermaid
 graph LR
-    subgraph Azure["Azure — resource group 'crgolden'"]
-        CH["crgolden-churches<br/>App Service · Linux · NODE 22-lts"]
-        DIR["crgolden-directory<br/>App Service · Windows · .NET 10"]
-        FN["crgolden-functions<br/>Function App · Linux"]
-        SB[["Service Bus 'crgolden'<br/>Basic tier · 7 queues"]]
-        ST[("Storage 'crgolden'<br/>$web · churches · imports")]
-        KV["Key Vault 'crgolden'"]
-        AOAI["crgolden-manuals<br/>Azure OpenAI · gpt-5-mini"]
-        MSI["oidc-msi-9309<br/>GitHub Actions deploy identity"]
+    subgraph Azure["Azure — one resource group"]
+        CH["Churches<br/>App Service · Linux · Node 22"]
+        DIR["Directory<br/>App Service · Windows · .NET 10"]
+        FN["Functions<br/>Function App · Linux"]
+        SB[["Service Bus<br/>Basic tier · 7 queues"]]
+        ST[("Storage<br/>$web · churches · imports")]
+        KV["Key Vault"]
+        AOAI["Azure OpenAI<br/>gpt-5-mini"]
+        MSI["Deploy identity<br/>(GitHub Actions OIDC)"]
     end
-    subgraph SelfHosted["Self-hosted — crgolden.com"]
+    subgraph SelfHosted["Self-hosted"]
         SQL[("SQL Server<br/>catalog Directory")]
-        RED[("Redis :6379")]
-        ES[("Elasticsearch :9200")]
-        AL["Grafana Alloy :4317"]
+        RED[("Redis")]
+        ES[("Elasticsearch")]
+        AL["Grafana Alloy"]
     end
     CH --> KV
     CH --> RED
@@ -452,27 +475,27 @@ graph LR
 
 | App | Plan/OS | Runtime identity | Notes |
 |---|---|---|---|
-| `crgolden-churches` | Linux, `NODE\|22-lts` | System-assigned MI | Startup: `node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`. Only hostname is `crgolden-churches.azurewebsites.net` — no custom domain yet (the `crgolden.com` entries in prod `allowedHosts` are forward-looking) |
-| `crgolden-directory` | **Windows**, .NET v10.0 | System-assigned MI | Data protection keys in blob (`identity/keys.xml`) wrapped by a Key Vault key |
-| `crgolden-functions` | Linux Function App | System-assigned MI | Fully identity-based bindings (`ServiceBusConnection__fullyQualifiedNamespace` + `__credential`, `AzureWebJobsStorage__credential`) — no connection strings anywhere |
+| Churches | Linux, Node 22 LTS | System-assigned MI | Startup: `node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`. No custom domain bound yet |
+| Directory | **Windows**, .NET 10 | System-assigned MI | Data protection keys in blob, wrapped by a Key Vault key |
+| Functions | Linux Function App | System-assigned MI | Fully identity-based bindings (`ServiceBusConnection__fullyQualifiedNamespace` + `__credential`, `AzureWebJobsStorage__credential`) — no connection strings anywhere |
 
-**RBAC per managed identity** (least-privilege, verified per principal):
+**RBAC per managed identity** (least privilege):
 
 | Identity | Roles |
 |---|---|
 | churches | Key Vault Secrets User + Crypto User; Storage Blob Data Contributor |
 | directory | Key Vault Secrets User + Crypto User; Storage Blob Data Contributor; **Service Bus Data Sender** (publish-only — it can enqueue but never consume) |
-| functions | Key Vault Secrets User; Storage Blob Data Contributor; **Service Bus Data Sender + Receiver + Data Owner** (Owner is required by `QueueDepthMonitorJob` — reading runtime queue properties needs more than Receiver); **Cognitive Services OpenAI User** on `crgolden-manuals` (the OpenAI account is shared with the Manuals app) |
-| `oidc-msi-9309` | GitHub Actions federated-credential deploy identity — deployment only, not runtime |
+| functions | Key Vault Secrets User; Storage Blob Data Contributor; **Service Bus Data Sender + Receiver + Data Owner** (Owner is required by `QueueDepthMonitorJob` — reading runtime queue properties needs more than Receiver); **Cognitive Services OpenAI User** on the Azure OpenAI account |
+| deploy identity | GitHub Actions federated-credential deploy identity — deployment only, not runtime |
 
-Key production settings (verified): Churches — `OidcAuthority=https://crgolden-identity.azurewebsites.net`, `DirectoryApiAddress=https://crgolden-directory.azurewebsites.net`, `RedisHost=crgolden.com` / `RedisPort=6379`; only `ChurchesClientId`/`ChurchesClientSecret` come from Key Vault, the rest are App Service settings. Directory — `SqlConnectionStringBuilder__DataSource=crgolden.com`, `ServiceBusNamespace=crgolden.servicebus.windows.net`. Functions — `ChurchesBaseUrl=https://crgolden-churches.azurewebsites.net`, `CensusGeocoderUrl=https://geocoding.geo.census.gov/geocoder/locations/address`.
+Configuration comes from App Service settings plus Key Vault: the Churches app fetches only its OIDC client credentials (`ChurchesClientId`/`ChurchesClientSecret`) from Key Vault at startup, everything else (`OidcAuthority`, `DirectoryApiAddress`, `RedisHost`, …) is an App Service setting. Directory and Functions follow the same pattern with their own keys.
 
 ### Deployment pipelines
 
 Each repo deploys independently via GitHub Actions with Azure OIDC federated credentials:
 
-- **Churches** → Linux App Service `crgolden-churches`: `npm ci` → lint → CI build → Vitest → Playwright E2E → SonarCloud → production build → deploy → post-deploy smoke tests.
-- **Directory** → Windows App Service `crgolden-directory`: build (compiles the `Directory.Data` dacpac) → unit tests + coverage → SonarCloud → **dacpac deployed via SqlPackage before the app** — the schema is always ahead of or equal to the code.
-- **Functions** → Function App `crgolden-functions`: build + deploy (no test job).
+- **Churches** → Linux App Service: `npm ci` → lint → CI build → Vitest → Playwright E2E → SonarCloud → production build → deploy → post-deploy smoke tests.
+- **Directory** → Windows App Service: build (compiles the `Directory.Data` dacpac) → unit tests + coverage → SonarCloud → **dacpac deployed via SqlPackage before the app** — the schema is always ahead of or equal to the code.
+- **Functions** → Function App: build + deploy (no test job).
 
 Testing strategy per repo: [Churches/TESTING.md](TESTING.md), [Directory/TESTING.md](https://github.com/crgolden/Directory/blob/main/TESTING.md), [Functions/TESTING.md](https://github.com/crgolden/Functions/blob/main/TESTING.md).
