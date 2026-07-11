@@ -1,16 +1,6 @@
 # Church Platform Architecture
 
-<!--
-Mermaid maintenance note: never put labels ON edges in flowchart/graph diagrams
-(`-->|text|`, `-- text -->`) or on erDiagram relationships. GitHub renders diagrams
-in lazy iframes, and Mermaid 11.16.0 throws "Could not find a suitable point for the
-given distance" whenever a labeled edge is laid out while the iframe is hidden —
-diagrams then randomly show as raw source. Instead use borderless label nodes:
-    A --- LBL["label text"] --> B
-    classDef edgeLabel fill:none,stroke:none
-    class LBL edgeLabel
-Sequence diagrams are unaffected.
--->
+<!-- Keep flowchart/ER edges label-free (GitHub's Mermaid fails on labeled edges in hidden iframes); use the borderless label-node pattern seen in the diagrams below. -->
 
 This document describes the nationwide U.S. church-discovery platform end-to-end: how a page request travels through the **Churches** app (Angular SSR + Node BFF), how the **Directory** API serves and curates the data, and how the **Functions** pipeline discovers, scrapes, enriches, geocodes, and scores churches in the background. It is the authoritative architecture reference for the platform; the per-repo READMEs keep only operational reference (commands, config keys, deployment steps).
 
