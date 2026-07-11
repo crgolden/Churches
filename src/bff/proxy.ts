@@ -101,7 +101,14 @@ export async function directoryProxy(
   // Express strips the mount prefix for middleware registered via app.use('/directory/api', ...).
   // Using originalUrl here would forward the full '/directory/api/...' path to Directory, whose
   // real routes have no such prefix (e.g. '/denominations', '/search').
-  const targetUrl = `${base}${req.url}`;
+  //
+  // Resolve the request path against the fixed Directory base with the URL constructor rather
+  // than concatenating strings: this guarantees the upstream origin is always DirectoryApiAddress
+  // and can never be overridden by a crafted request path (a protocol-relative '//evil.host' or a
+  // userinfo '@evil.host'). Leading slashes are stripped so req.url always resolves as a path under
+  // the base rather than replacing it, and the trailing slash on the base keeps its last segment.
+  const relativePath = req.url.replace(/^\/+/, '');
+  const targetUrl = new URL(relativePath, `${base}/`);
 
   // Proactively refresh if the token is within 60 s of expiry.
   const { accessToken, refreshToken, tokenExpiresAt } = req.session;

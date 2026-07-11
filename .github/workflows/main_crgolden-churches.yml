@@ -42,13 +42,13 @@ jobs:
           restore-keys: ${{ runner.os }}-npm-
 
       - name: Install npm dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint
         run: npm run lint
 
       - name: Run unit tests with coverage
-        run: npx vitest run --coverage
+        run: npm run test:coverage
 
       # istanbul on Linux writes forward-slash paths already; normalise for safety.
       - name: Fix LCOV paths for SonarQube
@@ -69,7 +69,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: npm run playwright:install
 
       # Save immediately after install (before E2E) so the browser download is cached even when a
       # later step fails — actions/cache's post-step save only runs on full job success.
@@ -196,7 +196,7 @@ jobs:
       # SonarCloud analysis — runs after coverage is generated and tests pass.
       # Uses the sonarcloud-github-action (no JDK/dotnet-sonarscanner setup required).
       - name: SonarCloud analysis
-        uses: sonarsource/sonarcloud-github-action@master
+        uses: sonarsource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8  # v5.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -292,7 +292,7 @@ jobs:
           restore-keys: ${{ runner.os }}-npm-
 
       - name: Install npm dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Restore Playwright browsers cache
         id: cache-playwright
@@ -303,7 +303,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: npm run playwright:install
 
       - name: Warm up deployed app
         run: |

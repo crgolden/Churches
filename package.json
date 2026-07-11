@@ -9,9 +9,11 @@
     "watch": "ng build --watch --configuration development",
     "lint": "ng lint",
     "test": "ng test",
+    "test:coverage": "vitest run --coverage",
     "build:ci": "ng build --configuration=ci",
     "e2e": "npm run build:ci && playwright test --project=e2e",
-    "e2e:smoke": "playwright test --project=smoke"
+    "e2e:smoke": "playwright test --project=smoke",
+    "playwright:install": "playwright install --with-deps chromium"
   },
   "private": true,
   "packageManager": "npm@11.9.0",
