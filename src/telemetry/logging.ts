@@ -60,7 +60,9 @@ function buildLogger(): Logger {
       console.error('[logging] Elasticsearch insert error:', err),
     );
 
-    streams.push({ stream: streamToElastic });
+    // Only Warning+ ships to Elasticsearch — mirrors the Serilog minimum-level-override the .NET
+    // apps set in Azure app settings, keeping chatty info/debug logs out of the fleet's ES cluster.
+    streams.push({ stream: streamToElastic, level: 'warn' });
   }
 
   return pino(
