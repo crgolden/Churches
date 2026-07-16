@@ -420,7 +420,7 @@ Identity (Duende IdentityServer) issues every token. The Churches BFF is a confi
 
 ### Telemetry
 
-All three services export OTLP traces and metrics to a self-hosted Grafana Alloy (gated on `AlloyEndpoint`; `/health` excluded from tracing), and structured logs to self-hosted Elasticsearch — pino (`pino-elasticsearch` multistream, index `logs-dotnet-churches`) for the Node app, Serilog data streams for the .NET services. The Churches OTLP SDK loads as a `node --import ./instrumentation.mjs` sidecar before the app.
+All three services export OTLP traces and metrics to a self-hosted Grafana Alloy (gated on `AlloyEndpoint`; `/health` excluded from tracing), and structured logs to self-hosted Elasticsearch — pino (`pino-elasticsearch` multistream, index `logs-app-churches`) for the Node app, Serilog data streams for the .NET services. The Churches OTLP SDK loads as a `node --import ./instrumentation.mjs` sidecar before the app.
 
 ### Azure hosting
 

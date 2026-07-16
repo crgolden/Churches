@@ -39,13 +39,13 @@ function buildLogger(): Logger {
 
   if (esNode) {
     // pino-elasticsearch writes to a data stream when opType is 'create'. The index name must
-    // match the Grafana Elasticsearch datasource pattern (`logs-dotnet-*`, see
+    // match the Grafana Elasticsearch datasource pattern (`logs-app-*`, see
     // Tools/Grafana/01-bootstrap.sh) so Churches logs appear in the Logs/Fleet dashboards
-    // alongside the sibling apps — `dotnet` here is the fleet's app-logs dataset convention.
+    // alongside the sibling apps — `app` here is the fleet's app-logs dataset convention.
     const streamToElastic = pinoElasticsearch({
       node: esNode,
       auth: esUsername && esPassword ? { username: esUsername, password: esPassword } : undefined,
-      index: 'logs-dotnet-churches',
+      index: 'logs-app-churches',
       esVersion: 8,
       opType: 'create',
       flushBytes: 1000,

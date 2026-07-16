@@ -173,7 +173,7 @@ describe('logger construction', () => {
     expect(pinoElasticsearch).toHaveBeenCalledWith({
       node: 'https://es.example.com:9200',
       auth: { username: 'elastic-user', password: 'elastic-pass' },
-      index: 'logs-dotnet-churches',
+      index: 'logs-app-churches',
       esVersion: 8,
       opType: 'create',
       flushBytes: 1000,
