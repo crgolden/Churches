@@ -32,15 +32,20 @@ app.set('trust proxy', 1);
 // falls back to client-side rendering — which would defeat the entire SSR/SEO goal. The allow-list is
 // per-environment (see src/environments/*), swapped at build time via fileReplacements.
 //
-// trustProxyHeaders: true is required because Azure App Service's edge always injects X-Forwarded-For
-// (and other X-Forwarded-* headers) on every request. Angular's default trusted set only covers
+// trustProxyHeaders is required because Azure App Service's edge always injects X-Forwarded-For (and
+// other X-Forwarded-* headers) on every request. Angular's default trusted set only covers
 // x-forwarded-host/x-forwarded-proto; any other X-Forwarded-* header present without being explicitly
-// trusted causes Angular to silently deopt to client-side-only rendering (serveClientSidePage()) —
-// this broke SSR/SEO for every production request behind Azure's proxy until this was set. Safe here
-// since Azure App Service's edge is the only entity that can reach this Node process directly.
+// trusted causes Angular to silently deopt to client-side-only rendering (serveClientSidePage()) — this
+// broke SSR/SEO for every production request behind Azure's proxy until this was set. `true` is NOT
+// enough here: @angular/ssr normalizes `true` to a fixed 5-header set (x-forwarded-for/host/port/proto/
+// prefix) that does NOT include `X-Forwarded-Tlsversion` — a header Azure App Service also sends on
+// every request — so `true` alone still deopts every request to CSR (confirmed live: crgolden.com was
+// serving every page as CSR-only under `trustProxyHeaders: true`). List every X-Forwarded-* header
+// Azure's edge is known to send. Safe here since Azure App Service's edge is the only entity that can
+// reach this Node process directly.
 const angularApp = new AngularNodeAppEngine({
   allowedHosts: environment.allowedHosts,
-  trustProxyHeaders: true,
+  trustProxyHeaders: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-port', 'x-forwarded-proto', 'x-forwarded-tlsversion'],
 });
 
 // Health endpoint — mounted first so it is anonymous and untraced (the instrumentation.mjs http
