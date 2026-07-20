@@ -79,6 +79,35 @@ app.use('/directory/api', csrfForMutating, directoryProxy);
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// GET /sitemap.xml: streams the sitemap from blob static-website hosting (where the Functions
+// `SitemapGenerator` timer writes it nightly) under this app's own origin. Crawlers require a
+// sitemap to be served from the same host as the URLs it lists — the URLs inside this sitemap are
+// all built from ChurchesBaseUrl, so serving it from the storage account's own hostname instead
+// causes Google to discard every entry. See ARCHITECTURE.md's SEO section.
+app.get('/sitemap.xml', async (_req, res) => {
+  const sitemapBlobUrl = process.env['SitemapBlobUrl'];
+  if (!sitemapBlobUrl) {
+    res.status(502).type('text/plain').send('SitemapBlobUrl is not configured');
+    return;
+  }
+
+  try {
+    const blobResponse = await fetch(sitemapBlobUrl);
+    if (!blobResponse.ok) {
+      res.status(502).type('text/plain').send('Sitemap upstream fetch failed');
+      return;
+    }
+    const body = await blobResponse.arrayBuffer();
+    res.status(200);
+    res.type('application/xml');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.end(Buffer.from(body));
+  } catch (err) {
+    logger.error({ err }, 'Failed to fetch sitemap from blob storage');
+    res.status(502).type('text/plain').send('Sitemap upstream fetch failed');
+  }
+});
+
 // Serve static browser assets.
 app.use(
   express.static(browserDistFolder, {
