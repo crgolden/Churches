@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { applySession } from './bff/session';
 import { buildBffRouter } from './bff/routes';
 import { csrfForMutating, directoryProxy } from './bff/proxy';
+import { sitemapIndexHandler, sitemapChunkHandler } from './bff/sitemap';
 import { logger, requestLogger } from './telemetry/logging';
 import { environment } from './environments/environment';
 
@@ -79,34 +80,15 @@ app.use('/directory/api', csrfForMutating, directoryProxy);
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GET /sitemap.xml: streams the sitemap from blob static-website hosting (where the Functions
-// `SitemapGenerator` timer writes it nightly) under this app's own origin. Crawlers require a
-// sitemap to be served from the same host as the URLs it lists — the URLs inside this sitemap are
-// all built from ChurchesBaseUrl, so serving it from the storage account's own hostname instead
-// causes Google to discard every entry. See ARCHITECTURE.md's SEO section.
-app.get('/sitemap.xml', async (_req, res) => {
-  const sitemapBlobUrl = process.env['SitemapBlobUrl'];
-  if (!sitemapBlobUrl) {
-    res.status(502).type('text/plain').send('SitemapBlobUrl is not configured');
-    return;
-  }
-
-  try {
-    const blobResponse = await fetch(sitemapBlobUrl);
-    if (!blobResponse.ok) {
-      res.status(502).type('text/plain').send('Sitemap upstream fetch failed');
-      return;
-    }
-    const body = await blobResponse.arrayBuffer();
-    res.status(200);
-    res.type('application/xml');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.end(Buffer.from(body));
-  } catch (err) {
-    logger.error({ err }, 'Failed to fetch sitemap from blob storage');
-    res.status(502).type('text/plain').send('Sitemap upstream fetch failed');
-  }
-});
+// GET /sitemap-index.xml + GET /sitemaps/:file: stream the sitemap index and its gzipped chunk
+// files from blob static-website hosting (where the Functions `SitemapGenerator` timer writes them
+// nightly) under this app's own origin. Crawlers require a sitemap/index to be served from the same
+// host as the URLs/sub-sitemaps it references — the URLs inside are all built from ChurchesBaseUrl,
+// so serving them from the storage account's own hostname instead causes Google to discard every
+// entry. `/sitemaps/:file` strictly whitelists the filename before resolving any blob URL from it.
+// See ARCHITECTURE.md's SEO section.
+app.get('/sitemap-index.xml', sitemapIndexHandler);
+app.get('/sitemaps/:file', sitemapChunkHandler);
 
 // Serve static browser assets.
 app.use(

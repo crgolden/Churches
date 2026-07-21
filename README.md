@@ -59,7 +59,7 @@ DirectoryApiAddress=https://localhost:7002
 ChurchesClientId=<dev client id>
 ChurchesClientSecret=<dev client secret>
 SessionSecret=<at-least-32-chars-dev-secret>
-SitemapBlobUrl=https://crgolden.z13.web.core.windows.net/sitemap.xml
+SitemapBlobBaseUrl=https://crgolden.z13.web.core.windows.net/
 ```
 
 Session storage defaults to an in-memory store (fine for local dev — sessions just don't survive a
