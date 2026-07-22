@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { RESPONSE_INIT } from '@angular/core';
 import { ChurchDetailComponent } from './church-detail.component';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Location } from '@angular/common';
+import { SeoService } from '../../shared/seo.service';
 
 describe('ChurchDetailComponent', () => {
   let component: ChurchDetailComponent;
@@ -17,6 +19,7 @@ describe('ChurchDetailComponent', () => {
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: RESPONSE_INIT, useValue: {} },
       ],
     }).compileComponents();
 
@@ -153,5 +156,21 @@ describe('ChurchDetailComponent', () => {
     expect(req.request.body.latitude).toBe(0);
     expect(req.request.body.longitude).toBe(0);
     req.flush({ id: 'cp1' });
+  });
+
+  it('loadChurch error sets 404 status and noindex when the church is not found', () => {
+    const responseInit = TestBed.inject(RESPONSE_INIT);
+    const seo = TestBed.inject(SeoService);
+    const spy = vi.spyOn(seo, 'setNoIndex');
+    component['slug'] = 'missing-church';
+
+    component['loadChurch']();
+
+    const req = controller.expectOne('/directory/api/churches/missing-church');
+    req.flush('Not found', { status: 404, statusText: 'Not Found' });
+
+    expect(component['error']()).toBe('Church not found.');
+    expect(responseInit?.status).toBe(404);
+    expect(spy).toHaveBeenCalled();
   });
 });

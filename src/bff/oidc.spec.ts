@@ -1,10 +1,6 @@
 // ── Mocks (hoisted before imports) ────────────────────────────────────────────
-// Both oidc.ts dependencies are mocked so each vi.resetModules() cycle produces
-// fresh mock instances with call counts starting at 0.
-
-vi.mock('./secrets', () => ({
-  loadKeyVaultSecrets: vi.fn().mockResolvedValue(undefined),
-}));
+// openid-client is mocked so each vi.resetModules() cycle produces a fresh mock
+// instance with call counts starting at 0.
 
 vi.mock('openid-client', () => ({
   discovery: vi.fn(),
@@ -32,18 +28,14 @@ describe('getOidcConfig', () => {
   // Per-test references to the fresh mock instances.
   let getOidcConfig: () => Promise<unknown>;
   let discoveryMock: ReturnType<typeof vi.fn>;
-  let secretsMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     clearEnv();
     vi.clearAllMocks();
     vi.resetModules();
 
-    // Import in dependency order — secrets and openid-client first so they are
-    // cached when oidc.ts loads them as static imports.
-    const secretsModule = await import('./secrets');
-    secretsMock = vi.mocked(secretsModule.loadKeyVaultSecrets);
-
+    // Import openid-client first so it is cached when oidc.ts loads it as a
+    // static import.
     const oidcClientModule = await import('openid-client');
     discoveryMock = vi.mocked(oidcClientModule.discovery);
 
@@ -85,16 +77,6 @@ describe('getOidcConfig', () => {
 
     expect(discoveryMock).toHaveBeenCalledTimes(1);
     expect(second).toBe(first);
-  });
-
-  it('calls loadKeyVaultSecrets only on the first invocation', async () => {
-    setValidEnv();
-    discoveryMock.mockResolvedValue({ issuer: 'https://identity.example.com' });
-
-    await getOidcConfig();
-    await getOidcConfig();
-
-    expect(secretsMock).toHaveBeenCalledTimes(1);
   });
 
   it('throws when OidcAuthority is missing', async () => {

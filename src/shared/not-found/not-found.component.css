@@ -1,0 +1,13 @@
+.not-found {
+  text-align: center;
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+}
+
+.not-found h1 {
+  margin-bottom: var(--space-3);
+}
+
+.not-found p {
+  margin-bottom: var(--space-5);
+}

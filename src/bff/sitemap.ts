@@ -16,14 +16,12 @@ function resolveBlobUrl(path: string): string | undefined {
 }
 
 // Buffers the blob response fully before responding, rather than streaming it through, so the
-// client gets a normal Content-Length instead of Transfer-Encoding: chunked — every other resource
-// on this site (robots.txt, static assets) is served with Content-Length, and chunked responses are
-// the one HTTP-shape difference between this route and everything else Googlebot has successfully
-// crawled here. Chunk files are gzip-compressed down to a few hundred KB, well within safe buffering
-// range. Only `Content-Type` is set explicitly; no upstream headers are forwarded (unlike
-// directoryProxy), and `Content-Encoding` is never set here: gzip chunks are served as the `.xml.gz`
-// resource itself (Google's documented convention), not via negotiated HTTP compression, so nothing
-// in this path may relabel or reinterpret the byte stream.
+// client gets a normal Content-Length instead of Transfer-Encoding: chunked. Chunk files are
+// gzip-compressed down to a few hundred KB, small enough to buffer safely. Only `Content-Type` is
+// set explicitly; no upstream headers are forwarded (unlike directoryProxy), and `Content-Encoding`
+// is never set here: gzip chunks are served as the `.xml.gz` resource itself (Google's documented
+// convention), not via negotiated HTTP compression, so nothing in this path may relabel or
+// reinterpret the byte stream.
 async function sendBlob(res: Response, blobUrl: string, contentType: string): Promise<void> {
   const blobResponse = await fetch(blobUrl);
   if (!blobResponse.ok) {

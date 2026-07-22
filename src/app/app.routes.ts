@@ -6,6 +6,7 @@ import { ChurchListComponent } from '../churches/list/church-list.component';
 import { ChurchDetailComponent } from '../churches/detail/church-detail.component';
 import { ContributeComponent } from '../churches/contribute/contribute.component';
 import { ModerationComponent } from '../admin/moderation/moderation.component';
+import { NotFoundComponent } from '../shared/not-found/not-found.component';
 
 export const routes: Routes = [
   { path: '', component: SearchComponent, title: 'Find Your Church Home' },
@@ -14,5 +15,5 @@ export const routes: Routes = [
   { path: 'churches/:slug', component: ChurchDetailComponent, title: 'Church' },
   { path: 'contribute/:slug', component: ContributeComponent, canActivate: [authGuard], title: 'Suggest a Correction' },
   { path: 'admin/moderation', component: ModerationComponent, canActivate: [modGuard], title: 'Moderation' },
-  { path: '**', redirectTo: '' },
+  { path: '**', component: NotFoundComponent, title: 'Page Not Found' },
 ];

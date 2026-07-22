@@ -71,6 +71,11 @@ in-memory store regardless of `RedisHost`, so setting both together silently ign
 
 **Key Vault secrets required at runtime (production):**
 
+Each is wired up as an App Service setting holding a `@Microsoft.KeyVault(SecretUri=...)` reference, so
+App Service resolves it from Key Vault at startup using the app's managed identity and hands it to the
+process as an ordinary environment variable. The app has no Key Vault SDK dependency and makes no vault
+calls of its own.
+
 | Secret name | Description |
 |-------------|-------------|
 | `ChurchesClientId` | OIDC client ID |

@@ -25,6 +25,36 @@ declare module 'express-session' {
   }
 }
 
+// ── Redis connection liveness ─────────────────────────────────────────────────
+// Because `saveUninitialized: false` means anonymous traffic never touches the session store, this
+// client can sit completely idle for minutes at a time. Azure App Service's outbound SNAT drops idle
+// flows after ~4 minutes without notifying either end, leaving a half-open socket: node-redis still
+// believes it is connected, writes the next command into a black hole, and the awaiting request hangs.
+// Every route runs through session middleware, so one wedged socket stalls the whole app (including
+// the home page) while `/health` — mounted before this middleware — keeps returning 200, which is why
+// health polling never showed a gap.
+//
+// Preventing the drop is the *server's* job and is fixed once for every client by keeping Redis's
+// `tcp-keepalive` below the platform's idle timeout; it does not belong in each app's code.
+//
+// Bounding the damage, however, is only possible here. When the path breaks, the server's keepalive
+// probes fail and it closes its side, but that RST/FIN travels the same broken path and never arrives
+// — the client alone can notice. Close the socket after this much inactivity rather than waiting on
+// TCP keep-alive, which can take ~11 minutes to give up: far longer than the ~240s at which the Azure
+// front end abandons the request and returns 504/502. StackExchange.Redis (used by the .NET apps,
+// which never exhibited this) enforces command timeouts by default; node-redis defaults to waiting
+// forever, so it has to be set explicitly.
+const SOCKET_TIMEOUT_MS = 90_000;
+
+// node-redis's *default* reconnect strategy deliberately does NOT reconnect after a SocketTimeoutError
+// ("By default, do not reconnect on socket timeout" — @redis/client socket.js), which would leave the
+// client permanently closed and every subsequent session lookup failing until the process restarts.
+// Setting socketTimeout therefore REQUIRES a custom strategy that does reconnect. Backoff is capped
+// with jitter so a Redis outage doesn't turn into a reconnect storm.
+function reconnectStrategy(retries: number): number {
+  return Math.min(retries * 100, 3_000) + Math.floor(Math.random() * 200);
+}
+
 /**
  * Attaches express-session to the Express app.
  *
@@ -64,11 +94,22 @@ export function applySession(app: Express): void {
     // `tls: true` (literal) is required for TLS connections.
     const redisClient = isProd
       ? createClient({
-          socket: { host, port, tls: true as const },
+          socket: {
+            host,
+            port,
+            tls: true as const,
+            socketTimeout: SOCKET_TIMEOUT_MS,
+            reconnectStrategy,
+          },
           password: process.env['RedisPassword'],
         })
       : createClient({
-          socket: { host, port },
+          socket: {
+            host,
+            port,
+            socketTimeout: SOCKET_TIMEOUT_MS,
+            reconnectStrategy,
+          },
           password: process.env['RedisPassword'],
         });
 

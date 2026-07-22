@@ -2,24 +2,22 @@ import {
   discovery,
   type Configuration,
 } from 'openid-client';
-import { loadKeyVaultSecrets } from './secrets';
 
 let _config: Configuration | null = null;
-let _secretsLoaded = false;
 
 /**
  * Lazily initialises (and caches) the openid-client Configuration via
- * Authorization Server Metadata discovery.  Key Vault secrets are loaded
- * once on first call so that the server can start without blocking on Azure.
+ * Authorization Server Metadata discovery.
+ *
+ * Every value below arrives as a plain environment variable. In production the
+ * client id and secret are App Service settings declared as
+ * `@Microsoft.KeyVault(SecretUri=...)` references, which the platform resolves
+ * from Key Vault at startup using the app's managed identity — so this code
+ * never talks to Key Vault itself.
  */
 export async function getOidcConfig(): Promise<Configuration> {
   if (_config !== null) {
     return _config;
-  }
-
-  if (!_secretsLoaded) {
-    await loadKeyVaultSecrets();
-    _secretsLoaded = true;
   }
 
   const authority = process.env['OidcAuthority'];

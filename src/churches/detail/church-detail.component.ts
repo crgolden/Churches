@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal, RESPONSE_INIT } from '@angular/core';
 import { Location } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -21,6 +21,7 @@ export class ChurchDetailComponent implements OnInit {
   private readonly location = inject(Location);
   private readonly fb = inject(FormBuilder);
   private readonly seo = inject(SeoService);
+  private readonly responseInit = inject(RESPONSE_INIT);
   private slug: string | null = null;
 
   protected readonly auth = inject(AuthService);
@@ -161,7 +162,14 @@ export class ChurchDetailComponent implements OnInit {
         this.seo.setChurchMeta(c);
         this.loading.set(false);
       },
-      error: () => { this.error.set('Church not found.'); this.loading.set(false); },
+      error: () => {
+        this.error.set('Church not found.');
+        this.loading.set(false);
+        if (this.responseInit) {
+          this.responseInit.status = 404;
+        }
+        this.seo.setNoIndex();
+      },
     });
   }
 

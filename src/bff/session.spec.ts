@@ -113,7 +113,7 @@ describe('applySession', () => {
 
     expect(createClient).toHaveBeenCalledWith(
       expect.objectContaining({
-        socket: { host: 'redis.dev.local', port: 6379 },
+        socket: expect.objectContaining({ host: 'redis.dev.local', port: 6379 }),
       }),
     );
     const callArg = vi.mocked(createClient).mock.calls[0][0] as Record<string, unknown>;
@@ -131,11 +131,50 @@ describe('applySession', () => {
 
     expect(createClient).toHaveBeenCalledWith(
       expect.objectContaining({
-        socket: { host: 'redis.azure.com', port: 6380, tls: true },
+        socket: expect.objectContaining({
+          host: 'redis.azure.com',
+          port: 6380,
+          tls: true,
+        }),
         password: 'secret-password',
       }),
     );
     expect(RedisStore).toHaveBeenCalledOnce();
+  });
+
+  // ── Connection liveness ────────────────────────────────────────────────────
+  // A half-open socket (Azure SNAT silently dropping an idle flow) otherwise hangs every request
+  // that touches the session store — which is every route — until the platform 504s at ~240s.
+
+  it('bounds socket inactivity so a half-open connection cannot hang requests forever', () => {
+    process.env['RedisHost'] = 'redis.dev.local';
+
+    applySession(makeApp() as unknown as Express);
+
+    const [callArg] = vi.mocked(createClient).mock.calls[0];
+    const socket = (callArg as Record<string, unknown>)['socket'] as Record<string, unknown>;
+    expect(socket['socketTimeout']).toBeTypeOf('number');
+    // Must stay under the ~240s at which Azure App Service abandons the request.
+    expect(socket['socketTimeout'] as number).toBeLessThan(240_000);
+  });
+
+  it('reconnects after a socket timeout', () => {
+    // node-redis's default strategy returns false (no reconnect) for SocketTimeoutError, which would
+    // leave the client permanently closed and fail every later session lookup. Setting socketTimeout
+    // without overriding this is a footgun — guard against the override being dropped.
+    process.env['RedisHost'] = 'redis.dev.local';
+
+    applySession(makeApp() as unknown as Express);
+
+    const [callArg] = vi.mocked(createClient).mock.calls[0];
+    const socket = (callArg as Record<string, unknown>)['socket'] as Record<string, unknown>;
+    const strategy = socket['reconnectStrategy'] as (retries: number) => number | false;
+
+    expect(strategy).toBeTypeOf('function');
+    expect(strategy(0)).toBeTypeOf('number');
+    expect(strategy(50)).toBeTypeOf('number');
+    // Backoff stays bounded so an outage doesn't become an ever-lengthening stall.
+    expect(strategy(1000) as number).toBeLessThanOrEqual(3_200);
   });
 
   it('defaults RedisPort to 6380 when RedisPort is not set', () => {

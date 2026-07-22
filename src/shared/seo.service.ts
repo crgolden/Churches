@@ -61,6 +61,11 @@ export class SeoService {
     this.setJsonLd(this.buildChurchJsonLd(church, canonicalUrl));
   }
 
+  /** Marks the current page as noindex, e.g. for a not-found or error page that must never be indexed. */
+  setNoIndex(): void {
+    this.meta.updateTag({ name: 'robots', content: 'noindex' });
+  }
+
   /** Removes any JSON-LD script element previously injected by this service. */
   removeJsonLd(): void {
     const existing = this.document.getElementById(JSON_LD_ELEMENT_ID);
