@@ -4,7 +4,7 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=crgolden_Churches&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=crgolden_Churches)
 
-The end-user surface of a nationwide U.S. church discovery platform: an **Angular 21 SSR** application
+The end-user surface of a nationwide U.S. church discovery platform: an **Angular 22 SSR** application
 with a **Node.js Express** Backend-for-Frontend (BFF), served by a single Node process. The BFF holds
 the OIDC session and proxies every data call to the standalone [Directory](https://github.com/crgolden/Directory)
 API; the browser never sees an access token directly. Anonymous SEO routes are server-side rendered;
@@ -27,7 +27,7 @@ authenticated routes are client-side.
 
 See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the end-to-end platform architecture (request flow through the Express/SSR stack, OIDC + proxy sequence diagrams, the Directory API, and the Functions data pipeline). In one paragraph:
 
-A single Node process runs both the Angular 21 SSR renderer and an Express BFF. The BFF owns the
+A single Node process runs both the Angular 22 SSR renderer and an Express BFF. The BFF owns the
 OIDC session (`openid-client` v6, PKCE; scopes `offline_access openid profile email directory`),
 proxies `/directory/api/**` to the Directory API with the session's Bearer token (or anonymously),
 and requires `X-CSRF: 1` on mutating calls. Anonymous routes (`/`, `/churches`, `/churches/:slug`)
@@ -42,7 +42,7 @@ traces/metrics → Grafana Alloy; structured logs → Elasticsearch (`pino-elast
 |---|---|
 | Framework | Node.js 22 / Express 5 |
 | Auth / BFF | `openid-client` v6 + `express-session` + `connect-redis` |
-| Frontend | Angular 21 SSR (`@angular/ssr`) |
+| Frontend | Angular 22 SSR (`@angular/ssr`) |
 | Observability | OpenTelemetry → Grafana Alloy (OTLP), `pino` → Elasticsearch |
 | Hosting | Azure App Service (Linux, Node 22) |
 | Secrets | Azure Key Vault (Managed Identity) |

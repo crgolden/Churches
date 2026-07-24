@@ -4,14 +4,18 @@
       <div class="success-icon">&#10003;</div>
       <h2>Thank you!</h2>
       <p>Your correction has been submitted for review.</p>
-      <a [href]="'/churches/' + church()?.slug" class="btn-primary">Back to church</a>
+      <a [href]="'/churches/' + $safeNavigationMigration(church()?.slug)" class="btn-primary"
+        >Back to church</a
+      >
     </div>
   </div>
 } @else if (church()) {
   <div class="contribute-page">
     <div class="contribute-card card">
       <h1>Suggest a Correction</h1>
-      <p class="church-label">For: <strong>{{ church()!.canonicalName }}</strong></p>
+      <p class="church-label">
+        For: <strong>{{ church()!.canonicalName }}</strong>
+      </p>
       <form class="contribute-form" (submit)="$event.preventDefault(); submit()">
         <div class="field-group">
           <label for="field-select">Field to correct</label>

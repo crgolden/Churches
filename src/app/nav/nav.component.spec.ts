@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NavComponent } from './nav.component';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 
 describe('NavComponent', () => {
   let component: NavComponent;
@@ -10,10 +10,7 @@ describe('NavComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [NavComponent],
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-      ],
+      providers: [provideRouter([]), provideHttpClient(withXhr())],
     }).compileComponents();
 
     fixture = TestBed.createComponent(NavComponent);

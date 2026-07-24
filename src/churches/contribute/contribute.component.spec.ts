@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ContributeComponent } from './contribute.component';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
 describe('ContributeComponent', () => {
@@ -22,11 +22,7 @@ describe('ContributeComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ContributeComponent],
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [provideRouter([]), provideHttpClient(withXhr()), provideHttpClientTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ContributeComponent);
@@ -80,7 +76,9 @@ describe('ContributeComponent', () => {
     component['field'].set('street');
     component['newValue'].set('456 Oak Ave');
     component['submit']();
-    controller.expectOne('/directory/api/corrections').flush('', { status: 500, statusText: 'Error' });
+    controller
+      .expectOne('/directory/api/corrections')
+      .flush('', { status: 500, statusText: 'Error' });
     expect(component['error']()).toContain('Failed to submit');
     expect(component['submitting']()).toBe(false);
   });

@@ -24,9 +24,14 @@ vi.mock('connect-redis', () => ({
   RedisStore: vi.fn(),
 }));
 
+vi.mock('../telemetry/logging', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
+
 import session from 'express-session';
 import { createClient } from 'redis';
 import { RedisStore } from 'connect-redis';
+import { logger } from '../telemetry/logging';
 import { applySession } from './session';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -93,14 +98,12 @@ describe('applySession', () => {
 
   it('logs a warning when MemoryStore is used in production', () => {
     process.env['NODE_ENV'] = 'production';
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     applySession(makeApp() as unknown as Express);
 
-    expect(warnSpy).toHaveBeenCalledWith(
+    expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('MemoryStore in production'),
     );
-    warnSpy.mockRestore();
   });
 
   // ── RedisStore selection ───────────────────────────────────────────────────
@@ -235,7 +238,6 @@ describe('applySession', () => {
 
   it('logs a connection error when Redis emits an "error" event', () => {
     process.env['RedisHost'] = 'redis.dev.local';
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     // Capture the listener registered via redisClient.on('error', listener)
     let errorListener: ((err: unknown) => void) | undefined;
@@ -252,13 +254,11 @@ describe('applySession', () => {
     const connectionError = new Error('ECONNREFUSED');
     errorListener?.(connectionError);
 
-    expect(errorSpy).toHaveBeenCalledWith('[Redis] Connection error:', connectionError);
-    errorSpy.mockRestore();
+    expect(logger.error).toHaveBeenCalledWith({ err: connectionError }, '[Redis] Connection error');
   });
 
   it('logs a connect error when Redis initial connect rejects', async () => {
     process.env['RedisHost'] = 'redis.dev.local';
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const connectError = new Error('initial connect failed');
 
     vi.mocked(createClient).mockReturnValue({
@@ -271,7 +271,6 @@ describe('applySession', () => {
     // Allow the rejected connect promise to propagate to the .catch handler.
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(errorSpy).toHaveBeenCalledWith('[Redis] Initial connect failed:', connectError);
-    errorSpy.mockRestore();
+    expect(logger.error).toHaveBeenCalledWith({ err: connectError }, '[Redis] Initial connect failed');
   });
 });

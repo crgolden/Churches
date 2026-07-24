@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient, withInterceptors, HttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors, HttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { REQUEST } from '@angular/core';
 import { ssrAbsoluteUrlInterceptor } from './ssr-absolute-url.interceptor';
@@ -10,7 +10,7 @@ function configure(requestProviderValue: Request | null) {
   TestBed.configureTestingModule({
     providers: [
       { provide: REQUEST, useValue: requestProviderValue },
-      provideHttpClient(withInterceptors([ssrAbsoluteUrlInterceptor])),
+      provideHttpClient(withXhr(), withInterceptors([ssrAbsoluteUrlInterceptor])),
       provideHttpClientTesting(),
     ],
   });
@@ -58,7 +58,7 @@ describe('ssrAbsoluteUrlInterceptor', () => {
     it('rewrites a relative path to an absolute URL using the request origin', () => {
       http.get('/directory/api/churches').subscribe();
 
-      const req = controller.expectOne(r => r.url.startsWith('https://ssr-host'));
+      const req = controller.expectOne((r) => r.url.startsWith('https://ssr-host'));
       expect(req.request.url).toBe('https://ssr-host.example.com:4000/directory/api/churches');
       req.flush([]);
     });
@@ -66,7 +66,7 @@ describe('ssrAbsoluteUrlInterceptor', () => {
     it('adds a leading slash when the relative URL lacks one', () => {
       http.get('directory/api/churches').subscribe();
 
-      const req = controller.expectOne(r => r.url.startsWith('https://ssr-host'));
+      const req = controller.expectOne((r) => r.url.startsWith('https://ssr-host'));
       expect(req.request.url).toBe('https://ssr-host.example.com:4000/directory/api/churches');
       req.flush([]);
     });

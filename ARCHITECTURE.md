@@ -6,7 +6,7 @@ This document describes the nationwide U.S. church-discovery platform end-to-end
 
 | Repo | Role | Reference docs |
 |---|---|---|
-| [Churches](https://github.com/crgolden/Churches) (this repo) | Angular 21 SSR app + Node (Express) BFF — the only user-facing surface | [README](README.md), [TESTING](TESTING.md) |
+| [Churches](https://github.com/crgolden/Churches) (this repo) | Angular 22 SSR app + Node (Express) BFF — the only user-facing surface | [README](README.md), [TESTING](TESTING.md) |
 | [Directory](https://github.com/crgolden/Directory) | ASP.NET Core 10 Minimal API + SQL Server — the church data service | [README](https://github.com/crgolden/Directory/blob/main/README.md), [SEEDING](https://github.com/crgolden/Directory/blob/main/SEEDING.md) |
 | [Functions](https://github.com/crgolden/Functions) | Azure Functions isolated worker — the data-acquisition pipeline and scheduled jobs | [README](https://github.com/crgolden/Functions/blob/main/README.md) |
 | [Identity](https://github.com/crgolden/Identity) | Duende IdentityServer — issues every token the platform validates | [README](https://github.com/crgolden/Identity/blob/main/README.md) |
@@ -19,7 +19,7 @@ graph TB
     Browser["Browser"]
 
     subgraph ChurchesApp["Churches — one Node process"]
-        SSR["Angular 21 SSR"]
+        SSR["Angular 22 SSR"]
         BFF["Express BFF<br/>(session, OIDC, proxy)"]
     end
 

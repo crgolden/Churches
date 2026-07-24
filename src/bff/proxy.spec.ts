@@ -10,7 +10,12 @@ vi.mock('openid-client', () => ({
   refreshTokenGrant: vi.fn(),
 }));
 
+vi.mock('../telemetry/logging', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
+
 import { refreshTokenGrant } from 'openid-client';
+import { logger } from '../telemetry/logging';
 import { csrfForMutating, directoryProxy } from './proxy';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -311,8 +316,8 @@ describe('directoryProxy', () => {
   it('forwards the 401 and warns when the token refresh during retry fails', async () => {
     process.env['DirectoryApiAddress'] = 'https://directory.example.com';
     stubFetch([{ status: 401 }]);
-    vi.mocked(refreshTokenGrant).mockRejectedValueOnce(new Error('refresh failed'));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const refreshError = new Error('refresh failed');
+    vi.mocked(refreshTokenGrant).mockRejectedValueOnce(refreshError);
 
     const req = makeReq({
       session: {
@@ -325,12 +330,11 @@ describe('directoryProxy', () => {
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
-    expect(warnSpy).toHaveBeenCalledWith(
+    expect(logger.warn).toHaveBeenCalledWith(
+      { err: refreshError },
       expect.stringContaining('Token refresh on 401 failed'),
-      expect.any(Error),
     );
     expect(res.status).toHaveBeenCalledWith(401);
-    warnSpy.mockRestore();
   });
 
   it('buffers a POST body from string chunks and forwards it', async () => {

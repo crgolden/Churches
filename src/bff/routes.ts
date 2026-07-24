@@ -9,6 +9,7 @@ import {
   randomState,
 } from 'openid-client';
 import { getOidcConfig } from './oidc';
+import { logger } from '../telemetry/logging';
 
 // Scopes mirror the .NET BFF (appsettings.json OpenIdConnectOptions.Scope).
 const SCOPES = 'offline_access openid profile email directory';
@@ -106,7 +107,7 @@ export function buildBffRouter(): Router {
 
       res.redirect(redirectUrl.href);
     } catch (err) {
-      console.error('[BFF /login]', err);
+      logger.error({ err }, '[BFF /login]');
       res.status(500).json({ error: 'Login initiation failed' });
     }
   });
@@ -185,7 +186,7 @@ export function buildBffRouter(): Router {
       // Redirect to the app root (or to an explicit return URL if added later).
       res.redirect('/');
     } catch (err) {
-      console.error('[BFF /callback]', err);
+      logger.error({ err }, '[BFF /callback]');
       res.status(500).json({ error: 'Callback processing failed' });
     }
   });
@@ -239,7 +240,7 @@ export function buildBffRouter(): Router {
       const endSessionUrl = buildEndSessionUrl(config, params);
       res.redirect(endSessionUrl.href);
     } catch (err) {
-      console.error('[BFF /logout]', err);
+      logger.error({ err }, '[BFF /logout]');
       // Fall back to app root on error so the user isn't stuck.
       res.redirect('/');
     }

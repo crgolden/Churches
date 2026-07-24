@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { AuthService } from './auth.service';
 import type { Claim } from './claim';
@@ -10,11 +10,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        AuthService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [AuthService, provideHttpClient(withXhr()), provideHttpClientTesting()],
     });
     service = TestBed.inject(AuthService);
     controller = TestBed.inject(HttpTestingController);
@@ -82,7 +78,7 @@ describe('AuthService', () => {
 
   it('initialize returns empty session when bff/user errors', () => {
     let result: Claim[] | null = null;
-    service.initialize().subscribe(s => (result = s));
+    service.initialize().subscribe((s) => (result = s));
     controller.expectOne('bff/user').flush('', { status: 401, statusText: 'Unauthorized' });
     expect(result).toEqual([]);
   });

@@ -53,11 +53,16 @@ function buildLogger(): Logger {
 
     // pino-elasticsearch reports failures only through events; without these listeners a rejected
     // bulk document or a connection error is swallowed and log documents vanish with no trace.
+    // Routed through `logger` itself, not console.error: buildLogger() always includes the stdout
+    // stream unconditionally (line above), so this still reaches stdout/Elasticsearch's own
+    // dashboards even when the Elasticsearch leg specifically is what's failing -- `logger` is safe
+    // to reference here because pino.multistream() returns synchronously and `logger` (module scope,
+    // below) is assigned before any request can trigger these listeners.
     streamToElastic.on('error', (err) =>
-      console.error('[logging] Elasticsearch connection error:', err),
+      logger.error({ err }, '[logging] Elasticsearch connection error'),
     );
     streamToElastic.on('insertError', (err) =>
-      console.error('[logging] Elasticsearch insert error:', err),
+      logger.error({ err }, '[logging] Elasticsearch insert error'),
     );
 
     // Only Warning+ ships to Elasticsearch — mirrors the Serilog minimum-level-override the .NET

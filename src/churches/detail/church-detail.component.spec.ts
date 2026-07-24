@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RESPONSE_INIT } from '@angular/core';
 import { ChurchDetailComponent } from './church-detail.component';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Location } from '@angular/common';
 import { SeoService } from '../../shared/seo.service';
@@ -17,7 +17,7 @@ describe('ChurchDetailComponent', () => {
       imports: [ChurchDetailComponent],
       providers: [
         provideRouter([]),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         { provide: RESPONSE_INIT, useValue: {} },
       ],
@@ -53,8 +53,16 @@ describe('ChurchDetailComponent', () => {
   });
 
   it('encodeAddress encodes all present fields', () => {
-    const church = { id: '1', street: '123 Main St', city: 'Denver', state: 'CO', zip: '80201' } as never;
-    expect(component['encodeAddress'](church)).toBe(encodeURIComponent('123 Main St, Denver, CO, 80201'));
+    const church = {
+      id: '1',
+      street: '123 Main St',
+      city: 'Denver',
+      state: 'CO',
+      zip: '80201',
+    } as never;
+    expect(component['encodeAddress'](church)).toBe(
+      encodeURIComponent('123 Main St, Denver, CO, 80201'),
+    );
   });
 
   it('encodeAddress skips null/undefined fields', () => {
@@ -63,15 +71,31 @@ describe('ChurchDetailComponent', () => {
   });
 
   it('scheduleLabel formats day name and HH:mm time', () => {
-    expect(component['scheduleLabel']({ dayOfWeek: 0, startTime: '10:30:00' } as never)).toBe('Sunday 10:30');
-    expect(component['scheduleLabel']({ dayOfWeek: 3, startTime: '19:00:00' } as never)).toBe('Wednesday 19:00');
+    expect(component['scheduleLabel']({ dayOfWeek: 0, startTime: '10:30:00' } as never)).toBe(
+      'Sunday 10:30',
+    );
+    expect(component['scheduleLabel']({ dayOfWeek: 3, startTime: '19:00:00' } as never)).toBe(
+      'Wednesday 19:00',
+    );
   });
 
   it('campusAddress joins present address parts', () => {
-    expect(component['campusAddress']({ street: '1 N St', city: 'Denver', state: 'CO', zip: '80201' } as never))
-      .toBe('1 N St, Denver, CO, 80201');
-    expect(component['campusAddress']({ street: null, city: 'Boulder', state: 'CO', zip: '80301' } as never))
-      .toBe('Boulder, CO, 80301');
+    expect(
+      component['campusAddress']({
+        street: '1 N St',
+        city: 'Denver',
+        state: 'CO',
+        zip: '80201',
+      } as never),
+    ).toBe('1 N St, Denver, CO, 80201');
+    expect(
+      component['campusAddress']({
+        street: null,
+        city: 'Boulder',
+        state: 'CO',
+        zip: '80301',
+      } as never),
+    ).toBe('Boulder, CO, 80301');
   });
 
   it('mapPoints includes the church and campuses that have coordinates', () => {
@@ -90,13 +114,22 @@ describe('ChurchDetailComponent', () => {
   });
 
   it('mapPoints skips entries without coordinates', () => {
-    component['church'].set({ canonicalName: 'Grace', latitude: 0, longitude: 0, campuses: [] } as never);
+    component['church'].set({
+      canonicalName: 'Grace',
+      latitude: 0,
+      longitude: 0,
+      campuses: [],
+    } as never);
     expect(component['mapPoints']().length).toBe(0);
   });
 
   it('addSchedule POSTs the form to the church schedules endpoint', () => {
     component['church'].set({ id: 'church-1' } as never);
-    component['scheduleForm'].setValue({ dayOfWeek: 0, startTime: '10:00', description: 'Worship' });
+    component['scheduleForm'].setValue({
+      dayOfWeek: 0,
+      startTime: '10:00',
+      description: 'Worship',
+    });
 
     component['addSchedule']();
 
@@ -128,7 +161,13 @@ describe('ChurchDetailComponent', () => {
   it('addCampus POSTs the campus form', () => {
     component['church'].set({ id: 'church-1' } as never);
     component['campusForm'].setValue({
-      name: 'North', street: '1 N St', city: 'Denver', state: 'CO', zip: '80201', latitude: 39.7, longitude: -104.9,
+      name: 'North',
+      street: '1 N St',
+      city: 'Denver',
+      state: 'CO',
+      zip: '80201',
+      latitude: 39.7,
+      longitude: -104.9,
     });
 
     component['addCampus']();
@@ -147,7 +186,13 @@ describe('ChurchDetailComponent', () => {
   it('addCampus coerces blank coordinates to 0 in the posted body', () => {
     component['church'].set({ id: 'church-1' } as never);
     component['campusForm'].setValue({
-      name: 'North', street: '', city: 'Denver', state: 'CO', zip: '80201', latitude: null, longitude: null,
+      name: 'North',
+      street: '',
+      city: 'Denver',
+      state: 'CO',
+      zip: '80201',
+      latitude: null,
+      longitude: null,
     });
 
     component['addCampus']();

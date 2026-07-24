@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ChurchApiService } from './church.service';
 
@@ -9,11 +9,7 @@ describe('ChurchApiService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        ChurchApiService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [ChurchApiService, provideHttpClient(withXhr()), provideHttpClientTesting()],
     });
     service = TestBed.inject(ChurchApiService);
     controller = TestBed.inject(HttpTestingController);
@@ -28,7 +24,7 @@ describe('ChurchApiService', () => {
 
   it('getChurches hits /directory/api/churches with page params', () => {
     service.getChurches(2, 10).subscribe();
-    const req = controller.expectOne(r => r.url.includes('/churches'));
+    const req = controller.expectOne((r) => r.url.includes('/churches'));
     expect(req.request.params.get('page')).toBe('2');
     req.flush({ items: [], totalCount: 0, page: 2, pageSize: 10 });
   });
@@ -40,7 +36,7 @@ describe('ChurchApiService', () => {
 
   it('search with no optional params sends only page and pageSize', () => {
     service.search({ page: 1, pageSize: 20 }).subscribe();
-    const req = controller.expectOne(r => r.url.includes('/search'));
+    const req = controller.expectOne((r) => r.url.includes('/search'));
     expect(req.request.params.has('q')).toBe(false);
     expect(req.request.params.has('lat')).toBe(false);
     expect(req.request.params.has('lng')).toBe(false);
@@ -57,22 +53,24 @@ describe('ChurchApiService', () => {
   });
 
   it('search with all optional params sends all params', () => {
-    service.search({
-      q: 'grace',
-      lat: 39.7,
-      lng: -104.9,
-      radiusMiles: 25,
-      state: 'CO',
-      denominationId: 'den-1',
-      worshipStyle: 2,
-      wheelchairAccessible: true,
-      dayOfWeek: 0,
-      startTimeAfter: '09:00',
-      startTimeBefore: '12:00',
-      page: 1,
-      pageSize: 10,
-    }).subscribe();
-    const req = controller.expectOne(r => r.url.includes('/search'));
+    service
+      .search({
+        q: 'grace',
+        lat: 39.7,
+        lng: -104.9,
+        radiusMiles: 25,
+        state: 'CO',
+        denominationId: 'den-1',
+        worshipStyle: 2,
+        wheelchairAccessible: true,
+        dayOfWeek: 0,
+        startTimeAfter: '09:00',
+        startTimeBefore: '12:00',
+        page: 1,
+        pageSize: 10,
+      })
+      .subscribe();
+    const req = controller.expectOne((r) => r.url.includes('/search'));
     expect(req.request.params.get('q')).toBe('grace');
     expect(req.request.params.get('lat')).toBe('39.7');
     expect(req.request.params.get('lng')).toBe('-104.9');
@@ -89,14 +87,14 @@ describe('ChurchApiService', () => {
 
   it('getCorrections without status omits status param', () => {
     service.getCorrections().subscribe();
-    const req = controller.expectOne(r => r.url.includes('/corrections'));
+    const req = controller.expectOne((r) => r.url.includes('/corrections'));
     expect(req.request.params.has('status')).toBe(false);
     req.flush({ items: [], totalCount: 0, page: 1, pageSize: 20 });
   });
 
   it('getCorrections with status includes status param', () => {
     service.getCorrections(1).subscribe();
-    const req = controller.expectOne(r => r.url.includes('/corrections'));
+    const req = controller.expectOne((r) => r.url.includes('/corrections'));
     expect(req.request.params.get('status')).toBe('1');
     req.flush({ items: [], totalCount: 0, page: 1, pageSize: 20 });
   });

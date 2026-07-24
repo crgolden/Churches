@@ -24,7 +24,7 @@ npx vitest run             # one-shot
 npx vitest run --coverage  # LCOV → coverage/lcov.info
 ```
 
-Vitest runs with `pool: threads`, `fileParallelism: false`, `testTimeout: 15000`. Angular 21 is zoneless —
+Vitest runs with `pool: threads`, `fileParallelism: false`, `testTimeout: 15000`. Angular 22 is zoneless —
 always call `fixture.detectChanges()` manually.
 
 ---

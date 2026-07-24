@@ -2,6 +2,7 @@ import type { Express } from 'express';
 import session from 'express-session';
 import { createClient } from 'redis';
 import { RedisStore } from 'connect-redis';
+import { logger } from '../telemetry/logging';
 
 // ── Session data shape ────────────────────────────────────────────────────────
 // Tokens and claims are stored server-side in Redis; nothing is sent to the
@@ -81,7 +82,7 @@ export function applySession(app: Express): void {
     // express-session's built-in store — no external dependency required.
     store = new session.MemoryStore();
     if (isProd) {
-      console.warn(
+      logger.warn(
         '[Session] WARNING: using MemoryStore in production. ' +
           'Set RedisHost (and optionally SessionStore) to switch to Redis.',
       );
@@ -116,11 +117,11 @@ export function applySession(app: Express): void {
     // Log connection errors without crashing.  In local dev Redis may be
     // absent; the session store will fail gracefully and log the issue.
     redisClient.on('error', (err: unknown) => {
-      console.error('[Redis] Connection error:', err);
+      logger.error({ err }, '[Redis] Connection error');
     });
 
     redisClient.connect().catch((err: unknown) => {
-      console.error('[Redis] Initial connect failed:', err);
+      logger.error({ err }, '[Redis] Initial connect failed');
     });
 
     store = new RedisStore({ client: redisClient });

@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChurchListComponent } from './church-list.component';
 import { provideRouter, Router } from '@angular/router';
 import { ViewportScroller } from '@angular/common';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { vi } from 'vitest';
 
@@ -21,7 +21,7 @@ describe('ChurchListComponent', () => {
       imports: [ChurchListComponent],
       providers: [
         provideRouter([]),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         { provide: ViewportScroller, useValue: { scrollToPosition: scrollSpy } },
       ],
@@ -33,7 +33,7 @@ describe('ChurchListComponent', () => {
     fixture.detectChanges();
 
     // ngOnInit fires a search request when subscribing to empty queryParams
-    controller.expectOne(r => r.url.includes('/search')).flush(emptySearchResult);
+    controller.expectOne((r) => r.url.includes('/search')).flush(emptySearchResult);
   });
 
   afterEach(() => controller.verify());
@@ -56,7 +56,7 @@ describe('ChurchListComponent', () => {
     component['setView']('list');
     expect(spy).toHaveBeenCalledWith(
       [],
-      expect.objectContaining({ queryParams: { view: 'list' } })
+      expect.objectContaining({ queryParams: { view: 'list' } }),
     );
   });
 
@@ -68,10 +68,7 @@ describe('ChurchListComponent', () => {
     const router = TestBed.inject(Router);
     const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     component['goToPage'](3);
-    expect(spy).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({ queryParams: { page: 3 } })
-    );
+    expect(spy).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { page: 3 } }));
   });
 
   it('changePageSize navigates with updated pageSize and resets page to 1', () => {
@@ -80,7 +77,7 @@ describe('ChurchListComponent', () => {
     component['changePageSize'](50);
     expect(spy).toHaveBeenCalledWith(
       [],
-      expect.objectContaining({ queryParams: { pageSize: 50, page: 1 } })
+      expect.objectContaining({ queryParams: { pageSize: 50, page: 1 } }),
     );
   });
 
@@ -90,7 +87,7 @@ describe('ChurchListComponent', () => {
     component['changeSort']('name');
     expect(spy).toHaveBeenCalledWith(
       [],
-      expect.objectContaining({ queryParams: { sort: 'name', page: 1 } })
+      expect.objectContaining({ queryParams: { sort: 'name', page: 1 } }),
     );
   });
 
@@ -146,7 +143,12 @@ describe('ChurchListComponent', () => {
     };
 
     beforeEach(() => {
-      component['results'].set({ items: [churchItem] as never, totalCount: 1, page: 1, pageSize: 20 });
+      component['results'].set({
+        items: [churchItem] as never,
+        totalCount: 1,
+        page: 1,
+        pageSize: 20,
+      });
     });
 
     it('renders grid cards when view is grid', () => {

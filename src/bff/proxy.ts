@@ -1,6 +1,7 @@
 import type { Request, Response as ExpressResponse, NextFunction } from 'express';
 import { refreshTokenGrant } from 'openid-client';
 import { getOidcConfig } from './oidc';
+import { logger } from '../telemetry/logging';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -121,7 +122,7 @@ export async function directoryProxy(
     try {
       await refreshAndSave(req);
     } catch (err) {
-      console.warn('[BFF proxy] Proactive token refresh failed:', err);
+      logger.warn({ err }, '[BFF proxy] Proactive token refresh failed');
     }
   }
 
@@ -199,7 +200,7 @@ export async function directoryProxy(
       await refreshAndSave(req);
       apiResponse = await doFetch();
     } catch (err) {
-      console.warn('[BFF proxy] Token refresh on 401 failed:', err);
+      logger.warn({ err }, '[BFF proxy] Token refresh on 401 failed');
       // Fall through and forward the 401 to the client.
     }
   }
