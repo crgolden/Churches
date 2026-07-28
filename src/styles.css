@@ -51,9 +51,11 @@
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+/* Deliberately no `html { scroll-behavior: smooth }`. Smooth scrolling is driven by animation
+ * frames, so anywhere frames aren't running — a throttled background tab, a stalled GPU process,
+ * a scroll-hijacking extension — the scroll is dropped entirely rather than degrading to a jump.
+ * Anchor navigation and programmatic scrolls must land unconditionally; the animation is not
+ * worth making them fail closed. */
 
 body {
   margin: 0;
