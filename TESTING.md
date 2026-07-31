@@ -5,7 +5,7 @@ The Churches test suite covers **frontend unit tests** (Vitest) and **browser E2
 stack. The Directory API has its own suite in the [Directory](https://github.com/crgolden/Directory) repo.
 
 Unit test coding standards (no control-flow in tests, etc.) are in the workspace-level
-[Unit Test Standards](../TESTING.md#unit-test-standards).
+[Unit Test Standards](../AGENTS/TESTING.md#unit-test-standards).
 
 ## Test tiers
 
@@ -134,4 +134,4 @@ sonar-scanner `
 
 The coverage **score is read from SonarCloud, never hand-maintained** here. Build a per-method table
 only when SonarCloud flags a method with **cognitive complexity > 15 AND uncovered conditions > 0**.
-See `../DESIGN-LANGUAGE.md` and `../TESTING-COVERAGE.md`.
+See `../AGENTS/DESIGN-LANGUAGE.md` and `../AGENTS/TESTING-COVERAGE.md`.
