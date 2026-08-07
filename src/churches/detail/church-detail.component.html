@@ -72,11 +72,11 @@
             }
           </div>
         </div>
-        @if (church()!.schedules?.length || auth.hasModerationScope()) {
+        @if (church()!.schedules.length || auth.hasModerationScope()) {
           <div class="detail-section">
             <h4 class="eyebrow">Service Times</h4>
             <ul id="church-schedules" class="info-rows">
-              @for (s of church()!.schedules ?? []; track s.id) {
+              @for (s of church()!.schedules; track s.id) {
                 <li class="info-row">
                   <span class="info-label">{{ scheduleLabel(s) }}</span>
                   <span>
@@ -121,11 +121,11 @@
             }
           </div>
         }
-        @if (church()!.ministries?.length || auth.hasModerationScope()) {
+        @if (church()!.ministries.length || auth.hasModerationScope()) {
           <div class="detail-section">
             <h4 class="eyebrow">Ministries</h4>
             <ul id="church-ministries" class="info-rows">
-              @for (m of church()!.ministries ?? []; track m.id) {
+              @for (m of church()!.ministries; track m.id) {
                 <li class="info-row">
                   <span class="info-label">{{ m.name }}</span>
                   <span>
@@ -174,11 +174,11 @@
             }
           </div>
         }
-        @if (church()!.campuses?.length || auth.hasModerationScope()) {
+        @if (church()!.campuses.length || auth.hasModerationScope()) {
           <div class="detail-section">
             <h4 class="eyebrow">Campuses</h4>
             <ul id="church-campuses" class="info-rows">
-              @for (cp of church()!.campuses ?? []; track cp.id) {
+              @for (cp of church()!.campuses; track cp.id) {
                 <li class="info-row">
                   <span class="info-label">{{ cp.name }}</span>
                   <span>

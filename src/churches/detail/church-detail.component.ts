@@ -79,7 +79,7 @@ export class ChurchDetailComponent implements OnInit {
     if (c.latitude && c.longitude) {
       points.push({ lat: c.latitude, lng: c.longitude, label: c.canonicalName });
     }
-    for (const campus of c.campuses ?? []) {
+    for (const campus of c.campuses) {
       if (campus.latitude && campus.longitude) {
         points.push({ lat: campus.latitude, lng: campus.longitude, label: campus.name });
       }

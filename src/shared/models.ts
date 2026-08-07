@@ -23,9 +23,9 @@ export interface Church {
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
-  schedules?: ServiceSchedule[];
-  ministries?: Ministry[];
-  campuses?: Campus[];
+  schedules: ServiceSchedule[];
+  ministries: Ministry[];
+  campuses: Campus[];
 }
 
 export interface ServiceSchedule {
