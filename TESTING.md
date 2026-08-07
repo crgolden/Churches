@@ -31,7 +31,9 @@ always call `fixture.detectChanges()` manually.
 
 ## E2E tests (regression)
 
-No live servers needed. Playwright manages two local servers for the test run:
+No live servers needed. Playwright manages two local servers for the test run, started in this order
+(the mock Directory API must be healthy before the SSR server starts — its warmup request during
+Angular bootstrap hits the mock directly):
 
 1. **Mock Directory API** (`npx tsx e2e/mocks/directory-server.ts`, port 4001) — handles
    `/directory/api/*` routes and the `/_test/*` control API used by test helpers.
@@ -40,6 +42,9 @@ No live servers needed. Playwright manages two local servers for the test run:
 
 Every `/bff/**` and `/directory/api/**` call is either handled by the mock server or intercepted by
 Playwright route mocks — no real Identity or Directory is contacted.
+
+The `e2e` project (`playwright.config.ts`) runs serialized — `fullyParallel: false`, single worker —
+because every spec shares the mock server's in-memory state; concurrent specs would race on it.
 
 **Prerequisites (one-time):** install the Playwright Chromium browser:
 

@@ -8,8 +8,6 @@ const CORRECTABLE_FIELDS = [
   'phoneNumber', 'website', 'emailAddress', 'primaryLanguage',
 ] as const;
 
-// Only the scalar string fields above are correctable, so indexing Church by one yields a string —
-// never the schedules/ministries/campuses arrays that keyof Church would also admit.
 type CorrectableField = typeof CORRECTABLE_FIELDS[number];
 
 @Component({

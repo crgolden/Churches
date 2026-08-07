@@ -11,17 +11,10 @@ import {
 import { getOidcConfig } from './oidc';
 import { logger } from '../telemetry/logging';
 
-// Scopes mirror the .NET BFF (appsettings.json OpenIdConnectOptions.Scope).
 const SCOPES = 'offline_access openid profile email directory';
 
-// Path the Identity Server will redirect back to after authentication.
-// Register this exact path in the Identity Server client's RedirectUris.
-// Default matches the value built by Node when NODE_ENV is not production;
-// override with the OidcCallbackPath env var if the deployment differs.
 const CALLBACK_PATH =
   process.env['OidcCallbackPath'] ?? '/bff/callback';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function stringifyClaimValue(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -61,8 +54,6 @@ function destroySession(req: Request): Promise<void> {
   );
 }
 
-// ── CSRF middleware ───────────────────────────────────────────────────────────
-
 /**
  * Rejects requests that lack the static `X-CSRF` header.
  * Apply to every BFF endpoint that is called via XHR/fetch (not browser nav).
@@ -79,13 +70,9 @@ export function requireCsrf(
   next();
 }
 
-// ── Router ────────────────────────────────────────────────────────────────────
-
 export function buildBffRouter(): Router {
   const router = Router();
 
-  // ── /bff/login ─────────────────────────────────────────────────────────────
-  // Browser navigation — no X-CSRF required; PKCE + state provide protection.
   router.get('/login', async (req: Request, res: Response) => {
     try {
       const config = await getOidcConfig();
@@ -112,8 +99,6 @@ export function buildBffRouter(): Router {
     }
   });
 
-  // ── /bff/callback ──────────────────────────────────────────────────────────
-  // Redirect from the Identity Server — no X-CSRF required.
   router.get('/callback', async (req: Request, res: Response) => {
     try {
       const config = await getOidcConfig();
@@ -133,8 +118,6 @@ export function buildBffRouter(): Router {
         expectedState: oauthState,
       });
 
-      // Retrieve additional claims from the userinfo endpoint, mirroring
-      // GetClaimsFromUserInfoEndpoint = true in the .NET BFF.
       const idClaims = tokens.claims();
       const sub =
         idClaims && typeof idClaims.sub === 'string'
@@ -148,10 +131,6 @@ export function buildBffRouter(): Router {
 
       const userInfo = await fetchUserInfo(config, tokens.access_token, sub);
 
-      // Build the flat claims array the Angular client expects via /bff/user.
-      // Merge ID token + userinfo (userinfo wins on conflict, matching .NET
-      // behaviour with MapInboundClaims = false, NameClaimType = "name",
-      // RoleClaimType = "role").
       const merged: Record<string, unknown> = {
         ...(idClaims ?? {}),
         ...userInfo,
@@ -178,12 +157,10 @@ export function buildBffRouter(): Router {
           : undefined;
       req.session.claims = claims;
 
-      // Clean up transient login state.
       delete req.session.pkceCodeVerifier;
       delete req.session.oauthState;
       await saveSession(req);
 
-      // Redirect to the app root (or to an explicit return URL if added later).
       res.redirect('/');
     } catch (err) {
       logger.error({ err }, '[BFF /callback]');
@@ -191,16 +168,12 @@ export function buildBffRouter(): Router {
     }
   });
 
-  // ── /bff/user ──────────────────────────────────────────────────────────────
-  // XHR endpoint — X-CSRF header required.
   router.get('/user', requireCsrf, (req: Request, res: Response) => {
     if (!req.session.claims) {
       res.status(401).end();
       return;
     }
 
-    // Append the Duende BFF-style logout URL claim so the Angular client can
-    // use it without knowing the session ID.
     const claims = [
       ...req.session.claims,
       {
@@ -212,9 +185,6 @@ export function buildBffRouter(): Router {
     res.json(claims);
   });
 
-  // ── /bff/logout ────────────────────────────────────────────────────────────
-  // Browser navigation — CSRF protection via the `sid` query parameter (which
-  // only the server knows and embeds in the bff:logout_url claim).
   router.get('/logout', async (req: Request, res: Response) => {
     const sid = req.query['sid'];
     if (!sid || sid !== req.sessionID) {
@@ -241,7 +211,6 @@ export function buildBffRouter(): Router {
       res.redirect(endSessionUrl.href);
     } catch (err) {
       logger.error({ err }, '[BFF /logout]');
-      // Fall back to app root on error so the user isn't stuck.
       res.redirect('/');
     }
   });

@@ -1,7 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
 
-// ── Mocks (hoisted before imports) ────────────────────────────────────────────
-
 vi.mock('./oidc', () => ({
   getOidcConfig: vi.fn().mockResolvedValue({ issuer: 'https://identity.example.com' }),
 }));
@@ -17,8 +15,6 @@ vi.mock('../telemetry/logging', () => ({
 import { refreshTokenGrant } from 'openid-client';
 import { logger } from '../telemetry/logging';
 import { csrfForMutating, directoryProxy } from './proxy';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 interface SessionLike {
   accessToken?: string;
@@ -39,8 +35,6 @@ function makeReq(overrides: {
   const bodyChunk = overrides.body ?? (hasBody ? Buffer.from('{}') : undefined);
 
   const originalUrl = overrides.originalUrl ?? '/directory/api/churches';
-  // Mirrors real Express behaviour for middleware mounted via app.use('/directory/api', ...):
-  // req.url is the original path with the mount prefix stripped.
   const url = originalUrl.replace(/^\/directory\/api/, '') || '/';
 
   const req: Record<string, unknown> = {
@@ -84,8 +78,6 @@ function stubFetch(responses: { status: number; headers?: Headers; body?: ArrayB
   let call = 0;
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(mocks[call++])));
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('csrfForMutating', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -257,10 +249,6 @@ describe('directoryProxy', () => {
   });
 
   it('strips Content-Encoding and Content-Length since fetch() already decompressed the body', async () => {
-    // Regression test: fetch() transparently decompresses gzip/br/deflate bodies, so
-    // apiResponse.arrayBuffer() returns plain bytes. Forwarding the upstream
-    // Content-Encoding/Content-Length made clients try to decompress an already-decompressed
-    // body ("incorrect header check" gzip errors against the real deployed Directory API).
     process.env['DirectoryApiAddress'] = 'https://directory.example.com';
     const responseHeaders = new Headers({
       'content-type': 'application/json',
@@ -299,7 +287,6 @@ describe('directoryProxy', () => {
     process.env['DirectoryApiAddress'] = 'https://directory.example.com';
     stubFetch([{ status: 200 }]);
 
-    // Express allows array-valued headers; the proxy joins them.
     const req = makeReq({
       headers: { accept: ['application/json', 'text/plain'] as unknown as string },
     });
@@ -345,11 +332,9 @@ describe('directoryProxy', () => {
       method: 'POST',
       headers: { 'x-csrf': '1', 'content-type': 'application/json' },
       session: { accessToken: 'token' },
-      // Override the default Buffer yield with string chunks.
       body: undefined,
     });
 
-    // Replace the async iterator with one yielding a string chunk.
     (req as Record<string, unknown>)[Symbol.asyncIterator] = async function* () {
       yield '{"test":true}';
     };

@@ -32,7 +32,6 @@ describe('ChurchListComponent', () => {
     controller = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
 
-    // ngOnInit fires a search request when subscribing to empty queryParams
     controller.expectOne((r) => r.url.includes('/search')).flush(emptySearchResult);
   });
 
@@ -92,7 +91,6 @@ describe('ChurchListComponent', () => {
   });
 
   it('scrolls to top after a query-params-driven load', () => {
-    // The initial ngOnInit subscription (flushed in beforeEach) already triggers one scroll call.
     expect(scrollSpy).toHaveBeenCalledWith([0, 0]);
   });
 

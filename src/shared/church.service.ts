@@ -80,8 +80,6 @@ export class ChurchApiService {
     return this.http.patch<void>(`${this.base}/corrections/${id}/reject`, null);
   }
 
-  // --- Moderator curation of church children (requires the churches.mod claim) ---
-
   createSchedule(churchId: string, input: ScheduleInput): Observable<ServiceSchedule> {
     return this.http.post<ServiceSchedule>(`${this.base}/churches/${churchId}/schedules`, input);
   }

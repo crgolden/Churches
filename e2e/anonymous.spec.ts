@@ -8,8 +8,6 @@
 import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
 import type { ChurchRecord } from './fixtures.js';
 
-// ── SSR assertion helper ─────────────────────────────────────────────────────
-
 async function assertLeafletStylesheetApplied(page: import('@playwright/test').Page): Promise<void> {
   const mapPanePos = await page.evaluate(
     () => getComputedStyle(document.querySelector('.leaflet-map-pane')!).position,
@@ -27,8 +25,6 @@ async function assertLeafletStylesheetApplied(page: import('@playwright/test').P
   expect(containerOverflow).toContain('hidden');
 }
 
-// ── SSR raw-HTML assertions ──────────────────────────────────────────────────
-
 test.describe('SSR — raw HTML assertions', () => {
   test('churches list page is server-rendered with SEO tags', async ({ request, store }) => {
     await store.reset();
@@ -39,13 +35,8 @@ test.describe('SSR — raw HTML assertions', () => {
 
     const html = await res.text();
 
-    // Proves SSR (Angular writes this attribute on the server-rendered root).
     expect(html).toContain('ng-server-context');
-
-    // <title> tag set by AppTitleStrategy / SeoService.setPage.
     expect(html).toMatch(/<title[^>]*>/);
-
-    // Open Graph and Twitter Card (set by SeoService.setPage on the list component).
     expect(html).toContain('og:title');
     expect(html).toContain('twitter:card');
   });
@@ -59,13 +50,8 @@ test.describe('SSR — raw HTML assertions', () => {
 
     const html = await res.text();
 
-    // Proves SSR.
     expect(html).toContain('ng-server-context');
-
-    // Church name appears in server-rendered markup (data was fetched server-side).
     expect(html).toContain('First Baptist Church Austin');
-
-    // SEO tags present in raw HTML.
     expect(html).toMatch(/<title[^>]*>First Baptist Church Austin/);
     expect(html).toContain('name="description"');
     expect(html).toContain('rel="canonical"');
@@ -73,14 +59,10 @@ test.describe('SSR — raw HTML assertions', () => {
     expect(html).toContain('og:description');
     expect(html).toContain('og:url');
     expect(html).toContain('twitter:card');
-
-    // JSON-LD structured data.
     expect(html).toContain('application/ld+json');
     expect(html).toContain('"Church"');
   });
 });
-
-// ── Existing E2E tests (ported from AnonymousTests.cs) ───────────────────────
 
 test.describe('HomePage', () => {
   test('on load, shows search form and heading', async ({ anonymousPage: page, store }) => {
@@ -299,9 +281,6 @@ test.describe('ChurchList', () => {
     await expect(page.locator('.leaflet-container')).toBeVisible();
     await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible();
     await expect(page.locator('.leaflet-tile').first()).toBeVisible();
-
-    // Guard against the missing-leaflet.css regression: without the stylesheet,
-    // markers and the container exist but are not properly positioned/clipped.
     await assertLeafletStylesheetApplied(page);
   });
 

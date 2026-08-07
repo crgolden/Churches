@@ -5,29 +5,20 @@ import { logger } from '../telemetry/logging';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-// Request headers that must NOT be forwarded to the upstream API.
 const DROP_REQUEST_HEADERS = new Set([
   'host',
   'connection',
   'transfer-encoding',
-  // Strip the BFF-internal CSRF header so it doesn't confuse the API.
   'x-csrf',
 ]);
 
-// Response headers that must NOT be forwarded to the client.
 const DROP_RESPONSE_HEADERS = new Set([
   'connection',
   'keep-alive',
   'transfer-encoding',
-  // fetch() transparently decompresses gzip/br/deflate bodies (apiResponse.arrayBuffer()
-  // returns the decompressed bytes), so forwarding the upstream Content-Encoding/Content-Length
-  // would make the client try to decompress an already-decompressed body. Node recalculates
-  // Content-Length itself from the buffer passed to res.end().
   'content-encoding',
   'content-length',
 ]);
-
-// ── CSRF guard ────────────────────────────────────────────────────────────────
 
 /**
  * Rejects mutating proxy requests that lack the static `X-CSRF` header.
@@ -44,8 +35,6 @@ export function csrfForMutating(
   }
   next();
 }
-
-// ── Token refresh ─────────────────────────────────────────────────────────────
 
 async function refreshAndSave(req: Request): Promise<void> {
   const { refreshToken } = req.session;
@@ -69,8 +58,6 @@ async function refreshAndSave(req: Request): Promise<void> {
     ),
   );
 }
-
-// ── Proxy ─────────────────────────────────────────────────────────────────────
 
 /**
  * Fetch-based proxy that forwards `/directory/api/**` to `DirectoryApiAddress`.
@@ -98,20 +85,9 @@ export async function directoryProxy(
     return;
   }
 
-  // req.url (not req.originalUrl) is relative to the mount point ('/directory/api'), since
-  // Express strips the mount prefix for middleware registered via app.use('/directory/api', ...).
-  // Using originalUrl here would forward the full '/directory/api/...' path to Directory, whose
-  // real routes have no such prefix (e.g. '/denominations', '/search').
-  //
-  // Resolve the request path against the fixed Directory base with the URL constructor rather
-  // than concatenating strings: this guarantees the upstream origin is always DirectoryApiAddress
-  // and can never be overridden by a crafted request path (a protocol-relative '//evil.host' or a
-  // userinfo '@evil.host'). Leading slashes are stripped so req.url always resolves as a path under
-  // the base rather than replacing it, and the trailing slash on the base keeps its last segment.
   const relativePath = req.url.replace(/^\/+/, '');
   const targetUrl = new URL(relativePath, `${base}/`);
 
-  // Proactively refresh if the token is within 60 s of expiry.
   const { accessToken, refreshToken, tokenExpiresAt } = req.session;
   if (
     accessToken &&
@@ -126,25 +102,17 @@ export async function directoryProxy(
     }
   }
 
-  // Buffer the request body (as Uint8Array) so it can be replayed on a 401
-  // retry.  Uint8Array satisfies the DOM fetch BodyInit type.
   const hasBody = !['GET', 'HEAD'].includes(req.method);
-  // TypeScript 5.9 made array buffer types generic.  BodyInit requires
-  // Uint8Array<ArrayBuffer> (not Uint8Array<ArrayBufferLike>), so we declare
-  // explicitly and construct via new Uint8Array(length) which always yields
-  // Uint8Array<ArrayBuffer>.
   let bodyBuffer: Uint8Array<ArrayBuffer> | undefined;
 
   if (hasBody) {
     const chunks: Uint8Array<ArrayBuffer>[] = [];
     for await (const chunk of req as AsyncIterable<unknown>) {
       if (Buffer.isBuffer(chunk)) {
-        // Copy the slice into a fresh ArrayBuffer to satisfy the generic bound.
         const view = new Uint8Array(chunk.byteLength);
         view.set(new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength));
         chunks.push(view);
       } else if (typeof chunk === 'string') {
-        // TextEncoder always returns Uint8Array<ArrayBuffer>.
         chunks.push(new TextEncoder().encode(chunk));
       }
     }
@@ -159,7 +127,6 @@ export async function directoryProxy(
     bodyBuffer = combined;
   }
 
-  // Build upstream headers, injecting the session Bearer token when present.
   const buildHeaders = (): Record<string, string> => {
     const out: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) {
@@ -173,18 +140,14 @@ export async function directoryProxy(
 
     const token = req.session.accessToken;
     if (token) {
-      // UserOrNone — authenticated path.
       out['authorization'] = `Bearer ${token}`;
     } else {
-      // UserOrNone — anonymous path: do not forward any stale auth header.
       delete out['authorization'];
     }
 
     return out;
   };
 
-  // The global `fetch` returns the Web API Response; alias the return type
-  // explicitly to avoid confusion with the Express Response parameter.
   const doFetch = (): Promise<globalThis.Response> =>
     fetch(targetUrl, {
       method: req.method,
@@ -194,18 +157,15 @@ export async function directoryProxy(
 
   let apiResponse = await doFetch();
 
-  // On 401: attempt one token refresh then retry.
   if (apiResponse.status === 401 && req.session.refreshToken) {
     try {
       await refreshAndSave(req);
       apiResponse = await doFetch();
     } catch (err) {
       logger.warn({ err }, '[BFF proxy] Token refresh on 401 failed');
-      // Fall through and forward the 401 to the client.
     }
   }
 
-  // Forward the upstream status and headers.
   res.status(apiResponse.status);
   apiResponse.headers.forEach((value: string, key: string) => {
     if (!DROP_RESPONSE_HEADERS.has(key.toLowerCase())) {
@@ -213,7 +173,6 @@ export async function directoryProxy(
     }
   });
 
-  // Buffer and forward the response body.
   const body = await apiResponse.arrayBuffer();
   res.end(Buffer.from(body));
 }

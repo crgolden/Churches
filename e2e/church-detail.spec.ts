@@ -32,7 +32,6 @@ test.describe('ChurchDetail', () => {
     await expect(page.locator('#church-campuses')).toContainText('1200 N Lamar Blvd');
     await expect(page.locator('#church-map-section .leaflet-container')).toBeVisible();
 
-    // Location heading must horizontally align with the Contact/About headings.
     const headingsAligned = await page.evaluate(() => {
       const contact = document.querySelector('.detail-body .detail-section h4');
       const location = document.querySelector('#church-map-section h4');
@@ -41,10 +40,7 @@ test.describe('ChurchDetail', () => {
     });
     expect(headingsAligned).toBe(true);
 
-    // Main church + one campus marker.
     await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2);
-
-    // Leaflet CSS guard — same assertion as the list map.
     await expect(page.locator('.leaflet-tile').first()).toBeVisible();
     const mapPanePos = await page.evaluate(
       () => getComputedStyle(document.querySelector('.leaflet-map-pane')!).position,
@@ -101,10 +97,7 @@ test.describe('ChurchDetail', () => {
     await page.goto('/churches/mosaic-church-austin-tx');
     await expect(page.locator('#church-name')).toContainText('Mosaic Church Austin');
 
-    // Wait for auth to settle and moderator UI to appear.
     await expect(page.locator("label[for='schedule-day']")).toBeVisible();
-
-    // Render guard: add-form must be laid out with CSS grid, not plain block.
     await expect(page.locator("label[for='schedule-time']")).toBeVisible();
     const gridDisplay = await page.evaluate(
       () => getComputedStyle(document.querySelector('.mod-add-grid')!).display,
@@ -116,7 +109,6 @@ test.describe('ChurchDetail', () => {
     expect(gridRowGap).not.toBe('0px');
     expect(gridRowGap).not.toBe('normal');
 
-    // Add a schedule.  Wait for the POST + reload round-trip to complete.
     await page.getByLabel('Day of week').selectOption({ label: 'Wednesday' });
     await page.locator('#schedule-time').fill('19:00');
     await page.locator('#schedule-desc').fill('Midweek Prayer');
@@ -128,7 +120,6 @@ test.describe('ChurchDetail', () => {
     await expect(page.locator('#church-schedules')).toContainText('Wednesday 19:00', { timeout: 15_000 });
     await expect(page.locator('#church-schedules')).toContainText('Midweek Prayer', { timeout: 15_000 });
 
-    // Delete it.
     const deleteResponsePromise = page.waitForResponse(r => r.url().includes('/schedules') && r.request().method() === 'DELETE');
     await page.locator("#church-schedules button[aria-label='Delete schedule']").click();
     await deleteResponsePromise;
@@ -143,7 +134,6 @@ test.describe('ChurchDetail', () => {
     await page.goto('/churches/mosaic-church-austin-tx');
     await expect(page.locator('#church-name')).toContainText('Mosaic Church Austin');
 
-    // Wait for auth to settle and moderator UI to appear.
     await expect(page.locator('#ministry-name')).toBeVisible();
 
     const ministryResponsePromise = page.waitForResponse(r => r.url().includes('/ministries') && r.request().method() === 'POST');

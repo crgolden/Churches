@@ -48,7 +48,6 @@ export class ChurchDetailComponent implements OnInit {
     city: '',
     state: '',
     zip: '',
-    // Nullable so the inputs render empty (placeholder/label visible) instead of a literal 0.
     latitude: this.fb.control<number | null>(null),
     longitude: this.fb.control<number | null>(null),
   });
@@ -65,7 +64,6 @@ export class ChurchDetailComponent implements OnInit {
 
   protected scheduleLabel(schedule: ServiceSchedule): string {
     const day = DAYS_OF_WEEK.find(d => d.value === schedule.dayOfWeek)?.label ?? '';
-    // startTime arrives as "HH:mm:ss"; show "HH:mm".
     const time = schedule.startTime.slice(0, 5);
     return `${day} ${time}`.trim();
   }

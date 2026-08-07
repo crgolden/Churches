@@ -9,7 +9,8 @@
 
 import express, { type Express, type Request, type Response } from 'express';
 
-// ── Data models ──────────────────────────────────────────────────────────────
+export const CorrectionStatus = { Pending: 0, Approved: 1, Rejected: 2 } as const;
+export type CorrectionStatusValue = (typeof CorrectionStatus)[keyof typeof CorrectionStatus];
 
 export interface ChurchRecord {
   id: string;
@@ -82,14 +83,12 @@ export interface CorrectionRecord {
   field: string;
   oldValue: string | null;
   newValue: string;
-  status: number; // 0=pending, 1=approved, 2=rejected
+  status: CorrectionStatusValue;
   reviewedBy: string | null;
   reviewedAt: string | null;
   createdAt: string;
   churchName: string | null;
 }
-
-// ── In-memory stores ─────────────────────────────────────────────────────────
 
 const churches = new Map<string, ChurchRecord>();
 const corrections = new Map<string, CorrectionRecord>();
@@ -105,8 +104,6 @@ function now(): string {
 function getActiveChurches(): ChurchRecord[] {
   return [...churches.values()].filter(c => c.isActive);
 }
-
-// ── Seed data (mirror of C# ChurchStore static fields) ───────────────────────
 
 export const FIRST_BAPTIST_AUSTIN: ChurchRecord = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -220,13 +217,9 @@ export const MOSAIC_AUSTIN: ChurchRecord = {
   campuses: [],
 };
 
-// ── Express app factory ───────────────────────────────────────────────────────
-
 export function createDirectoryApp(): Express {
   const app = express();
   app.use(express.json());
-
-  // ── Control API (/_test/*) — test state management ──────────────────────
 
   /** Clear all state (called at the start of each test). */
   app.post('/_test/reset', (_req: Request, res: Response) => {
@@ -254,8 +247,6 @@ export function createDirectoryApp(): Express {
     corrections.set(correction.id, correction);
     res.status(201).json({ id: correction.id });
   });
-
-  // ── Directory API routes (no path prefix, matches the real upstream API) ────
 
   /** GET /denominations — always returns empty array. */
   app.get('/denominations', (_req: Request, res: Response) => {
@@ -427,7 +418,7 @@ export function createDirectoryApp(): Express {
     const pageSize = Math.min(50, Math.max(1, parseInt((req.query['pageSize'] as string) ?? '20', 10)));
 
     const all = [...corrections.values()]
-      .filter(c => c.status === 0)
+      .filter(c => c.status === CorrectionStatus.Pending)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     const total = all.length;
     const items = all.slice((page - 1) * pageSize, page * pageSize);
@@ -455,7 +446,7 @@ export function createDirectoryApp(): Express {
       field,
       oldValue: (body['oldValue'] as string | null) ?? null,
       newValue,
-      status: 0,
+      status: CorrectionStatus.Pending,
       reviewedBy: null,
       reviewedAt: null,
       createdAt: now(),
@@ -468,10 +459,10 @@ export function createDirectoryApp(): Express {
   /** PATCH /corrections/:id/approve. */
   app.patch('/corrections/:id/approve', (req: Request, res: Response) => {
     const correction = corrections.get(req.params['id'] ?? '');
-    if (!correction || correction.status !== 0) { res.status(404).end(); return; }
+    if (!correction || correction.status !== CorrectionStatus.Pending) { res.status(404).end(); return; }
     corrections.set(correction.id, {
       ...correction,
-      status: 1,
+      status: CorrectionStatus.Approved,
       reviewedBy: 'e2e-mod-id',
       reviewedAt: now(),
     });
@@ -481,10 +472,10 @@ export function createDirectoryApp(): Express {
   /** PATCH /corrections/:id/reject. */
   app.patch('/corrections/:id/reject', (req: Request, res: Response) => {
     const correction = corrections.get(req.params['id'] ?? '');
-    if (!correction || correction.status !== 0) { res.status(404).end(); return; }
+    if (!correction || correction.status !== CorrectionStatus.Pending) { res.status(404).end(); return; }
     corrections.set(correction.id, {
       ...correction,
-      status: 2,
+      status: CorrectionStatus.Rejected,
       reviewedBy: 'e2e-mod-id',
       reviewedAt: now(),
     });

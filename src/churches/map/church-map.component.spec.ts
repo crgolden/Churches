@@ -3,8 +3,6 @@ import { vi } from 'vitest';
 import { ChurchMapComponent } from './church-map.component';
 import type { SearchResult } from '../../shared/models';
 
-// Leaflet needs a real browser environment; stub the dynamic import so jsdom doesn't
-// throw on tile URL resolution or canvas APIs.
 const markerStub = {
   addTo: vi.fn().mockReturnThis(),
   bindPopup: vi.fn().mockReturnThis(),
@@ -84,13 +82,10 @@ describe('ChurchMapComponent', () => {
     const emitted: string[] = [];
     component.markerClick.subscribe((slug: string) => emitted.push(slug));
 
-    // Set items and detect changes so ngOnChanges fires
     fixture.componentRef.setInput('items', [makeResult('grace-church', 39.7, -104.9)]);
     fixture.detectChanges();
     await fixture.whenStable();
 
-    // Leaflet lifecycle is async; markerClick is connected to marker.on('click', ...).
-    // In jsdom, Leaflet's async init finishes after whenStable; emit via the stub directly.
     const L = await import('leaflet');
     const onCalls = vi.mocked(L.default.marker).mock.results
       .map((r: { value: { on: ReturnType<typeof vi.fn> } }) => r.value.on.mock.calls as [string, () => void][])
@@ -98,8 +93,6 @@ describe('ChurchMapComponent', () => {
     const handler = onCalls.find(c => c[0] === 'click')?.[1];
     handler?.();
 
-    // Verifying that markerClick fires is best done in an E2E test with a real browser.
-    // This test confirms the component does not throw and the output channel exists.
     expect(component.markerClick).toBeTruthy();
   });
 

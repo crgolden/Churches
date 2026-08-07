@@ -20,9 +20,6 @@ export interface MapPoint {
   label: string;
 }
 
-// A small standalone Leaflet map that plots a set of labelled points (used on the church-detail page
-// to show the main church plus its campuses). Leaflet is dynamically imported so it stays out of the
-// initial bundle.
 @Component({
   selector: 'app-location-map',
   standalone: true,
@@ -66,7 +63,6 @@ export class LocationMapComponent implements AfterViewInit, OnChanges, OnDestroy
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(this.map);
-    // Recompute size in case the container was laid out after Leaflet read it during init.
     this.map.invalidateSize();
     this.renderMarkers(L);
   }

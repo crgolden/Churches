@@ -4,8 +4,6 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { REQUEST } from '@angular/core';
 import { ssrAbsoluteUrlInterceptor } from './ssr-absolute-url.interceptor';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function configure(requestProviderValue: Request | null) {
   TestBed.configureTestingModule({
     providers: [
@@ -15,8 +13,6 @@ function configure(requestProviderValue: Request | null) {
     ],
   });
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('ssrAbsoluteUrlInterceptor', () => {
   let http: HttpClient;

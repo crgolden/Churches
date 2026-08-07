@@ -30,8 +30,6 @@ test.describe('AuthFlow', () => {
 
     await page.goto('/');
 
-    // The /bff/user route is mocked — evaluate fetches from the browser context
-    // and the Playwright route intercept returns our fake claims JSON.
     const json = await page.evaluate(async () => {
       const r = await fetch('/bff/user', { headers: { 'X-CSRF': '1' } });
       return r.json() as Promise<Array<{ type: string; value: string }>>;

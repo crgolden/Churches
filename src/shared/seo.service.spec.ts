@@ -45,7 +45,6 @@ describe('SeoService', () => {
   });
 
   afterEach(() => {
-    // Clean up injected DOM nodes between tests.
     doc.querySelector('link[rel="canonical"]')?.remove();
     doc.getElementById('app-json-ld')?.remove();
     doc.querySelectorAll('meta[property^="og:"]').forEach(el => el.remove());

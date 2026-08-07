@@ -45,8 +45,6 @@ export class SearchComponent implements OnInit {
     );
   }
 
-  // Resolves whatever the user typed/picked (a 2-letter code or a full state name, any case) to the
-  // 2-letter code the Directory API expects, or null when it isn't a recognizable state.
   protected resolveStateCode(raw: string): string | null {
     const value = raw.trim();
     if (!value) return null;
@@ -58,7 +56,6 @@ export class SearchComponent implements OnInit {
     return /^[A-Z]{2}$/.test(upper) ? upper : null;
   }
 
-  // Snap the field to the canonical code on commit (blur / datalist pick) so "Texas" becomes "TX".
   protected commitState(raw: string): void {
     this.state.set(this.resolveStateCode(raw) ?? raw.trim());
   }

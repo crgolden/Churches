@@ -1,12 +1,6 @@
-// ── Mocks (hoisted before imports) ────────────────────────────────────────────
-// openid-client is mocked so each vi.resetModules() cycle produces a fresh mock
-// instance with call counts starting at 0.
-
 vi.mock('openid-client', () => ({
   discovery: vi.fn(),
 }));
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const ENV_KEYS = ['OidcAuthority', 'ChurchesClientId', 'ChurchesClientSecret'];
 
@@ -20,12 +14,7 @@ function clearEnv(): void {
   ENV_KEYS.forEach(k => delete process.env[k]);
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
-// Each test calls vi.resetModules() via a shared beforeEach and receives fresh
-// module instances.  Dynamic imports are used to get the post-reset versions.
-
 describe('getOidcConfig', () => {
-  // Per-test references to the fresh mock instances.
   let getOidcConfig: () => Promise<unknown>;
   let discoveryMock: ReturnType<typeof vi.fn>;
 
@@ -34,8 +23,6 @@ describe('getOidcConfig', () => {
     vi.clearAllMocks();
     vi.resetModules();
 
-    // Import openid-client first so it is cached when oidc.ts loads it as a
-    // static import.
     const oidcClientModule = await import('openid-client');
     discoveryMock = vi.mocked(oidcClientModule.discovery);
 

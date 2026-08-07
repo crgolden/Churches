@@ -3,7 +3,6 @@ import { DOCUMENT } from '@angular/common';
 import { REQUEST } from '@angular/core';
 import { injectOrigin } from './origin';
 
-// The DOCUMENT mock simulates what jsdom provides: document.location.origin.
 const BROWSER_ORIGIN = 'https://churches.example.com';
 
 describe('injectOrigin', () => {
@@ -33,7 +32,6 @@ describe('injectOrigin', () => {
     beforeEach(() => {
       TestBed.configureTestingModule({
         providers: [
-          // REQUEST not provided — inject returns null (optional: true)
           {
             provide: DOCUMENT,
             useValue: { location: { origin: BROWSER_ORIGIN } },

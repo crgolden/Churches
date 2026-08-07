@@ -34,8 +34,6 @@ export async function getOidcConfig(): Promise<Configuration> {
     throw new Error('Missing required environment variable: ChurchesClientSecret');
   }
 
-  // discovery(server, clientId, clientSecret) — the third-argument string
-  // shorthand sets client_secret and defaults to ClientSecretPost.
   _config = await discovery(new URL(authority), clientId, clientSecret);
 
   return _config;

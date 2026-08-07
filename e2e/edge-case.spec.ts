@@ -72,7 +72,7 @@ test.describe('EdgeCases', () => {
     store,
   }) => {
     await store.reset();
-    await store.seedChurch(MOSAIC_AUSTIN); // confidenceScore 0.2
+    await store.seedChurch(MOSAIC_AUSTIN);
 
     await page.goto('/churches/mosaic-church-austin-tx');
     await expect(page.locator('h1')).toContainText('Mosaic Church Austin');
@@ -83,7 +83,7 @@ test.describe('EdgeCases', () => {
     store,
   }) => {
     await store.reset();
-    await store.seedChurch(MOSAIC_AUSTIN); // phoneNumber: null
+    await store.seedChurch(MOSAIC_AUSTIN);
 
     await page.goto('/contribute/mosaic-church-austin-tx');
     await page.locator('select').selectOption('phoneNumber');
@@ -97,7 +97,7 @@ test.describe('EdgeCases', () => {
     store,
   }) => {
     await store.reset();
-    await store.seedChurch(FIRST_BAPTIST_AUSTIN); // street: '901 Trinity St'
+    await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/contribute/first-baptist-church-austin-tx');
     await page.locator('select').selectOption('street');

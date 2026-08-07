@@ -23,7 +23,6 @@ export interface Church {
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
-  // Present only on the church-detail response.
   schedules?: ServiceSchedule[];
   ministries?: Ministry[];
   campuses?: Campus[];
@@ -126,8 +125,6 @@ export const WORSHIP_STYLES: { value: number; label: string }[] = [
   { value: 5, label: 'Liturgical' },
 ];
 
-// U.S. states + DC, used to back the State autocomplete. The Directory API expects the 2-letter
-// `code`; `name` is what the user can type/select via the <datalist>.
 export const US_STATES: { code: string; name: string }[] = [
   { code: 'AL', name: 'Alabama' },
   { code: 'AK', name: 'Alaska' },
@@ -182,8 +179,6 @@ export const US_STATES: { code: string; name: string }[] = [
   { code: 'WY', name: 'Wyoming' },
 ];
 
-// Matches .NET System.DayOfWeek (Sunday = 0 ... Saturday = 6), the value the
-// Directory API binds for the ServiceSchedules day filter.
 export const DAYS_OF_WEEK: { value: number; label: string }[] = [
   { value: 0, label: 'Sunday' },
   { value: 1, label: 'Monday' },

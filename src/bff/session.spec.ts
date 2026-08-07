@@ -1,9 +1,5 @@
 import type { Express } from 'express';
 
-// ── Mocks (hoisted before imports) ────────────────────────────────────────────
-// vi.fn() (no implementation) produces a real function usable as a constructor.
-// Avoid arrow functions in implementations when the mock is called with `new`.
-
 vi.mock('express-session', () => {
   const MemoryStore = vi.fn();
   const sessionMiddleware = vi.fn();
@@ -34,13 +30,9 @@ import { RedisStore } from 'connect-redis';
 import { logger } from '../telemetry/logging';
 import { applySession } from './session';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function makeApp(): { use: ReturnType<typeof vi.fn> } {
   return { use: vi.fn() };
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('applySession', () => {
   const savedEnv: Record<string, string | undefined> = {};
@@ -59,7 +51,6 @@ describe('applySession', () => {
       delete process.env[k];
     });
     vi.clearAllMocks();
-    // Restore implementations cleared by clearAllMocks
     vi.mocked(session).mockReturnValue(vi.fn() as never);
     vi.mocked(createClient).mockReturnValue({
       on: vi.fn().mockReturnThis(),
@@ -76,8 +67,6 @@ describe('applySession', () => {
       }
     });
   });
-
-  // ── MemoryStore selection ──────────────────────────────────────────────────
 
   it('uses MemoryStore when RedisHost is absent', () => {
     applySession(makeApp() as unknown as Express);
@@ -105,8 +94,6 @@ describe('applySession', () => {
       expect.stringContaining('MemoryStore in production'),
     );
   });
-
-  // ── RedisStore selection ───────────────────────────────────────────────────
 
   it('creates Redis client without TLS in development', () => {
     process.env['RedisHost'] = 'redis.dev.local';
@@ -145,10 +132,6 @@ describe('applySession', () => {
     expect(RedisStore).toHaveBeenCalledOnce();
   });
 
-  // ── Connection liveness ────────────────────────────────────────────────────
-  // A half-open socket (Azure SNAT silently dropping an idle flow) otherwise hangs every request
-  // that touches the session store — which is every route — until the platform 504s at ~240s.
-
   it('bounds socket inactivity so a half-open connection cannot hang requests forever', () => {
     process.env['RedisHost'] = 'redis.dev.local';
 
@@ -157,14 +140,10 @@ describe('applySession', () => {
     const [callArg] = vi.mocked(createClient).mock.calls[0];
     const socket = (callArg as Record<string, unknown>)['socket'] as Record<string, unknown>;
     expect(socket['socketTimeout']).toBeTypeOf('number');
-    // Must stay under the ~240s at which Azure App Service abandons the request.
     expect(socket['socketTimeout'] as number).toBeLessThan(240_000);
   });
 
   it('reconnects after a socket timeout', () => {
-    // node-redis's default strategy returns false (no reconnect) for SocketTimeoutError, which would
-    // leave the client permanently closed and fail every later session lookup. Setting socketTimeout
-    // without overriding this is a footgun — guard against the override being dropped.
     process.env['RedisHost'] = 'redis.dev.local';
 
     applySession(makeApp() as unknown as Express);
@@ -176,7 +155,6 @@ describe('applySession', () => {
     expect(strategy).toBeTypeOf('function');
     expect(strategy(0)).toBeTypeOf('number');
     expect(strategy(50)).toBeTypeOf('number');
-    // Backoff stays bounded so an outage doesn't become an ever-lengthening stall.
     expect(strategy(1000) as number).toBeLessThanOrEqual(3_200);
   });
 
@@ -188,8 +166,6 @@ describe('applySession', () => {
     const [callArg] = vi.mocked(createClient).mock.calls[0];
     expect((callArg as Record<string, unknown>)['socket']).toMatchObject({ port: 6380 });
   });
-
-  // ── Cookie flags ───────────────────────────────────────────────────────────
 
   it('sets secure=false cookie flag in development', () => {
     const app = makeApp();
@@ -216,8 +192,6 @@ describe('applySession', () => {
     );
   });
 
-  // ── Session options ────────────────────────────────────────────────────────
-
   it('uses the provided SessionSecret', () => {
     process.env['SessionSecret'] = 'my-long-random-secret';
 
@@ -239,7 +213,6 @@ describe('applySession', () => {
   it('logs a connection error when Redis emits an "error" event', () => {
     process.env['RedisHost'] = 'redis.dev.local';
 
-    // Capture the listener registered via redisClient.on('error', listener)
     let errorListener: ((err: unknown) => void) | undefined;
     vi.mocked(createClient).mockReturnValue({
       on: vi.fn().mockImplementation((event: string, listener: (err: unknown) => void) => {
@@ -268,7 +241,6 @@ describe('applySession', () => {
 
     applySession(makeApp() as unknown as Express);
 
-    // Allow the rejected connect promise to propagate to the .catch handler.
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     expect(logger.error).toHaveBeenCalledWith({ err: connectError }, '[Redis] Initial connect failed');

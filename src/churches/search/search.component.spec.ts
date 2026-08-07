@@ -17,7 +17,6 @@ describe('SearchComponent', () => {
       providers: [provideRouter([]), provideHttpClient(withXhr()), provideHttpClientTesting()],
     }).compileComponents();
 
-    // Stub getDenominations so it doesn't hit the network
     TestBed.inject(ChurchApiService).getDenominations = () => of([]);
     router = TestBed.inject(Router);
 

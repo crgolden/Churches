@@ -132,7 +132,7 @@ sequenceDiagram
 
 - The session cookie is `sameSite: 'lax'` — `Strict` breaks the OIDC callback (the redirect back from Identity is a cross-site navigation, so a Strict cookie wouldn't be sent and the callback couldn't find the session's PKCE verifier). `secure` in production.
 - Sessions live in Redis via `connect-redis` when `RedisHost` is set, otherwise an in-memory store (local dev only — sessions don't survive a restart).
-- `/bff/user` returns the session's claims (requires the `X-CSRF` header) and appends a `bff:logout_url` claim carrying the session ID; `/bff/logout` verifies that sid matches the live session before doing RP-initiated logout at Identity.
+- `/bff/user` returns the session's claims (requires the `X-CSRF` header) and appends a `bff:logout_url` claim carrying the session ID; `/bff/logout` verifies that sid matches the live session before doing RP-initiated logout at Identity. `/bff/login` and `/bff/callback` are browser-navigation redirects, not XHR/fetch calls, so they're exempt from the `X-CSRF` check — PKCE plus the `state` parameter protect them instead; `/bff/logout`'s CSRF protection is the server-issued `sid` query parameter rather than the header.
 - Known quirk: `/bff/login` accepts but ignores the `returnUrl` query parameter that `authGuard` appends — after login you land on the app root, not the page that triggered the redirect.
 
 ### Proxying to the Directory API

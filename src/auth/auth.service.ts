@@ -45,8 +45,6 @@ export class AuthService {
   public readonly loginUrl: string = '/bff/login';
 
   public initialize(): Observable<Session> {
-    // SEO routes are anonymous and rendered server-side; skip the BFF session
-    // check on the server so cookies aren't forwarded into the render.
     if (isPlatformServer(this.platformId)) {
       return of([]);
     }

@@ -2,8 +2,6 @@ import type { Request, Response } from 'express';
 import { Writable } from 'node:stream';
 import { sitemapIndexHandler, sitemapChunkHandler } from './sitemap';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function makeReq(params: Record<string, string> = {}): Request {
   return { params } as unknown as Request;
 }
@@ -47,8 +45,6 @@ function stubFetchRejection(error: Error) {
 }
 
 const GZIP_MAGIC = new Uint8Array([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff]);
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('sitemapIndexHandler', () => {
   const savedEnv: Record<string, string | undefined> = {};

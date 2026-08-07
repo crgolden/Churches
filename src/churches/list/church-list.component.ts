@@ -49,8 +49,6 @@ export class ChurchListComponent implements OnInit {
     return Math.min(total, this.page() * this.pageSize());
   });
 
-  // A window of up to PAGE_WINDOW page numbers centered on the current page, clamped to
-  // [1, totalPages], mirroring the numbered-pagination pattern used elsewhere in the workspace.
   protected readonly pageWindow = computed(() => {
     const total = this.totalPages();
     const current = this.page();
@@ -134,9 +132,6 @@ export class ChurchListComponent implements OnInit {
       next: result => {
         this.results.set(result);
         this.loading.set(false);
-        // Scroll only after the new (possibly shorter/taller) result set has actually
-        // rendered — resetting scroll before the async response lands races the DOM
-        // update and can leave the viewport well below the top on the next page.
         this.viewportScroller.scrollToPosition([0, 0]);
       },
       error: () => {

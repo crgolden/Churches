@@ -33,9 +33,6 @@ test.describe('Smoke — deployed stack', () => {
 
   test('BFF proxy GET without CSRF header still succeeds (CSRF only guards mutating methods)', async ({ request }) => {
     skipIfNotSmoke();
-    // csrfForMutating only rejects POST/PUT/PATCH/DELETE without X-CSRF — GET/HEAD are
-    // read-only and pass through unchecked (standard CSRF practice: safe methods don't
-    // need the defence since they must not have side effects).
     const res = await request.get(`${smokeBaseUrl}/directory/api/search`);
     expect(res.status()).toBe(200);
   });

@@ -13,8 +13,6 @@ import type { ChurchRecord, CorrectionRecord } from './mocks/directory.js';
 
 export type { ChurchRecord, CorrectionRecord };
 
-// ── Pre-built seed records (mirrors C# ChurchStore static fields) ─────────────
-
 export const FIRST_BAPTIST_AUSTIN: ChurchRecord = {
   id: '11111111-1111-1111-1111-111111111111',
   canonicalName: 'First Baptist Church Austin',
@@ -127,8 +125,6 @@ export const MOSAIC_AUSTIN: ChurchRecord = {
   campuses: [],
 };
 
-// ── Mock server control client ────────────────────────────────────────────────
-
 const MOCK_BASE = 'http://localhost:4001';
 
 export interface TestStore {
@@ -148,8 +144,6 @@ async function fetchControl(path: string, body?: unknown): Promise<void> {
   }
 }
 
-// ── Anonymous and authenticated claim payloads ────────────────────────────────
-
 const USER_CLAIMS = [
   { type: 'sub', value: 'e2e-user-id' },
   { type: 'email', value: 'e2e@test.invalid' },
@@ -162,8 +156,6 @@ const MOD_CLAIMS = [
   ...USER_CLAIMS,
   { type: 'churches.mod', value: 'true' },
 ];
-
-// ── Route mock helpers ────────────────────────────────────────────────────────
 
 async function applyAnonymousRoutes(page: Page): Promise<void> {
   await page.route('**/bff/user**', route =>
@@ -195,16 +187,12 @@ async function applyAuthRoutes(page: Page, claims: typeof USER_CLAIMS): Promise<
   );
 }
 
-// ── Fixture type ──────────────────────────────────────────────────────────────
-
 type ChurchesFixtures = {
   store: TestStore;
   anonymousPage: Page;
   authedPage: Page;
   modPage: Page;
 };
-
-// ── Extended test instance ────────────────────────────────────────────────────
 
 export const test = base.extend<ChurchesFixtures>({
   store: async ({}, use) => {
