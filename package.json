@@ -38,7 +38,7 @@
     "@opentelemetry/sdk-trace-node": "^2.10.0",
     "@opentelemetry/semantic-conventions": "^1.41.1",
     "@types/leaflet": "^1.9.21",
-    "connect-redis": "^9.0.0",
+    "connect-redis": "^10.0.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "leaflet": "^1.9.4",
