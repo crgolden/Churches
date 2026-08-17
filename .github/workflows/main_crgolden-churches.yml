@@ -208,7 +208,7 @@ jobs:
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
             -Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs
-            -Dsonar.coverage.exclusions=e2e/**,src/test-setup.ts,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.config.ts,src/app/app.config.server.ts,src/app/app.routes.server.ts,**/*.mjs
+            -Dsonar.coverage.exclusions=e2e/**,scripts/**,**/*.config.*,src/test-setup.ts,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts
             -Dsonar.test.inclusions=**/*.spec.ts
             -Dsonar.scanner.skipJreProvisioning=true
 
