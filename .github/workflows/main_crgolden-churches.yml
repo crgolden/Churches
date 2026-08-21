@@ -11,9 +11,6 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     name: Build and analyze
@@ -30,7 +27,7 @@ jobs:
           fetch-depth: 0  # Shallow clones should be disabled for better Sonar analysis relevancy
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 
@@ -84,7 +81,7 @@ jobs:
         run: npm run e2e
 
       - name: Upload Playwright HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -92,7 +89,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Playwright failure artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: churches-playwright-artifacts
@@ -230,7 +227,7 @@ jobs:
           cp package-lock.json publish/package-lock.json
 
       - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: node-app
           path: publish/
@@ -250,21 +247,18 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Download artifact from build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: node-app
           path: publish/
 
       - name: Login to Azure
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5  # v2
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca  # v3.0.1
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C4CF7EE65BC442259601FFDB3B86513D }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D1FC42A8E15547A18F5A397D64F179D0 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C6E3B3EB281E4D4C85FC7D1501EE1170 }}
 
-      # node_modules is built on the runner and shipped inside the package, so a runtime major that
-      # disagrees with .nvmrc means the app runs against modules it was not built for. Read-only:
-      # this never writes site config, because a stack change restarts production.
       - name: Verify App Service Node runtime matches the build
         run: |
           expected="NODE|$(tr -d '[:space:]' < .nvmrc)-lts"
@@ -278,7 +272,7 @@ jobs:
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
-        uses: azure/webapps-deploy@84a80cfe7e9889f35148ed88c307e6e93bf02578  # v3
+        uses: azure/webapps-deploy@02a81bead70021f5284939794bcec79c271ab383  # v3.0.8
         with:
           app-name: 'crgolden-churches'
           slot-name: 'Production'
@@ -299,7 +293,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 
@@ -346,7 +340,7 @@ jobs:
         run: npm run e2e:smoke
 
       - name: Upload smoke Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: smoke-playwright-report
@@ -354,7 +348,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload smoke Playwright failure artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: churches-smoke-playwright-artifacts
