@@ -40,11 +40,11 @@ traces/metrics → Grafana Alloy; structured logs → Elasticsearch (`pino-elast
 
 | Layer | Technology |
 |---|---|
-| Framework | Node.js 22 / Express 5 |
+| Framework | Node.js 24 / Express 5 |
 | Auth / BFF | `openid-client` v6 + `express-session` + `connect-redis` |
 | Frontend | Angular 22 SSR (`@angular/ssr`) |
 | Observability | OpenTelemetry → Grafana Alloy (OTLP), `pino` → Elasticsearch |
-| Hosting | Azure App Service (Linux, Node 22) |
+| Hosting | Azure App Service (Linux, Node 24) |
 | Secrets | Azure Key Vault (Managed Identity) |
 
 ## Getting Started

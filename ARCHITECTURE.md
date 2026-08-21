@@ -431,7 +431,7 @@ Everything sits in one resource group. The data stores and observability stack a
 ```mermaid
 graph LR
     subgraph Azure["Azure — one resource group"]
-        CH["Churches<br/>App Service · Linux · Node 22"]
+        CH["Churches<br/>App Service · Linux · Node 24"]
         DIR["Directory<br/>App Service · Windows · .NET 10"]
         FN["Functions<br/>Function App · Linux"]
         SB[["Service Bus<br/>Basic tier · 7 queues"]]
@@ -467,7 +467,7 @@ graph LR
 
 | App | Plan/OS | Runtime identity | Notes |
 |---|---|---|---|
-| Churches | Linux, Node 22 LTS | System-assigned MI | Startup: `node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`. No custom domain bound yet |
+| Churches | Linux, Node 24 LTS | System-assigned MI | Startup: `node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`. No custom domain bound yet |
 | Directory | **Windows**, .NET 10 | System-assigned MI | Data protection keys in blob, wrapped by a Key Vault key |
 | Functions | Linux Function App | System-assigned MI | Fully identity-based bindings (`ServiceBusConnection__fullyQualifiedNamespace` + `__credential`, `AzureWebJobsStorage__credential`) — no connection strings anywhere |
 

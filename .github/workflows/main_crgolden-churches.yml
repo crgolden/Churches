@@ -32,7 +32,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
       - name: Cache npm packages
         uses: actions/cache@v5
@@ -247,6 +247,8 @@ jobs:
       contents: read
 
     steps:
+      - uses: actions/checkout@v6
+
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
@@ -259,6 +261,20 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C4CF7EE65BC442259601FFDB3B86513D }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D1FC42A8E15547A18F5A397D64F179D0 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C6E3B3EB281E4D4C85FC7D1501EE1170 }}
+
+      # node_modules is built on the runner and shipped inside the package, so a runtime major that
+      # disagrees with .nvmrc means the app runs against modules it was not built for. Read-only:
+      # this never writes site config, because a stack change restarts production.
+      - name: Verify App Service Node runtime matches the build
+        run: |
+          expected="NODE|$(tr -d '[:space:]' < .nvmrc)-lts"
+          actual=$(az webapp config show --name 'crgolden-churches' --resource-group 'crgolden' \
+            --query linuxFxVersion --output tsv)
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::App Service runtime is '$actual' but this build targets '$expected'. Update the App Service stack or .nvmrc before deploying."
+            exit 1
+          fi
+          echo "App Service runtime '$actual' matches the build."
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -285,7 +301,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
       - name: Restore npm cache
         uses: actions/cache/restore@v5
