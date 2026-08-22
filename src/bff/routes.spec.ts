@@ -251,6 +251,77 @@ describe('/bff/callback', () => {
       { type: 'role', value: 'user' },
     ]);
   });
+
+  it('takes churches.mod from the access token, so it does not depend on the profile identity resource', async () => {
+    const accessToken = `header.${Buffer.from(
+      JSON.stringify({ 'churches.mod': 'true' }),
+      'utf8',
+    ).toString('base64url')}.signature`;
+    vi.mocked(authorizationCodeGrant).mockResolvedValueOnce({
+      access_token: accessToken,
+      refresh_token: 'refresh-tok',
+      id_token: 'id-tok',
+      expires_in: 3600,
+      claims: () => ({ sub: 'user-123' }),
+    } as never);
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ sub: 'user-123' });
+
+    const req = makeReq({
+      session: { pkceCodeVerifier: 'pkce-verifier', oauthState: 'oauth-state' },
+    });
+    const res = makeRes();
+
+    await handler()(req, res as unknown as Response);
+
+    const session = req.session as unknown as Session;
+    expect(session.claims).toContainEqual({ type: 'churches.mod', value: 'true' });
+  });
+
+  it('copies only the allowlisted access-token claims into the session', async () => {
+    const accessToken = `header.${Buffer.from(
+      JSON.stringify({ 'churches.mod': 'true', client_id: 'churches-bff', jti: 'not-for-the-browser' }),
+      'utf8',
+    ).toString('base64url')}.signature`;
+    vi.mocked(authorizationCodeGrant).mockResolvedValueOnce({
+      access_token: accessToken,
+      refresh_token: 'refresh-tok',
+      id_token: 'id-tok',
+      expires_in: 3600,
+      claims: () => ({ sub: 'user-123' }),
+    } as never);
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ sub: 'user-123' });
+
+    const req = makeReq({
+      session: { pkceCodeVerifier: 'pkce-verifier', oauthState: 'oauth-state' },
+    });
+    const res = makeRes();
+
+    await handler()(req, res as unknown as Response);
+
+    const types = ((req.session as unknown as Session).claims ?? []).map(c => c.type);
+    expect(types).not.toContain('jti');
+  });
+
+  it('still stores the other claims when the access token is not a decodable JWT', async () => {
+    vi.mocked(authorizationCodeGrant).mockResolvedValueOnce({
+      access_token: 'not-a-jwt',
+      refresh_token: 'refresh-tok',
+      id_token: 'id-tok',
+      expires_in: 3600,
+      claims: () => ({ sub: 'user-123' }),
+    } as never);
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ sub: 'user-123' });
+
+    const req = makeReq({
+      session: { pkceCodeVerifier: 'pkce-verifier', oauthState: 'oauth-state' },
+    });
+    const res = makeRes();
+
+    await handler()(req, res as unknown as Response);
+
+    const session = req.session as unknown as Session;
+    expect(session.claims).toContainEqual({ type: 'sub', value: 'user-123' });
+  });
 });
 
 describe('/bff/user', () => {

@@ -16,6 +16,28 @@ const SCOPES = 'offline_access openid profile email directory';
 const CALLBACK_PATH =
   process.env['OidcCallbackPath'] ?? '/bff/callback';
 
+const ACCESS_TOKEN_CLAIM_ALLOWLIST = ['churches.mod'] as const;
+
+function accessTokenClaims(accessToken: string | undefined): Record<string, unknown> {
+  const payload = accessToken?.split('.')[1];
+  if (!payload) {
+    return {};
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+    const picked: Record<string, unknown> = {};
+    for (const claim of ACCESS_TOKEN_CLAIM_ALLOWLIST) {
+      if (decoded[claim] !== undefined) {
+        picked[claim] = decoded[claim];
+      }
+    }
+    return picked;
+  } catch {
+    return {};
+  }
+}
+
 function stringifyClaimValue(value: unknown): string {
   if (typeof value === 'string') return value;
   if (
@@ -134,6 +156,7 @@ export function buildBffRouter(): Router {
       const merged: Record<string, unknown> = {
         ...(idClaims ?? {}),
         ...userInfo,
+        ...accessTokenClaims(tokens.access_token),
       };
 
       const claims: { type: string; value: string }[] = [];
