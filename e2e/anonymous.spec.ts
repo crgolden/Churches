@@ -1,22 +1,6 @@
 import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
 import type { ChurchRecord } from './fixtures.js';
-
-async function assertLeafletStylesheetApplied(page: import('@playwright/test').Page): Promise<void> {
-  const mapPanePos = await page.evaluate(
-    () => getComputedStyle(document.querySelector('.leaflet-map-pane')!).position,
-  );
-  expect(mapPanePos).toBe('absolute');
-
-  const tilePos = await page.evaluate(
-    () => getComputedStyle(document.querySelector('.leaflet-tile')!).position,
-  );
-  expect(tilePos).toBe('absolute');
-
-  const containerOverflow = await page.evaluate(
-    () => getComputedStyle(document.querySelector('.leaflet-container')!).overflow,
-  );
-  expect(containerOverflow).toContain('hidden');
-}
+import { expectLeafletStylesheetApplied, expectTileLayerMounted } from './map-assertions.js';
 
 test.describe('SSR — raw HTML assertions', () => {
   test('churches list page is server-rendered with SEO tags', async ({ request, store }) => {
@@ -271,10 +255,10 @@ test.describe('ChurchList', () => {
 
     await page.goto('/churches?q=Baptist&page=1&pageSize=20');
     await page.locator('#btn-view-map').click();
-    await expect(page.locator('.leaflet-container')).toBeVisible();
-    await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible();
-    await expect(page.locator('.leaflet-tile').first()).toBeVisible();
-    await assertLeafletStylesheetApplied(page);
+    await expect(page.locator('#church-map')).toBeVisible();
+    await expect(page.locator(`#church-marker-${FIRST_BAPTIST_AUSTIN.slug}`)).toBeVisible();
+    await expectTileLayerMounted(page, 'church-map-tiles');
+    await expectLeafletStylesheetApplied(page, 'church-map', 'church-map-tiles');
   });
 
   test('clicking church name navigates to detail page', async ({ anonymousPage: page, store }) => {

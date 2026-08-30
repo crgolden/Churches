@@ -1,4 +1,5 @@
 import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
+import { expectLeafletStylesheetApplied, expectTileLayerMounted } from './map-assertions.js';
 
 test.describe('ChurchDetail', () => {
   test('with full data, renders all fields', async ({ anonymousPage: page, store }) => {
@@ -25,7 +26,7 @@ test.describe('ChurchDetail', () => {
     await expect(page.locator('#church-campuses')).toBeVisible();
     await expect(page.locator('#church-campuses')).toContainText('North Campus');
     await expect(page.locator('#church-campuses')).toContainText('1200 N Lamar Blvd');
-    await expect(page.locator('#church-map-section .leaflet-container')).toBeVisible();
+    await expect(page.locator('#location-map')).toBeVisible();
 
     const headingsAligned = await page.evaluate(() => {
       const contact = document.querySelector('#church-contact-heading');
@@ -35,16 +36,9 @@ test.describe('ChurchDetail', () => {
     });
     expect(headingsAligned).toBe(true);
 
-    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2);
-    await expect(page.locator('.leaflet-tile').first()).toBeVisible();
-    const mapPanePos = await page.evaluate(
-      () => getComputedStyle(document.querySelector('.leaflet-map-pane')!).position,
-    );
-    expect(mapPanePos).toBe('absolute');
-    const tilePos = await page.evaluate(
-      () => getComputedStyle(document.querySelector('.leaflet-tile')!).position,
-    );
-    expect(tilePos).toBe('absolute');
+    await expect(page.locator('[id^="location-marker-"]')).toHaveCount(2);
+    await expectTileLayerMounted(page, 'location-map-tiles');
+    await expectLeafletStylesheetApplied(page, 'location-map', 'location-map-tiles');
   });
 
   test('with sparse data, omits null fields', async ({ anonymousPage: page, store }) => {

@@ -20,7 +20,7 @@ import type { SearchResult } from '../../shared/models';
   selector: 'app-church-map',
   standalone: true,
   template: `
-    <div #mapEl class="leaflet-container" style="width:100%;height:480px;isolation:isolate"></div>
+    <div #mapEl id="church-map" class="leaflet-container" style="width:100%;height:480px;isolation:isolate"></div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -44,10 +44,14 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     const L = await this.loadLeaflet();
     this.fixDefaultIcon(L);
     this.map = L.map(this.mapElRef.nativeElement).setView([39.5, -98.35], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(this.map);
+    const tileContainer = tiles.getContainer();
+    if (tileContainer) {
+      tileContainer.id = 'church-map-tiles';
+    }
     this.map.invalidateSize();
     this.renderMarkers(L);
   }
@@ -80,9 +84,10 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       const lat = item.church.latitude;
       const lng = item.church.longitude;
       if (!lat || !lng) continue;
-      const marker = L.marker([lat, lng])
+      const marker = L.marker([lat, lng], { alt: item.church.canonicalName })
         .addTo(this.map)
         .bindPopup(item.church.canonicalName);
+      marker.getElement()?.setAttribute('id', `church-marker-${item.church.slug}`);
       marker.on('click', () => this.markerClick.emit(item.church.slug));
       this.markers.push(marker);
     }
