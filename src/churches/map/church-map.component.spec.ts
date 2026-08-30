@@ -3,11 +3,18 @@ import { vi } from 'vitest';
 import { ChurchMapComponent } from './church-map.component';
 import type { SearchResult } from '../../shared/models';
 
+const tileLayerElement = document.createElement('div');
+
 const markerStub = {
   addTo: vi.fn().mockReturnThis(),
   bindPopup: vi.fn().mockReturnThis(),
   on: vi.fn().mockReturnThis(),
+  getElement: vi.fn().mockReturnValue(document.createElement('img')),
   remove: vi.fn(),
+};
+const tileLayerStub = {
+  addTo: vi.fn().mockReturnThis(),
+  getContainer: vi.fn().mockReturnValue(tileLayerElement),
 };
 const mapStub = {
   setView: vi.fn().mockReturnThis(),
@@ -18,7 +25,7 @@ const mapStub = {
 vi.mock('leaflet', () => ({
   default: {
     map: vi.fn().mockReturnValue(mapStub),
-    tileLayer: vi.fn().mockReturnValue({ addTo: vi.fn().mockReturnThis() }),
+    tileLayer: vi.fn().mockReturnValue(tileLayerStub),
     marker: vi.fn().mockReturnValue(markerStub),
     featureGroup: vi.fn().mockReturnValue({ getBounds: vi.fn().mockReturnValue([]) }),
     Icon: { Default: { prototype: {}, mergeOptions: vi.fn() } },
@@ -106,4 +113,11 @@ describe('ChurchMapComponent', () => {
     await fixture.whenStable();
     expect(component).toBeTruthy();
   });
+
+  it('names the tile layer so a test can select it without a Leaflet class', async () => {
+    fixture.detectChanges();
+
+    await vi.waitFor(() => expect(tileLayerElement.id).toBe('church-map-tiles'));
+  });
+
 });
