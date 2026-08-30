@@ -9,7 +9,7 @@ export function routeTemplateFor(req: Request): string {
   const matched = req.route as { path?: string } | undefined;
 
   if (matched?.path) {
-    const base = req.baseUrl ?? '';
+    const base = req.baseUrl;
     const path = matched.path === ROOT_ROUTE ? '' : matched.path;
     return `${base}${path}` || ROOT_ROUTE;
   }

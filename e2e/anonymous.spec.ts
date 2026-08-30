@@ -1,10 +1,3 @@
-/**
- * Port of C# AnonymousTests — anonymous public browsing + SSR assertions.
- *
- * SSR proof section: fetches raw server-rendered HTML and asserts the SEO
- * tags Angular SSR writes during the render, proving the SEO gap is closed.
- */
-
 import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
 import type { ChurchRecord } from './fixtures.js';
 
@@ -70,9 +63,9 @@ test.describe('HomePage', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Find Your Church Home');
-    await expect(page.getByRole('textbox').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Search' })).toBeVisible();
+    await expect(page.locator('#search-title')).toContainText('Find Your Church Home');
+    await expect(page.locator('#search-keyword')).toBeVisible();
+    await expect(page.locator('#btn-search')).toBeVisible();
   });
 });
 
@@ -82,10 +75,10 @@ test.describe('SearchForm', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/');
-    await page.getByRole('textbox').first().fill('Baptist');
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.locator('#search-keyword').fill('Baptist');
+    await page.locator('#btn-search').click();
     await page.waitForURL('**/churches**');
-    await expect(page.locator('text=First Baptist Church Austin')).toBeVisible();
+    await expect(page.locator('#church-name-0')).toContainText('First Baptist Church Austin');
   });
 
   test('with state filter, shows matching churches', async ({ anonymousPage: page, store }) => {
@@ -94,10 +87,10 @@ test.describe('SearchForm', () => {
     await store.seedChurch(MOSAIC_AUSTIN);
 
     await page.goto('/');
-    await page.locator("input[placeholder*='State'], input[name*='state'], input[id*='state']").first().fill('TX');
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.locator('#search-state').fill('TX');
+    await page.locator('#btn-search').click();
     await page.waitForURL('**/churches**');
-    await expect(page.locator('text=Austin, TX').first()).toBeVisible();
+    await expect(page.locator('#church-location-0')).toContainText('Austin, TX');
   });
 
   test('with worship style filter, navigates to results page', async ({ anonymousPage: page, store }) => {
@@ -106,7 +99,7 @@ test.describe('SearchForm', () => {
 
     await page.goto('/');
     await page.locator('#search-worship-style').selectOption('1');
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.locator('#btn-search').click();
     await page.waitForURL('**/churches**');
     expect(page.url()).toContain('/churches');
   });
@@ -117,7 +110,7 @@ test.describe('SearchForm', () => {
 
     await page.goto('/');
     await page.locator("input[type='checkbox']").check();
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.locator('#btn-search').click();
     await page.waitForURL('**/churches**');
     expect(page.url()).toContain('/churches');
   });
@@ -126,10 +119,10 @@ test.describe('SearchForm', () => {
     await store.reset();
 
     await page.goto('/');
-    await page.getByRole('textbox').first().fill('zzz_no_match_zzz');
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.locator('#search-keyword').fill('zzz_no_match_zzz');
+    await page.locator('#btn-search').click();
     await page.waitForURL('**/churches**');
-    await expect(page.locator('text=0 churches found')).toBeVisible();
+    await expect(page.locator('#result-count')).toContainText('0 churches found');
   });
 
   test('when Enter key pressed, navigates to results page', async ({ anonymousPage: page, store }) => {
@@ -137,7 +130,7 @@ test.describe('SearchForm', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/');
-    const input = page.getByRole('textbox').first();
+    const input = page.locator('#search-keyword');
     await input.fill('Baptist');
     await input.press('Enter');
     await page.waitForURL('**/churches**');
@@ -154,7 +147,7 @@ test.describe('SearchForm', () => {
     });
 
     await page.goto('/');
-    await page.getByRole('button', { name: 'Near Me' }).click();
+    await page.locator('#btn-near-me').click();
     await page.waitForTimeout(500);
 
     const unexpected = errors.filter(e => !e.includes('/bff/user') && !e.includes('401'));
@@ -169,7 +162,7 @@ test.describe('ChurchList', () => {
     await store.seedChurch(MOSAIC_AUSTIN);
 
     await page.goto('/churches?q=Austin&page=1&pageSize=20');
-    await expect(page.locator('text=churches found')).toBeVisible();
+    await expect(page.locator('#result-count')).toContainText('churches found');
   });
 
   test('each card shows name link and location', async ({ anonymousPage: page, store }) => {
@@ -177,8 +170,8 @@ test.describe('ChurchList', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/churches?q=Baptist&page=1&pageSize=20');
-    await expect(page.locator('a', { hasText: 'First Baptist Church Austin' })).toBeVisible();
-    await expect(page.locator('text=Austin, TX')).toBeVisible();
+    await expect(page.locator('#church-name-0')).toContainText('First Baptist Church Austin');
+    await expect(page.locator('#church-location-0')).toContainText('Austin, TX');
   });
 
   test('without geolocation, omits distance column', async ({ anonymousPage: page, store }) => {
@@ -186,7 +179,7 @@ test.describe('ChurchList', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/churches?q=Baptist&page=1&pageSize=20');
-    await expect(page.locator('text=miles away')).toHaveCount(0);
+    await expect(page.locator('[id^="church-distance-"]')).toHaveCount(0);
   });
 
   test('when more results than page size, shows Next button', async ({ anonymousPage: page, store }) => {
@@ -225,8 +218,8 @@ test.describe('ChurchList', () => {
     }
 
     await page.goto('/churches?q=Church&page=1&pageSize=20');
-    await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    await expect(page.locator('#btn-next-page')).toBeEnabled();
+    await expect(page.locator('#btn-prev-page')).toBeDisabled();
   });
 
   test('on final page, shows Previous button only', async ({ anonymousPage: page, store }) => {
@@ -265,8 +258,8 @@ test.describe('ChurchList', () => {
     }
 
     await page.goto('/churches?q=Church&page=2&pageSize=20');
-    await expect(page.getByRole('button', { name: 'Previous' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled();
+    await expect(page.locator('#btn-prev-page')).toBeEnabled();
+    await expect(page.locator('#btn-next-page')).toBeDisabled();
   });
 
   test('toggling map view renders Leaflet map with markers and CSS applied', async ({
@@ -277,7 +270,7 @@ test.describe('ChurchList', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/churches?q=Baptist&page=1&pageSize=20');
-    await page.getByRole('button', { name: 'Map', exact: true }).click();
+    await page.locator('#btn-view-map').click();
     await expect(page.locator('.leaflet-container')).toBeVisible();
     await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible();
     await expect(page.locator('.leaflet-tile').first()).toBeVisible();
@@ -289,8 +282,8 @@ test.describe('ChurchList', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/churches?q=Baptist&page=1&pageSize=20');
-    await page.locator('a', { hasText: 'First Baptist Church Austin' }).click();
+    await page.locator('#church-name-0').click();
     await page.waitForURL('**/churches/first-baptist-church-austin-tx**');
-    await expect(page.locator('h1')).toContainText('First Baptist Church Austin');
+    await expect(page.locator('#church-name')).toContainText('First Baptist Church Austin');
   });
 });

@@ -76,10 +76,6 @@ function destroySession(req: Request): Promise<void> {
   );
 }
 
-/**
- * Rejects requests that lack the static `X-CSRF` header.
- * Apply to every BFF endpoint that is called via XHR/fetch (not browser nav).
- */
 export function requireCsrf(
   req: Request,
   res: Response,

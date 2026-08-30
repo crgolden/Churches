@@ -16,8 +16,6 @@
   --color-error: #DC2626;
   --color-success: #16A34A;
 
-  /* RGB companions — single source of truth for translucent brand tints.
-     Use as rgba(var(--color-primary-rgb), .08) instead of re-typing the hex. */
   --color-primary-rgb: 67, 56, 202;
   --color-accent-rgb: 245, 158, 11;
   --color-error-rgb: 220, 38, 38;
@@ -25,7 +23,6 @@
   --radius-sm: 6px;
   --radius-md: 10px;
 
-  /* Spacing scale — keep paddings/margins on these steps for a cohesive rhythm. */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -35,7 +32,6 @@
   --space-7: 3rem;
   --space-8: 4rem;
 
-  /* Standard inner padding for .card surfaces. */
   --card-pad: 1.5rem;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .06);
@@ -50,12 +46,6 @@
 *::after {
   box-sizing: border-box;
 }
-
-/* Deliberately no `html { scroll-behavior: smooth }`. Smooth scrolling is driven by animation
- * frames, so anywhere frames aren't running — a throttled background tab, a stalled GPU process,
- * a scroll-hijacking extension — the scroll is dropped entirely rather than degrading to a jump.
- * Anchor navigation and programmatic scrolls must land unconditionally; the animation is not
- * worth making them fail closed. */
 
 body {
   margin: 0;
@@ -99,14 +89,12 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Layout */
 .page-container {
   max-width: 1100px;
   margin: 0 auto;
   padding: 0 1.5rem;
 }
 
-/* Cards */
 .card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -114,7 +102,6 @@ a:hover {
   box-shadow: var(--shadow-sm);
 }
 
-/* Form elements */
 input[type='text'],
 input[type='email'],
 input[type='tel'],
@@ -135,8 +122,6 @@ textarea {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-/* Reset native chrome only where we don't need the built-in picker affordance.
-   Time/date keep their appearance so the picker icon stays usable. */
 input[type='text'],
 input[type='email'],
 input[type='tel'],
@@ -168,7 +153,6 @@ input[type='checkbox'] {
   flex-shrink: 0;
 }
 
-/* Buttons */
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -265,7 +249,6 @@ input[type='checkbox'] {
   font-size: 0.8rem;
 }
 
-/* Visually hide while keeping the element available to screen readers. */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -278,13 +261,11 @@ input[type='checkbox'] {
   border: 0;
 }
 
-/* Layout utilities */
 .page-section {
   padding-top: var(--space-6);
   padding-bottom: var(--space-7);
 }
 
-/* Small uppercase section label — shared by detail sections and table headers. */
 .eyebrow {
   font-size: 0.75rem;
   font-weight: 600;
@@ -293,7 +274,6 @@ input[type='checkbox'] {
   color: var(--color-text-muted);
 }
 
-/* State utilities */
 .text-muted {
   color: var(--color-text-muted);
   font-size: 0.9rem;

@@ -4,7 +4,6 @@ import { DOCUMENT } from '@angular/common';
 import { SeoService } from './seo.service';
 import { Church } from './models';
 
-/** A fully-populated Church fixture for use across spec blocks. */
 const GRACE_CHURCH: Church = {
   id: 'church-1',
   canonicalName: 'Grace Community Church',
@@ -111,7 +110,11 @@ describe('SeoService', () => {
 
     it('description includes church name, worship style, and city/state', () => {
       const tag = doc.querySelector('meta[name="description"]');
-      const content = tag?.getAttribute('content') ?? '';
+      const content = tag?.getAttribute('content');
+      expect(
+        typeof content,
+        'no meta[name="description"] with a content attribute was rendered, so none of the assertions below are testing anything',
+      ).toBe('string');
       expect(content).toContain('Grace Community Church');
       expect(content).toContain('Traditional');
       expect(content).toContain('Denver');

@@ -1,10 +1,3 @@
-/**
- * Port of C# Smoke/ApiTests — exercises the deployed Churches app.
- *
- * All tests in this file are skipped unless SmokeBaseUrl is set.
- * Run via: npm run e2e:smoke (sets SmokeBaseUrl from environment).
- */
-
 import { test, expect } from '@playwright/test';
 
 const smokeBaseUrl = process.env['SmokeBaseUrl']?.replace(/\/$/, '');

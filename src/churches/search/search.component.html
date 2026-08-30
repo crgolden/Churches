@@ -1,6 +1,6 @@
 <section class="hero">
   <div class="hero-content page-container">
-    <h1>Find Your Church Home</h1>
+    <h1 id="search-title">Find Your Church Home</h1>
     <p class="hero-sub">
       Discover congregations across the United States by location, worship style,
       and what matters to your family.
@@ -17,7 +17,7 @@
             [value]="keyword()"
             (input)="keyword.set(kw.value)"
           />
-          <button type="button" class="btn-secondary" (click)="useLocation()" [disabled]="locating()">
+          <button id="btn-near-me" type="button" class="btn-secondary" (click)="useLocation()" [disabled]="locating()">
             {{ locating() ? 'Locating…' : 'Near Me' }}
           </button>
         </div>
@@ -117,7 +117,7 @@
           <span>Wheelchair accessible</span>
         </label>
 
-        <button type="submit" class="btn-primary search-submit">Search Churches</button>
+        <button id="btn-search" type="submit" class="btn-primary search-submit">Search Churches</button>
       </form>
     </div>
   </div>

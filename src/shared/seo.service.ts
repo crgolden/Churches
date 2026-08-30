@@ -6,12 +6,6 @@ import { injectOrigin } from './origin';
 
 const JSON_LD_ELEMENT_ID = 'app-json-ld';
 
-/**
- * Centralised SEO helper.  Inject into each public-facing component and call
- * the appropriate method after data loads so that title, description,
- * canonical link, Open Graph tags, and JSON-LD are all written into the
- * server-rendered HTML during SSR.
- */
 @Injectable({ providedIn: 'root' })
 export class SeoService {
   private readonly meta = inject(Meta);
@@ -19,11 +13,6 @@ export class SeoService {
   private readonly document = inject(DOCUMENT);
   private readonly origin = injectOrigin();
 
-  /**
-   * Sets the page title, description meta, canonical link, and Open Graph /
-   * Twitter Card tags for a generic page.  No JSON-LD is emitted; call
-   * setChurchMeta for detail pages that need structured data.
-   */
   setPage(pageTitle: string, description: string, canonicalPath: string): void {
     const canonicalUrl = `${this.origin}${canonicalPath}`;
     this.title.setTitle(pageTitle);
@@ -36,11 +25,6 @@ export class SeoService {
     this.meta.updateTag({ name: 'twitter:card', content: 'summary' });
   }
 
-  /**
-   * Sets all SEO metadata for a church detail page: title, description,
-   * canonical link, Open Graph tags (type=place), Twitter Card, and a
-   * JSON-LD script with Church + BreadcrumbList structured data.
-   */
   setChurchMeta(church: Church): void {
     const worshipStyleLabel =
       WORSHIP_STYLES.find(s => s.value === church.worshipStyle)?.label ?? 'Christian';
@@ -61,12 +45,10 @@ export class SeoService {
     this.setJsonLd(this.buildChurchJsonLd(church, canonicalUrl));
   }
 
-  /** Marks the current page as noindex, e.g. for a not-found or error page that must never be indexed. */
   setNoIndex(): void {
     this.meta.updateTag({ name: 'robots', content: 'noindex' });
   }
 
-  /** Removes any JSON-LD script element previously injected by this service. */
   removeJsonLd(): void {
     const existing = this.document.getElementById(JSON_LD_ELEMENT_ID);
     existing?.parentNode?.removeChild(existing);

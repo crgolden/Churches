@@ -59,6 +59,11 @@ obj/
 bin/
 *.user
 
+# dotenv environment variable files
+.env
+.env.*
+!.env.example
+
 # System files
 .DS_Store
 Thumbs.db

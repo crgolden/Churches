@@ -12,7 +12,6 @@ declare module 'express-session' {
     oauthState?: string;
     /** OAuth 2.0 access token for the Directory API. */
     accessToken?: string;
-    /** OAuth 2.0 refresh token. */
     refreshToken?: string;
     /** OIDC ID token (used as id_token_hint for RP-initiated logout). */
     idToken?: string;
@@ -30,18 +29,6 @@ function reconnectStrategy(retries: number): number {
   return Math.min(retries * 100, 3_000) + Math.floor(Math.random() * 200);
 }
 
-/**
- * Attaches express-session to the Express app.
- *
- * Store selection:
- *  - Production (NODE_ENV=production AND RedisHost is set AND SessionStore≠memory):
- *    connect-redis backed by a Redis client.
- *  - Otherwise (local dev, test, or explicit SessionStore=memory):
- *    express-session's built-in MemoryStore.  Sessions do not persist across
- *    restarts — acceptable for development and E2E tests, not for production.
- *
- * Call this before any BFF routes are registered.
- */
 export function applySession(app: Express): void {
   const isProd = process.env['NODE_ENV'] === 'production';
 

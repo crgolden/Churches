@@ -5,16 +5,6 @@ import {
 
 let _config: Configuration | null = null;
 
-/**
- * Lazily initialises (and caches) the openid-client Configuration via
- * Authorization Server Metadata discovery.
- *
- * Every value below arrives as a plain environment variable. In production the
- * client id and secret are App Service settings declared as
- * `@Microsoft.KeyVault(SecretUri=...)` references, which the platform resolves
- * from Key Vault at startup using the app's managed identity — so this code
- * never talks to Key Vault itself.
- */
 export async function getOidcConfig(): Promise<Configuration> {
   if (_config !== null) {
     return _config;

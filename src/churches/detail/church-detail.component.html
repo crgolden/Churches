@@ -19,7 +19,7 @@
       </header>
       <div class="detail-body">
         <div class="detail-section">
-          <h4 class="eyebrow">Contact</h4>
+          <h4 id="church-contact-heading" class="eyebrow">Contact</h4>
           <div class="info-rows">
             @if (church()!.phoneNumber) {
               <div class="info-row">
@@ -90,7 +90,7 @@
             </ul>
             @if (auth.hasModerationScope()) {
               <form class="mod-add" [formGroup]="scheduleForm" (ngSubmit)="addSchedule()">
-                <div class="mod-add-grid">
+                <div id="schedule-add-grid" class="mod-add-grid">
                   <div class="field-group">
                     <label for="schedule-day">Day</label>
                     <select id="schedule-day" formControlName="dayOfWeek" aria-label="Day of week">

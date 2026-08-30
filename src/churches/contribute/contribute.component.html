@@ -1,6 +1,6 @@
 @if (submitted()) {
   <div class="contribute-page">
-    <div class="success-card card">
+    <div id="correction-submitted" class="success-card card">
       <div class="success-icon">&#10003;</div>
       <h2>Thank you!</h2>
       <p>Your correction has been submitted for review.</p>
@@ -12,8 +12,8 @@
 } @else if (church()) {
   <div class="contribute-page">
     <div class="contribute-card card">
-      <h1>Suggest a Correction</h1>
-      <p class="church-label">
+      <h1 id="contribute-title">Suggest a Correction</h1>
+      <p id="correction-church-label" class="church-label">
         For: <strong>{{ church()!.canonicalName }}</strong>
       </p>
       <form class="contribute-form" (submit)="$event.preventDefault(); submit()">
@@ -37,9 +37,9 @@
           />
         </div>
         @if (error()) {
-          <p class="text-error">{{ error() }}</p>
+          <p id="correction-error" class="text-error">{{ error() }}</p>
         }
-        <button type="submit" class="btn-primary" [disabled]="submitting()">
+        <button id="btn-submit-correction" type="submit" class="btn-primary" [disabled]="submitting()">
           {{ submitting() ? 'Submitting...' : 'Submit Correction' }}
         </button>
       </form>

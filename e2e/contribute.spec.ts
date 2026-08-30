@@ -1,7 +1,3 @@
-/**
- * Port of C# ContributeTests — correction submission form.
- */
-
 import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
 
 test.describe('CorrectionForm', () => {
@@ -10,11 +6,11 @@ test.describe('CorrectionForm', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/contribute/first-baptist-church-austin-tx');
-    await expect(page.locator('h1')).toContainText('Suggest a Correction');
-    await expect(page.locator('text=First Baptist Church Austin')).toBeVisible();
-    await expect(page.locator('select')).toBeVisible();
-    await expect(page.getByRole('textbox')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Submit Correction' })).toBeVisible();
+    await expect(page.locator('#contribute-title')).toContainText('Suggest a Correction');
+    await expect(page.locator('#correction-church-label')).toContainText('First Baptist Church Austin');
+    await expect(page.locator('#field-select')).toBeVisible();
+    await expect(page.locator('#new-value')).toBeVisible();
+    await expect(page.locator('#btn-submit-correction')).toBeVisible();
   });
 
   test('field selector defaults to canonicalName', async ({ authedPage: page, store }) => {
@@ -22,7 +18,7 @@ test.describe('CorrectionForm', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/contribute/first-baptist-church-austin-tx');
-    const selected = await page.locator('select').inputValue();
+    const selected = await page.locator('#field-select').inputValue();
     expect(selected).toBe('canonicalName');
   });
 
@@ -31,10 +27,10 @@ test.describe('CorrectionForm', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/contribute/first-baptist-church-austin-tx');
-    await page.locator('select').selectOption('street');
-    await page.getByRole('textbox').fill('123 New Street');
-    await page.getByRole('button', { name: 'Submit Correction' }).click();
-    await expect(page.locator('text=submitted for review')).toBeVisible();
+    await page.locator('#field-select').selectOption('street');
+    await page.locator('#new-value').fill('123 New Street');
+    await page.locator('#btn-submit-correction').click();
+    await expect(page.locator('#correction-submitted')).toBeVisible();
   });
 
   test('with empty new value, prevents submission', async ({ authedPage: page, store }) => {
@@ -42,9 +38,9 @@ test.describe('CorrectionForm', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/contribute/first-baptist-church-austin-tx');
-    await page.getByRole('button', { name: 'Submit Correction' }).click();
-    await expect(page.locator('text=submitted for review')).toHaveCount(0);
-    await expect(page.locator('h1')).toContainText('Suggest a Correction');
+    await page.locator('#btn-submit-correction').click();
+    await expect(page.locator('#correction-submitted')).toHaveCount(0);
+    await expect(page.locator('#contribute-title')).toContainText('Suggest a Correction');
   });
 
   test('when unauthenticated, redirects to login', async ({ anonymousPage: page, store }) => {

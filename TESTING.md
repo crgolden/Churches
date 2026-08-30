@@ -46,6 +46,20 @@ Playwright route mocks — no real Identity or Directory is contacted.
 The `e2e` project (`playwright.config.ts`) runs serialized — `fullyParallel: false`, single worker —
 because every spec shares the mock server's in-memory state; concurrent specs would race on it.
 
+**Authentication is mocked wholesale, and no tier exercises the real OIDC exchange.** `e2e/fixtures.ts`
+fulfils `/bff/user` with a fixed claim array — `authedPage` with user claims, `modPage` with
+`churches.mod=true` — so every moderator test passes regardless of which token really carried the claim,
+and `anonymousPage` fulfils it as 401. The PKCE authorization-code flow, the token exchange, and the
+userinfo call are not covered by the E2E tier, and the smoke tier does not cover them either: its five
+tests are `/health`, SPA bootstrap, two CSRF cases, and one unauthenticated 401. The discriminating test
+for where the `churches.mod` claim actually arrives from is `src/bff/routes.spec.ts`, not anything in
+`e2e/`.
+
+**Route order in the mock matters.** `GET /churches/:slug` must be registered *after* every
+`/churches/:churchId/*` route in `e2e/mocks/directory.ts`, because Express matches in registration order
+and `:slug` would otherwise swallow a UUID segment. Moving it up produces 404s on the child-curation
+routes rather than an error.
+
 **Prerequisites (one-time):** install the Playwright Chromium browser:
 
 ```powershell
@@ -64,7 +78,7 @@ npm run e2e   # self-builds the ci configuration (allowedHosts=localhost), then 
 Failure artifacts (screenshot, trace, video) are written to `playwright-artifacts/`.
 
 **E2E coverage (`e2e/`):** `anonymous.spec.ts` (public search/landing), `church-detail.spec.ts`,
-`auth-flow.spec.ts` (BFF login/logout), `contribute.spec.ts`, `moderation.spec.ts`, `edge-cases.spec.ts`.
+`auth-flow.spec.ts` (BFF session/claims), `contribute.spec.ts`, `moderation.spec.ts`, `edge-case.spec.ts`.
 
 **Map view:** `anonymous.spec.ts` seeds a church with coordinates, toggles "Map view" on `/churches`,
 and asserts `div.leaflet-container` is visible, at least one `.leaflet-marker-icon` renders, **and that
@@ -103,7 +117,10 @@ The GitHub Actions workflow (`.github/workflows/main_crgolden-churches.yml`) run
 1. `npm ci` → lint
 2. `npx vitest run --coverage` (LCOV → `coverage/lcov.info`)
 3. `npm run e2e` (self-builds the `ci` configuration, then runs Playwright E2E; Chromium cached by version)
-4. SonarCloud analysis via `sonarsource/sonarcloud-github-action` (JS LCOV only; no C# paths)
+4. SonarCloud analysis via `sonarsource/sonarqube-scan-action` (JS LCOV only; no C# paths). That action, not
+   `sonarcloud-github-action`: the latter is deprecated and its pinned scanner-cli bundles a JRE 17 that
+   SonarQube Cloud no longer accepts, so "modernising" back to it breaks the step. It also needs no JDK or
+   scanner setup step of its own.
 5. `npm run build` (production configuration) → `npm prune --omit=dev` → deploy to `crgolden-churches` (Linux)
 6. Post-deploy smoke (`npm run e2e:smoke` against `webapp-url`)
 

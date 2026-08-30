@@ -46,9 +46,6 @@
   color: var(--color-primary);
 }
 
-/* minmax(min(100%, 300px), 1fr) lets a single column shrink below 300px on narrow viewports —
-   plain minmax(300px, 1fr) forces a 300px floor that overflows the padded container on phones,
-   which made cards render edge-to-edge with no side padding. */
 .church-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
@@ -150,7 +147,6 @@
   font-weight: 600;
 }
 
-/* Compact single-column row layout for the List view — denser than .church-grid cards. */
 .church-list {
   display: flex;
   flex-direction: column;

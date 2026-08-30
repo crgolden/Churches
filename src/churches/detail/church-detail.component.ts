@@ -63,9 +63,9 @@ export class ChurchDetailComponent implements OnInit {
   }
 
   protected scheduleLabel(schedule: ServiceSchedule): string {
-    const day = DAYS_OF_WEEK.find(d => d.value === schedule.dayOfWeek)?.label ?? '';
+    const day = DAYS_OF_WEEK.find(d => d.value === schedule.dayOfWeek)?.label;
     const time = schedule.startTime.slice(0, 5);
-    return `${day} ${time}`.trim();
+    return [day, time].filter(Boolean).join(' ');
   }
 
   protected campusAddress(campus: Campus): string {

@@ -1,8 +1,3 @@
-/**
- * Port of C# ChurchDetailTests — church detail page coverage including
- * the Leaflet CSS guard, moderator add/delete flows, and SSR assertions.
- */
-
 import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
 
 test.describe('ChurchDetail', () => {
@@ -33,7 +28,7 @@ test.describe('ChurchDetail', () => {
     await expect(page.locator('#church-map-section .leaflet-container')).toBeVisible();
 
     const headingsAligned = await page.evaluate(() => {
-      const contact = document.querySelector('.detail-body .detail-section h4');
+      const contact = document.querySelector('#church-contact-heading');
       const location = document.querySelector('#church-map-section h4');
       if (!contact || !location) return false;
       return Math.abs(contact.getBoundingClientRect().left - location.getBoundingClientRect().left) < 1;
@@ -100,16 +95,16 @@ test.describe('ChurchDetail', () => {
     await expect(page.locator("label[for='schedule-day']")).toBeVisible();
     await expect(page.locator("label[for='schedule-time']")).toBeVisible();
     const gridDisplay = await page.evaluate(
-      () => getComputedStyle(document.querySelector('.mod-add-grid')!).display,
+      () => getComputedStyle(document.querySelector('#schedule-add-grid')!).display,
     );
     expect(gridDisplay).toBe('grid');
     const gridRowGap = await page.evaluate(
-      () => getComputedStyle(document.querySelector('.mod-add-grid')!).rowGap,
+      () => getComputedStyle(document.querySelector('#schedule-add-grid')!).rowGap,
     );
     expect(gridRowGap).not.toBe('0px');
     expect(gridRowGap).not.toBe('normal');
 
-    await page.getByLabel('Day of week').selectOption({ label: 'Wednesday' });
+    await page.locator('#schedule-day').selectOption({ label: 'Wednesday' });
     await page.locator('#schedule-time').fill('19:00');
     await page.locator('#schedule-desc').fill('Midweek Prayer');
     const scheduleResponsePromise = page.waitForResponse(r => r.url().includes('/schedules') && r.request().method() === 'POST');

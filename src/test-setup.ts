@@ -24,7 +24,13 @@ const resourceMap = buildResourceMap(srcDir);
 
 const resourceResolver = (url: string): Promise<{ text(): Promise<string> }> => {
   const filename = url.split('/').pop()?.split('\\').pop() ?? url;
-  const content = resourceMap.get(filename) ?? '';
+  const content = resourceMap.get(filename);
+  if (content === undefined) {
+    throw new Error(
+      `No file named '${filename}' exists under src/, so the component under test would render empty and assert nothing.`,
+    );
+  }
+
   return Promise.resolve({ text: () => Promise.resolve(content) });
 };
 

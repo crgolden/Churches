@@ -1,4 +1,3 @@
-/* Hero */
 .hero {
   background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-deep) 100%);
   padding: 5rem 0 var(--space-8);
@@ -42,8 +41,6 @@
   flex-shrink: 0;
 }
 
-/* Auto-fit grid: each filter keeps a sensible min-width so labels/values never truncate,
-   and the grid collapses to fewer columns (down to one) as the card narrows. */
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -96,7 +93,6 @@
   width: 100%;
 }
 
-/* Value props */
 .value-props {
   padding: var(--space-8) 0;
   background: var(--color-bg);
@@ -132,7 +128,6 @@
   margin: 0;
 }
 
-/* How it works */
 .how-it-works {
   padding: var(--space-8) 0;
   background: var(--color-surface);
@@ -189,7 +184,6 @@
     grid-template-columns: 1fr;
   }
 
-  /* Full-width Near Me on phones for a larger tap target once the row wraps. */
   .search-row .btn-secondary {
     width: 100%;
   }

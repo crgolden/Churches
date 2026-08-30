@@ -2,7 +2,6 @@
   margin-bottom: var(--space-5);
 }
 
-/* Scroll horizontally on narrow viewports instead of clipping the right-hand columns. */
 .table-card {
   overflow-x: auto;
 }
@@ -14,7 +13,6 @@ table {
   font-size: 0.9rem;
 }
 
-/* Typography comes from the shared .eyebrow utility on each <th>. */
 th {
   text-align: left;
   padding: var(--space-3) var(--space-4);

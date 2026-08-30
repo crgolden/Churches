@@ -45,8 +45,8 @@ describe('ChurchListComponent', () => {
     expect(component['worshipStyleLabel'](1)).toBe('Traditional');
   });
 
-  it('worshipStyleLabel returns empty string for unknown value', () => {
-    expect(component['worshipStyleLabel'](999)).toBe('');
+  it('worshipStyleLabel returns undefined for unknown value', () => {
+    expect(component['worshipStyleLabel'](999)).toBeUndefined();
   });
 
   it('setView updates the view query param', () => {

@@ -1,13 +1,3 @@
-/**
- * Custom Playwright fixtures for the Churches E2E suite.
- *
- * Provides:
- *  - `store`          HTTP control client for seeding/clearing mock server state.
- *  - `anonymousPage`  Page with /bff/user mocked as 401 and /bff/login as a mock page.
- *  - `authedPage`     Page with /bff/user mocked with standard user claims.
- *  - `modPage`        Page with /bff/user mocked with moderator claims (churches.mod=true).
- */
-
 import { test as base, type Page } from '@playwright/test';
 import type { ChurchRecord, CorrectionRecord } from './mocks/directory.js';
 

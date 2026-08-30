@@ -1,17 +1,3 @@
-// OpenTelemetry bootstrap for the Churches Node SSR + BFF server.
-//
-// This file is a *sidecar*: it is loaded via `node --import ./instrumentation.mjs server.mjs`
-// (see package.json `start:ssr` and the App Service startup command) so that auto-instrumentation
-// patches http/express BEFORE the Angular SSR server bundle imports them. ESM requires this early
-// `--import` + loader-hook ordering; it cannot live inside the bundled server.mjs.
-//
-// Parity with the retired .NET BFF (Churches.Server/Program.cs):
-//   - traces + metrics + logs exported to Grafana Alloy (OTLP/gRPC, AlloyEndpoint).
-//   - resource service.name = WEBSITE_SITE_NAME, deployment.environment = lowercased env name.
-//   - /health is excluded from tracing.
-// Every exporter is gated on its config being present and wrapped so an unreachable/missing backend
-// logs a warning instead of crashing the server.
-
 import { diag, DiagConsoleLogger, DiagLogLevel, metrics } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
@@ -37,7 +23,6 @@ const deploymentEnvironment = (
   'development'
 ).toLowerCase();
 
-// Surface exporter problems as warnings rather than letting them bubble up.
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 
 const resource = resourceFromAttributes({
@@ -46,8 +31,6 @@ const resource = resourceFromAttributes({
   'deployment.environment': deploymentEnvironment,
 });
 
-// Build a list of [label, factory] exporters and instantiate each defensively so one bad
-// constructor (e.g. malformed connection string) cannot take the others down.
 function safe(label, factory) {
   try {
     return factory();
@@ -57,7 +40,6 @@ function safe(label, factory) {
   }
 }
 
-// ── Traces ────────────────────────────────────────────────────────────────────
 const spanProcessors = [];
 if (alloyEndpoint) {
   const exporter = safe('OTLP trace exporter', () => new OTLPTraceExporter({ url: alloyEndpoint }));
@@ -67,7 +49,6 @@ if (alloyEndpoint) {
 const tracerProvider = new NodeTracerProvider({ resource, spanProcessors });
 tracerProvider.register();
 
-// ── Metrics ───────────────────────────────────────────────────────────────────
 const readers = [];
 if (alloyEndpoint) {
   const exporter = safe('OTLP metric exporter', () => new OTLPMetricExporter({ url: alloyEndpoint }));
@@ -77,7 +58,6 @@ if (alloyEndpoint) {
 const meterProvider = new MeterProvider({ resource, readers });
 metrics.setGlobalMeterProvider(meterProvider);
 
-// ── Logs (OTLP path; the direct-to-Elasticsearch path lives in src/telemetry/logging.ts) ──────
 const logProcessors = [];
 if (alloyEndpoint) {
   const exporter = safe('OTLP log exporter', () => new OTLPLogExporter({ url: alloyEndpoint }));
@@ -87,9 +67,6 @@ if (alloyEndpoint) {
 const loggerProvider = new LoggerProvider({ resource, processors: logProcessors });
 logs.setGlobalLoggerProvider(loggerProvider);
 
-// ── Auto-instrumentation ────────────────────────────────────────────────────────
-// Only patch http/fetch/Express when there's an OTLP backend to send spans to — in local dev
-// (no AlloyEndpoint) the monkey-patching is pure overhead/risk with nowhere for the data to go.
 if (alloyEndpoint) {
   registerInstrumentations({
     tracerProvider,
@@ -97,19 +74,15 @@ if (alloyEndpoint) {
     loggerProvider,
     instrumentations: [
       getNodeAutoInstrumentations({
-        // /health is polled constantly by the smoke job + Infrastructure dashboard — don't trace it
-        // (mirrors the AspNetCore trace filter in Program.cs).
         '@opentelemetry/instrumentation-http': {
           ignoreIncomingRequestHook: (req) => (req.url ?? '').startsWith('/health'),
         },
-        // fs instrumentation is extremely noisy and adds no value for an SSR app.
         '@opentelemetry/instrumentation-fs': { enabled: false },
       }),
     ],
   });
 }
 
-// Flush on shutdown so buffered telemetry isn't lost.
 async function shutdown() {
   await Promise.allSettled([
     tracerProvider.shutdown(),

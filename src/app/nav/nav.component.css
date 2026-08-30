@@ -53,8 +53,6 @@
   padding: 0.45rem 1rem;
 }
 
-/* The generic `.nav-links a` color rule (dark) would otherwise override .btn-primary's
-   white text via specificity, making the CTA unreadable on the indigo background. */
 .nav-links a.nav-cta,
 .nav-links a.nav-cta:hover {
   color: #fff;

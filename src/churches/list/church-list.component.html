@@ -9,7 +9,7 @@
 } @else if (results()) {
   <div class="page-container page-section">
     <div class="list-header">
-      <p class="count">
+      <p id="result-count" class="count">
         {{ results()!.totalCount | number }}
         {{ results()!.totalCount === 1 ? 'church' : 'churches' }} found
         @if (q()) {
@@ -20,7 +20,7 @@
         <div class="filter-field sort-field">
           <label for="sort-select" class="sr-only">Sort by</label>
           <select id="sort-select" #sortSelect (change)="changeSort(sortSelect.value)">
-            <option value="relevance" [selected]="sort() === '' || sort() === 'relevance'">Relevance</option>
+            <option value="relevance" [selected]="sort() === null || sort() === 'relevance'">Relevance</option>
             <option value="name" [selected]="sort() === 'name'">Name (A&ndash;Z)</option>
             @if (hasGeo()) {
               <option value="distance" [selected]="sort() === 'distance'">Distance</option>
@@ -37,6 +37,7 @@
         </div>
         <div class="view-toggle" role="group" aria-label="Result view">
           <button
+            id="btn-view-grid"
             type="button"
             class="btn-ghost"
             [class.active]="view() === 'grid'"
@@ -44,6 +45,7 @@
             Grid
           </button>
           <button
+            id="btn-view-list"
             type="button"
             class="btn-ghost"
             [class.active]="view() === 'list'"
@@ -51,6 +53,7 @@
             List
           </button>
           <button
+            id="btn-view-map"
             type="button"
             class="btn-ghost"
             [class.active]="view() === 'map'"
@@ -69,16 +72,16 @@
     } @else if (view() === 'list') {
       <div class="church-list">
         @for (item of results()!.items; track item.church.id) {
-          <article class="church-row">
-            <a [routerLink]="['/churches', item.church.slug]" class="church-name">
+          <article class="church-row" [attr.id]="'church-row-' + $index">
+            <a [attr.id]="'church-name-' + $index" [routerLink]="['/churches', item.church.slug]" class="church-name">
               {{ item.church.canonicalName }}
             </a>
-            <span class="church-location">
+            <span [attr.id]="'church-location-' + $index" class="church-location">
               {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
             </span>
             <div class="row-tags">
               @if (item.distanceMiles !== null) {
-                <span class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
+                <span [attr.id]="'church-distance-' + $index" class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
               }
               @if (item.church.worshipStyle) {
                 <span class="tag">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
@@ -93,17 +96,17 @@
     } @else {
       <div class="church-grid">
         @for (item of results()!.items; track item.church.id) {
-          <article class="church-card card">
+          <article class="church-card card" [attr.id]="'church-card-' + $index">
             <div class="card-body">
-              <a [routerLink]="['/churches', item.church.slug]" class="church-name">
+              <a [attr.id]="'church-name-' + $index" [routerLink]="['/churches', item.church.slug]" class="church-name">
                 <h2>{{ item.church.canonicalName }}</h2>
               </a>
-              <p class="church-location">
+              <p [attr.id]="'church-location-' + $index" class="church-location">
                 {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
               </p>
               <div class="card-tags">
                 @if (item.distanceMiles !== null) {
-                  <span class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
+                  <span [attr.id]="'church-distance-' + $index" class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
                 }
                 @if (item.church.worshipStyle) {
                   <span class="tag">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
@@ -131,7 +134,7 @@
         </span>
         @if (totalPages() > 1) {
           <div class="page-buttons">
-            <button class="btn-ghost" [disabled]="page() === 1" (click)="goToPage(page() - 1)">&larr; Previous</button>
+            <button id="btn-prev-page" class="btn-ghost" [disabled]="page() === 1" (click)="goToPage(page() - 1)">&larr; Previous</button>
             @for (p of pageWindow(); track p) {
               <button
                 class="btn-ghost page-number"
@@ -140,7 +143,7 @@
                 {{ p }}
               </button>
             }
-            <button class="btn-ghost" [disabled]="page() >= totalPages()" (click)="goToPage(page() + 1)">Next &rarr;</button>
+            <button id="btn-next-page" class="btn-ghost" [disabled]="page() >= totalPages()" (click)="goToPage(page() + 1)">Next &rarr;</button>
           </div>
         }
       </nav>

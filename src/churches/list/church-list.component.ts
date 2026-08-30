@@ -29,8 +29,8 @@ export class ChurchListComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(20);
-  protected readonly sort = signal('');
-  protected readonly q = signal('');
+  protected readonly sort = signal<string | null>(null);
+  protected readonly q = signal<string | null>(null);
   protected readonly hasGeo = signal(false);
   protected readonly worshipStyles = WORSHIP_STYLES;
   protected readonly view = signal<ViewMode>('grid');
@@ -62,8 +62,8 @@ export class ChurchListComponent implements OnInit {
     return pages;
   });
 
-  protected worshipStyleLabel(value: number): string {
-    return this.worshipStyles.find(s => s.value === value)?.label ?? '';
+  protected worshipStyleLabel(value: number): string | undefined {
+    return this.worshipStyles.find(s => s.value === value)?.label;
   }
 
   protected setView(mode: ViewMode): void {
@@ -99,8 +99,8 @@ export class ChurchListComponent implements OnInit {
     this.route.queryParams.subscribe(params => {
       this.page.set(+(params['page'] ?? 1));
       this.pageSize.set(+(params['pageSize'] ?? 20));
-      this.sort.set(String(params['sort'] ?? ''));
-      this.q.set(String(params['q'] ?? ''));
+      this.sort.set(typeof params['sort'] === 'string' ? params['sort'] : null);
+      this.q.set(typeof params['q'] === 'string' ? params['q'] : null);
       this.hasGeo.set(params['lat'] != null && params['lng'] != null);
       this.view.set((String(params['view'] ?? 'grid') as ViewMode));
       this.load(params);
@@ -124,7 +124,7 @@ export class ChurchListComponent implements OnInit {
       dayOfWeek: params['dayOfWeek'] ? +params['dayOfWeek'] : undefined,
       startTimeAfter: params['startTimeAfter'] || undefined,
       startTimeBefore: params['startTimeBefore'] || undefined,
-      sort: this.sort() || undefined,
+      sort: this.sort() ?? undefined,
       page: this.page(),
       pageSize: this.pageSize(),
     };

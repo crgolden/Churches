@@ -30,7 +30,6 @@
   gap: var(--space-6);
 }
 
-/* Typography comes from the shared .eyebrow utility on each section <h4>. */
 .detail-section h4 {
   margin-bottom: var(--space-3);
 }
@@ -62,15 +61,10 @@
   flex-wrap: wrap;
 }
 
-/* Full-width sections (the Location map) live outside the padded .detail-body grid, so they need
-   their own horizontal card padding to line their heading up with Contact/About above. */
 .detail-section--full {
   padding: 0 var(--card-pad) var(--card-pad);
 }
 
-/* Moderator "add new" forms (service times / ministries / campuses) sit below the read-only rows.
-   A dashed rule separates them; the labelled fields flow in an auto-fit grid that collapses to one
-   column as the section narrows. */
 .mod-add {
   margin-top: var(--space-4);
   padding-top: var(--space-4);
@@ -97,7 +91,6 @@
   color: var(--color-text-muted);
 }
 
-/* Compact inline delete control on existing rows (overrides the roomier .btn-ghost padding). */
 .btn-ghost.mod-delete {
   padding: 0.1rem 0.4rem;
   margin-left: var(--space-2);
@@ -115,9 +108,6 @@
     gap: 0.15rem;
   }
 
-  /* auto-fit's minmax(150px, 1fr) still fits 3 columns at this card width by the numbers, but 150px
-     is too narrow for real placeholder text (e.g. "e.g. Traditional service", "e.g. North Campus"),
-     so labels and inputs clip. Force a single column instead of relying on auto-fit math. */
   .mod-add-grid {
     grid-template-columns: 1fr;
   }

@@ -29,10 +29,6 @@ module.exports = tseslint.config(
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'app', style: 'kebab-case' }],
       '@typescript-eslint/unbound-method': ['error', { ignoreStatic: true }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      // AGENTS/COMMENTS.md: no narrative comments. This catches trailing comments; standalone
-      // full-line narrative comments aren't matchable by ESLint's built-in rule set (comments
-      // aren't part of the AST no-restricted-syntax selects against) — the fleet-wide catalog
-      // script (Tools/CommentAudit/Get-CommentCatalog.ps1) is the actual content-based gate.
       'no-inline-comments': 'error',
     },
   },
@@ -45,8 +41,6 @@ module.exports = tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/require-await': 'off',
-      // Tests reach protected/private component members via bracket notation; dot notation
-      // would be a TS access-modifier error, so allow bracket access for those members.
       '@typescript-eslint/dot-notation': [
         'error',
         { allowPrivateClassPropertyAccess: true, allowProtectedClassPropertyAccess: true },

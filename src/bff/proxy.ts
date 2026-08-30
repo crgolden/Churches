@@ -20,10 +20,6 @@ const DROP_RESPONSE_HEADERS = new Set([
   'content-length',
 ]);
 
-/**
- * Rejects mutating proxy requests that lack the static `X-CSRF` header.
- * GET/HEAD are read-only and are passed through without checking.
- */
 export function csrfForMutating(
   req: Request,
   res: ExpressResponse,
@@ -59,31 +55,19 @@ async function refreshAndSave(req: Request): Promise<void> {
   );
 }
 
-/**
- * Fetch-based proxy that forwards `/directory/api/**` to `DirectoryApiAddress`.
- *
- * Behaviour (mirrors .NET `MapRemoteBffApiEndpoint` with `UserOrNone`):
- *  - Attaches `Authorization: Bearer <access_token>` when the session holds a
- *    valid token (user is authenticated).
- *  - Proxies anonymously when no session / no token (anonymous browsing).
- *  - Proactively refreshes the access token when it is within 60 s of expiry.
- *  - On a 401 response from the API, attempts one token refresh and retries.
- *
- * The request body is buffered before the first upstream call so that it can
- * be replayed on a 401 retry.  The body is collected as Uint8Array throughout
- * to remain compatible with the DOM-typed `fetch` BodyInit.
- */
 export async function directoryProxy(
   req: Request,
   res: ExpressResponse,
   _next: NextFunction,
 ): Promise<void> {
-  const base = (process.env['DirectoryApiAddress'] ?? '').replace(/\/$/, '');
+  const configuredBase = process.env['DirectoryApiAddress'];
 
-  if (!base) {
+  if (configuredBase === undefined || configuredBase.trim().length === 0) {
     res.status(502).json({ error: 'DirectoryApiAddress is not configured' });
     return;
   }
+
+  const base = configuredBase.replace(/\/$/, '');
 
   const relativePath = req.url.replace(/^\/+/, '');
   const targetUrl = new URL(relativePath, `${base}/`);

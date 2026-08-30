@@ -3,11 +3,6 @@ import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { SeoService } from '../seo.service';
 
-/**
- * Rendered for any unmatched route (`{ path: '**' }`) and for a church slug that
- * fails to resolve. Sets a real HTTP 404 during SSR (via RESPONSE_INIT) and a
- * noindex robots tag so unresolved URLs are never indexed or treated as soft 404s.
- */
 @Component({
   selector: 'app-not-found',
   imports: [RouterLink],

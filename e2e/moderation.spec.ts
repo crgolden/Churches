@@ -1,7 +1,3 @@
-/**
- * Port of C# ModerationTests — moderation queue page.
- */
-
 import { test, expect, FIRST_BAPTIST_AUSTIN } from './fixtures.js';
 import type { CorrectionRecord } from './fixtures.js';
 
@@ -36,9 +32,9 @@ test.describe('ModerationQueue', () => {
     await store.seedCorrection(pendingCorrection());
 
     await page.goto('/admin/moderation');
-    await expect(page.locator('h1')).toContainText('Moderation Queue');
-    await expect(page.locator('text=First Baptist Church Austin')).toBeVisible();
-    await expect(page.locator('text=999 New St')).toBeVisible();
+    await expect(page.locator('#moderation-title')).toContainText('Moderation Queue');
+    await expect(page.locator('#correction-church-0')).toContainText('First Baptist Church Austin');
+    await expect(page.locator('#correction-new-value-0')).toContainText('999 New St');
   });
 
   test('approving correction removes it from queue', async ({ modPage: page, store }) => {
@@ -47,8 +43,8 @@ test.describe('ModerationQueue', () => {
     await store.seedCorrection(pendingCorrection());
 
     await page.goto('/admin/moderation');
-    await page.getByRole('button', { name: 'Approve' }).click();
-    await expect(page.locator('text=No pending corrections')).toBeVisible();
+    await page.locator('#btn-approve-0').click();
+    await expect(page.locator('#moderation-empty')).toBeVisible();
   });
 
   test('rejecting correction removes it from queue', async ({ modPage: page, store }) => {
@@ -57,8 +53,8 @@ test.describe('ModerationQueue', () => {
     await store.seedCorrection(pendingCorrection());
 
     await page.goto('/admin/moderation');
-    await page.getByRole('button', { name: 'Reject' }).click();
-    await expect(page.locator('text=No pending corrections')).toBeVisible();
+    await page.locator('#btn-reject-0').click();
+    await expect(page.locator('#moderation-empty')).toBeVisible();
   });
 
   test('when empty, shows empty state', async ({ modPage: page, store }) => {
@@ -66,6 +62,6 @@ test.describe('ModerationQueue', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/admin/moderation');
-    await expect(page.locator('text=No pending corrections')).toBeVisible();
+    await expect(page.locator('#moderation-empty')).toBeVisible();
   });
 });

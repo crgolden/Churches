@@ -1,6 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy Node.js app to Azure Web App - crgolden-churches
 
 on:
@@ -18,13 +15,13 @@ jobs:
     outputs:
       playwright-version: ${{ steps.playwright-version.outputs.version }}
     permissions:
-      id-token: write   # Required for Azure OIDC login in smoke job
+      id-token: write
       contents: read
 
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for better Sonar analysis relevancy
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -47,7 +44,6 @@ jobs:
       - name: Run unit tests with coverage
         run: npm run test:coverage
 
-      # istanbul on Linux writes forward-slash paths already; normalise for safety.
       - name: Fix LCOV paths for SonarQube
         run: sed -i 's|\\|/|g' coverage/lcov.info
 
@@ -68,8 +64,6 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: npm run playwright:install
 
-      # Save immediately after install (before E2E) so the browser download is cached even when a
-      # later step fails — actions/cache's post-step save only runs on full job success.
       - name: Save Playwright browsers cache
         if: steps.cache-playwright.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
@@ -101,12 +95,10 @@ jobs:
         shell: pwsh
         env:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
-          PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING: ${{ vars.PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING }}
         run: |
           $appName     = 'Churches'
           $suiteName   = 'E2E'
           $junitPath   = 'playwright-results.xml'
-          $artifactDir = 'playwright-artifacts'
 
           if (-not (Test-Path $junitPath)) {
               Write-Warning "No JUnit XML found at $junitPath - E2E tests produced no results. Skipping ADO publish."
@@ -115,10 +107,7 @@ jobs:
           [xml]$xml  = Get-Content $junitPath
           $suites    = @($xml.testsuites.testsuite)
           $allCases  = @($suites | ForEach-Object { @($_.testcase) } | Where-Object { $_ -ne $null })
-          $failed    = @($allCases | Where-Object { $_.failure -ne $null })
 
-          # Azure DevOps — use Invoke-RestMethod with explicit URLs (az devops invoke cannot
-          # disambiguate duplicate resource names: github.com/Azure/azure-devops-cli-extension/issues/1012).
           $adoHeaders = @{ Authorization = "Basic $([Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$env:AZURE_DEVOPS_EXT_PAT")))" }
           $adoBase    = 'https://dev.azure.com/crgolden/Churches/_apis/test'
           $adoVer     = 'api-version=7.1'
@@ -164,38 +153,9 @@ jobs:
               completedDate = [DateTimeOffset]::UtcNow.ToString('O') } | Out-Null
           Write-Host "Published $($adoResults.Count) results to Azure DevOps run $($run.id)."
 
-          # Azure Monitor
-          $cs       = $env:PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING
-          $iKey     = ($cs -split ';' | Where-Object { $_ -like 'InstrumentationKey=*' })  -replace 'InstrumentationKey=', ''
-          $endpoint = ($cs -split ';' | Where-Object { $_ -like 'IngestionEndpoint=*' })   -replace 'IngestionEndpoint=', ''
-          $common   = @{ app = $appName; suite = $suiteName; repository = $env:GITHUB_REPOSITORY
-              branch = $env:GITHUB_REF; sha = $env:GITHUB_SHA; githubRunId = $env:GITHUB_RUN_ID
-              githubRunUrl      = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-              artifactAvailable = (Test-Path $artifactDir).ToString() }
-
-          function New-Event {
-              param([string]$Name, [hashtable]$Props, [hashtable]$Measurements)
-              @{ name = 'Microsoft.ApplicationInsights.Event'; time = [DateTimeOffset]::UtcNow.ToString('O'); iKey = $iKey
-                 data = @{ baseType = 'EventData'; baseData = @{ ver = 2; name = $Name; properties = $Props; measurements = $Measurements } } }
-          }
-
-          $runProps = $common.Clone()
-          $runProps['junitFile'] = 'playwright-results.xml'
-          $runProps['outcome']   = if ($failed.Count) { 'Failed' } else { 'Passed' }
-          $events  = @(New-Event 'PlaywrightTestRun' $runProps @{ total = $allCases.Count; failed = $failed.Count; passed = ($allCases.Count - $failed.Count); durationMs = [double]$totalMs })
-          $events += $allCases | ForEach-Object {
-              $p = $common.Clone(); $p['testName'] = $_.name; $p['outcome'] = if ($_.failure -ne $null) { 'Failed' } else { 'Passed' }; $p['failed'] = ($_.failure -ne $null).ToString()
-              New-Event 'PlaywrightTestCase' $p @{ durationMs = [double]([double]$_.time * 1000) }
-          }
-          Invoke-RestMethod -Method Post -Uri ($endpoint.TrimEnd('/') + '/v2/track') -ContentType 'application/json' -Body ($events | ConvertTo-Json -Depth 20) | Out-Null
-          Write-Host "Sent $($events.Count) telemetry events to Azure Monitor."
-
-      # SonarCloud analysis — runs after coverage is generated and tests pass.
-      # Uses sonarqube-scan-action (no JDK/scanner setup required); sonarcloud-github-action is deprecated
-      # and its pinned scanner-cli bundles a JRE 17 that SonarQube Cloud no longer accepts.
       - name: SonarCloud analysis
         if: github.actor != 'dependabot[bot]'
-        uses: sonarsource/sonarqube-scan-action@v8
+        uses: sonarsource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -209,11 +169,9 @@ jobs:
             -Dsonar.test.inclusions=**/*.spec.ts
             -Dsonar.scanner.skipJreProvisioning=true
 
-      # Build production bundle for deployment (separate from the ci-config build used for E2E).
       - name: Build (production)
         run: npm run build
 
-      # Strip devDependencies so the deployment package only contains production modules.
       - name: Prune devDependencies
         run: npm prune --omit=dev
 
@@ -240,7 +198,7 @@ jobs:
     outputs:
       webapp-url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     permissions:
-      id-token: write   # Required for requesting the JWT (Azure OIDC)
+      id-token: write
       contents: read
 
     steps:
@@ -277,8 +235,6 @@ jobs:
           app-name: 'crgolden-churches'
           slot-name: 'Production'
           package: publish/
-          # Startup command for the Linux Node App Service.
-          # Azure-side: ensure the App Service startup command matches this in the portal/CLI.
           startup-command: 'node --import ./instrumentation.mjs dist/churches.client/server/server.mjs'
 
   smoke:
@@ -360,12 +316,10 @@ jobs:
         shell: pwsh
         env:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
-          PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING: ${{ vars.PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING }}
         run: |
           $appName     = 'Churches'
           $suiteName   = 'Smoke'
           $junitPath   = 'playwright-results.xml'
-          $artifactDir = 'playwright-artifacts'
 
           if (-not (Test-Path $junitPath)) {
               Write-Warning "No JUnit XML found at $junitPath - smoke tests produced no results. Skipping ADO publish."
@@ -374,7 +328,6 @@ jobs:
           [xml]$xml  = Get-Content $junitPath
           $suites    = @($xml.testsuites.testsuite)
           $allCases  = @($suites | ForEach-Object { @($_.testcase) } | Where-Object { $_ -ne $null })
-          $failed    = @($allCases | Where-Object { $_.failure -ne $null })
 
           $adoHeaders = @{ Authorization = "Basic $([Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$env:AZURE_DEVOPS_EXT_PAT")))" }
           $adoBase    = 'https://dev.azure.com/crgolden/Churches/_apis/test'
@@ -420,29 +373,3 @@ jobs:
               state         = 'Completed'
               completedDate = [DateTimeOffset]::UtcNow.ToString('O') } | Out-Null
           Write-Host "Published $($adoResults.Count) results to Azure DevOps run $($run.id)."
-
-          # Azure Monitor
-          $cs       = $env:PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING
-          $iKey     = ($cs -split ';' | Where-Object { $_ -like 'InstrumentationKey=*' })  -replace 'InstrumentationKey=', ''
-          $endpoint = ($cs -split ';' | Where-Object { $_ -like 'IngestionEndpoint=*' })   -replace 'IngestionEndpoint=', ''
-          $common   = @{ app = $appName; suite = $suiteName; repository = $env:GITHUB_REPOSITORY
-              branch = $env:GITHUB_REF; sha = $env:GITHUB_SHA; githubRunId = $env:GITHUB_RUN_ID
-              githubRunUrl      = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-              artifactAvailable = (Test-Path $artifactDir).ToString() }
-
-          function New-Event {
-              param([string]$Name, [hashtable]$Props, [hashtable]$Measurements)
-              @{ name = 'Microsoft.ApplicationInsights.Event'; time = [DateTimeOffset]::UtcNow.ToString('O'); iKey = $iKey
-                 data = @{ baseType = 'EventData'; baseData = @{ ver = 2; name = $Name; properties = $Props; measurements = $Measurements } } }
-          }
-
-          $runProps = $common.Clone()
-          $runProps['junitFile'] = 'playwright-results.xml'
-          $runProps['outcome']   = if ($failed.Count) { 'Failed' } else { 'Passed' }
-          $events  = @(New-Event 'PlaywrightTestRun' $runProps @{ total = $allCases.Count; failed = $failed.Count; passed = ($allCases.Count - $failed.Count); durationMs = [double]$totalMs })
-          $events += $allCases | ForEach-Object {
-              $p = $common.Clone(); $p['testName'] = $_.name; $p['outcome'] = if ($_.failure -ne $null) { 'Failed' } else { 'Passed' }; $p['failed'] = ($_.failure -ne $null).ToString()
-              New-Event 'PlaywrightTestCase' $p @{ durationMs = [double]([double]$_.time * 1000) }
-          }
-          Invoke-RestMethod -Method Post -Uri ($endpoint.TrimEnd('/') + '/v2/track') -ContentType 'application/json' -Body ($events | ConvertTo-Json -Depth 20) | Out-Null
-          Write-Host "Sent $($events.Count) telemetry events to Azure Monitor."
