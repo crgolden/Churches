@@ -124,9 +124,6 @@ The GitHub Actions workflow (`.github/workflows/main_crgolden-churches.yml`) run
 5. `npm run build` (production configuration) → `npm prune --omit=dev` → deploy to `crgolden-churches` (Linux)
 6. Post-deploy smoke (`npm run e2e:smoke` against `webapp-url`)
 
-ADO test results and Azure Monitor telemetry are published from the Playwright JUnit XML
-(`playwright-results.xml`), which is written by the `junit` reporter in `playwright.config.ts`.
-
 There is no SQL dacpac in this pipeline.
 
 ---
