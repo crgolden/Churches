@@ -27,7 +27,7 @@ export default defineConfig({
   projects: [
     {
       name: 'e2e',
-      testMatch: /.*\/e2e\/(?!smoke\/).*\.spec\.ts$/,
+      testMatch: /.*\/e2e\/(?!smoke\/|synthetic\/).*\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
       fullyParallel: false,
       workers: 1,
@@ -38,6 +38,19 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: smokeBaseUrl ?? `http://localhost:${SSR_PORT}`,
+      },
+    },
+    {
+      name: 'synthetic',
+      testDir: './e2e/synthetic',
+      timeout: 10 * 60_000,
+      retries: 0,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: smokeBaseUrl ?? `http://localhost:${SSR_PORT}`,
+        userAgent: `${devices['Desktop Chrome'].userAgent} crgolden-synthetic/1.0`,
+        actionTimeout: 30_000,
+        navigationTimeout: 60_000,
       },
     },
   ],

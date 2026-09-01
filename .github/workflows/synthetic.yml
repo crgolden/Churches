@@ -1,0 +1,110 @@
+name: Synthetic walker
+
+on:
+  schedule:
+    - cron: '17 10 * * *'
+    - cron: '17 22 * * *'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Walk seed (uint32) for deterministic replay; random when empty'
+        required: false
+      steps:
+        description: 'Step budget override (default 40)'
+        required: false
+
+concurrency:
+  group: synthetic-walker
+  cancel-in-progress: false
+
+jobs:
+  walk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://npm.pkg.github.com
+
+      - name: Cache npm packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Install npm dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}
+        run: npm ci --ignore-scripts
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: |
+          VERSION=$(node -e "console.log(require('./package-lock.json').packages['node_modules/@playwright/test'].version)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers cache
+        id: cache-playwright
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npm run playwright:install
+
+      - name: Resolve seed
+        id: seed
+        run: |
+          seed="${{ inputs.seed }}"
+          if [ -z "$seed" ]; then
+            seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
+          fi
+          echo "value=$seed" >> "$GITHUB_OUTPUT"
+          echo "### Synthetic walk seed: \`$seed\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run synthetic walker
+        env:
+          SmokeBaseUrl: ${{ vars.SMOKE_BASE_URL }}
+          SYNTHETIC_SEED: ${{ steps.seed.outputs.value }}
+          SYNTHETIC_STEPS: ${{ inputs.steps }}
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          SYNTHETIC_MARKER: ${{ secrets.SYNTHETIC_MARKER_SECRET }}
+        run: npm run e2e:synthetic
+
+      - name: Assert executed test count is nonzero
+        if: always()
+        run: |
+          count=$(grep -o 'tests="[0-9]*"' playwright-results.xml | head -1 | grep -o '[0-9]*' || true)
+          skipped=$(grep -o 'skipped="[0-9]*"' playwright-results.xml | head -1 | grep -o '[0-9]*' || true)
+          echo "Executed tests: ${count:-0} (skipped ${skipped:-0}, seed ${{ steps.seed.outputs.value }})" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$count" ] || [ "$count" -eq 0 ] || [ "${skipped:-0}" -ge "$count" ]; then
+            echo "::error::Synthetic run executed 0 tests — a vacuous green."
+            exit 1
+          fi
+
+      - name: Upload Playwright HTML report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: synthetic-playwright-report
+          path: playwright-report/
+
+      - name: Upload junit results and artifacts
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: synthetic-playwright-artifacts
+          path: |
+            playwright-results.xml
+            playwright-artifacts/
+          if-no-files-found: warn

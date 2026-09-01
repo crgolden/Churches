@@ -14,6 +14,7 @@ Unit test coding standards (no control-flow in tests, etc.) are in the workspace
 | Frontend unit | Vitest | `src/**/*.spec.ts` | No | Every push/PR |
 | E2E (regression) | Playwright (`--project=e2e`) | `e2e/` | No — Playwright manages the Node SSR server + mock Directory API | Every push/PR |
 | Smoke (post-deploy) | Playwright (`--project=smoke`) | `e2e/smoke/` | Yes — targets the deployed stack | Post-deploy only |
+| Synthetic walker | Playwright (`--project=synthetic`) | `e2e/synthetic/` | Yes — targets the deployed stack | Scheduled (`synthetic.yml`), never a merge gate |
 
 ---
 
@@ -107,6 +108,50 @@ gap is closed.
 Smoke tests exercise: `GET /health` (must return `Healthy`), SPA bootstrap, BFF CSRF enforcement
 (requests without `X-CSRF: 1` rejected with 401), proxy reachability (search returns 200 with header),
 and unauthenticated protected endpoint (corrections POST returns 401).
+
+---
+
+## Synthetic walker
+
+`e2e/synthetic/walker.spec.ts` performs a **seeded random walk of the deployed app**: one real
+login through Identity, then a weighted random sequence of read-only actions (search, open
+results, paginate, map view, contribute-form view — no mutating POSTs). It runs on a schedule
+from `.github/workflows/synthetic.yml` (twice daily, plus `workflow_dispatch` with a `seed`
+input) and is **never a merge gate** — it exists to catch regressions in production and to feed
+real traffic into observability. Tests skip unless `SmokeBaseUrl` is set.
+
+Environment contract:
+
+| Variable | Meaning |
+|---|---|
+| `SmokeBaseUrl` | Deployed app URL (same switch the smoke tier uses; disables `webServer`) |
+| `SYNTHETIC_SEED` | **Required** decimal uint32; the whole walk derives from it |
+| `SYNTHETIC_STEPS` | Optional step budget override (default 40) |
+| `TEST_USERNAME` / `TEST_PASSWORD` | Identity test account; the email must be in Identity's `ReCAPTCHATestEmails` |
+| `SYNTHETIC_MARKER` | Must equal Identity's `ReCAPTCHASyntheticMarkerSecret`; sent as `X-Synthetic-Marker` on Identity-origin requests (redirect hops can carry it to this app's own origin; never to third parties) |
+
+Replay a failed walk with the seed from the job summary / failure message:
+
+```powershell
+$env:SYNTHETIC_SEED = '<seed>'; $env:SmokeBaseUrl = '<deployed app URL>'; npm run e2e:synthetic
+```
+
+Same seed ⇒ same RNG decisions given the same action availability; divergence caused by live-data
+drift (a search returning different rows) is expected — the guarantee is the decision sequence,
+which is what makes a failure reproducible in practice.
+
+- **The seed is a run parameter, not unit-test data.** The generated-test-data rule
+  (CODE-STYLE.md rule 11) is scoped to unit tests; do not "fix" the walker by making the seed
+  unrepeatable.
+- **The engine comes from `@crgolden/modules/synthetic-walker`** (the Modules repo). Installing
+  it needs GitHub Packages auth — CI uses the `PACKAGES_READ_TOKEN` secret; locally a
+  `read:packages` PAT in your user `~/.npmrc`. A 401 on the `@crgolden` scope during `npm ci`
+  means the token is missing.
+- Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`; the secret
+  marker header goes to Identity-origin requests and, via redirect propagation, this app's own
+  origin — never to third-party hosts (verified from a trace network log).
+- **GitHub disables scheduled workflows after 60 days without repo activity in public repos**;
+  a push, a `workflow_dispatch`, or the Actions UI re-enables it. Schedules fire from `main` only.
 
 ---
 
