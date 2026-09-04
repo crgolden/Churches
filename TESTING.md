@@ -146,7 +146,18 @@ which is what makes a failure reproducible in practice.
 - **The engine comes from `@crgolden/modules/synthetic-walker`** (the Modules repo). Installing
   it needs GitHub Packages auth — CI uses the `PACKAGES_READ_TOKEN` secret; locally a
   `read:packages` PAT in your user `~/.npmrc`. A 401 on the `@crgolden` scope during `npm ci`
-  means the token is missing.
+  means the token is missing. Dependabot needs the **same secret again in its own store**
+  (`gh secret set PACKAGES_READ_TOKEN --app dependabot`) plus the `registries:` block in
+  `.github/dependabot.yml`, or every Dependabot PR fails `npm ci` with that same 401.
+- **The engine waits for Angular hydration before every step, and that wait is load-bearing.** A
+  scheduled walk failed at step 1 with a native form GET to `/?`: the click landed after SSR
+  paint but before hydration attached `(submit)="$event.preventDefault()"`, so the browser
+  submitted the form itself. The search inputs carry no `name` attributes, which is why the query
+  string came back empty — that empty `/?` is the signature of this race. Measured against
+  production: at Playwright's `load` event the page still carries `[ngh]` annotations, which
+  Angular removes only once hydration claims the DOM, while `ng-server-context` persists forever
+  and is **not** a usable signal. A local run rarely reproduces it because the app is warm; the
+  race needs a cold F1 instance, so CI is where it shows up.
 - Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`; the secret
   marker header goes to Identity-origin requests and, via redirect propagation, this app's own
   origin — never to third-party hosts (verified from a trace network log).
