@@ -156,8 +156,15 @@ which is what makes a failure reproducible in practice.
   string came back empty — that empty `/?` is the signature of this race. Measured against
   production: at Playwright's `load` event the page still carries `[ngh]` annotations, which
   Angular removes only once hydration claims the DOM, while `ng-server-context` persists forever
-  and is **not** a usable signal. A local run rarely reproduces it because the app is warm; the
-  race needs a cold F1 instance, so CI is where it shows up.
+  and is **not** a usable signal. That measurement was taken against a **warm** app and still
+  showed four pending annotations, so the window is client-side JS bootstrap, not server warmth;
+  it shows up in CI because a shared runner boots the bundle more slowly than a dev box.
+- **A walker timeout may be a performance finding rather than a test defect, so diagnose before
+  raising a timeout.** Step 37 of a walk failed asserting `#result-count`, and the cause was a
+  genuinely slow unfiltered search in Directory — fixed there, not papered over here. Post-
+  navigation assertions still route through `expectRendered` with an explicit timeout, because a
+  walker on a shared CI runner needs more headroom than Playwright's 5s default; that headroom
+  must never be the *answer* to a slow page.
 - Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`; the secret
   marker header goes to Identity-origin requests and, via redirect propagation, this app's own
   origin — never to third-party hosts (verified from a trace network log).
