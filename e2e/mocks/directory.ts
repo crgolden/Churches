@@ -221,8 +221,8 @@ export const MOSAIC_AUSTIN: ChurchRecord = {
 
 function routeParam(req: Request, name: string): string {
   const value = req.params[name];
-  if (value === undefined) {
-    throw new Error(`Handler for '${req.path}' ran without a '${name}' route parameter.`);
+  if (typeof value !== 'string') {
+    throw new Error(`Handler for '${req.path}' ran without a single '${name}' route parameter.`);
   }
 
   return value;
