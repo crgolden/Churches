@@ -73,12 +73,11 @@ jobs:
 
       - name: Run synthetic walker
         env:
-          SmokeBaseUrl: ${{ vars.SMOKE_BASE_URL }}
+          WalkerBaseUrl: ${{ vars.WALKER_BASE_URL }}
           SYNTHETIC_SEED: ${{ steps.seed.outputs.value }}
           SYNTHETIC_STEPS: ${{ inputs.steps }}
-          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
-          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-          SYNTHETIC_MARKER: ${{ secrets.SYNTHETIC_MARKER_SECRET }}
+          EMAIL1: ${{ secrets.EMAIL1 }}
+          PASSKEY_CREDENTIAL1: ${{ secrets.PASSKEY_CREDENTIAL1 }}
         run: npm run e2e:synthetic
 
       - name: Assert executed test count is nonzero

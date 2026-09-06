@@ -4,6 +4,8 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=crgolden_Churches&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=crgolden_Churches)
 
+[![Synthetic walker](https://github.com/crgolden/Churches/actions/workflows/synthetic.yml/badge.svg)](https://github.com/crgolden/Churches/actions/workflows/synthetic.yml)
+
 The end-user surface of a nationwide U.S. church discovery platform: an **Angular 22 SSR** application
 with a **Node.js Express** Backend-for-Frontend (BFF), served by a single Node process. The BFF holds
 the OIDC session and proxies every data call to the standalone [Directory](https://github.com/crgolden/Directory)
@@ -103,11 +105,10 @@ npm run serve:ssr    # run the full SSR + BFF: node --import ./instrumentation.m
 npm run lint         # ESLint
 npx vitest run       # unit tests (Vitest); add --coverage for LCOV
 npm run e2e          # build:ci + Playwright E2E vs the real Node server + mock Directory/OIDC (self-builds)
-npm run e2e:smoke    # Playwright smoke tests against a deployed stack (SmokeBaseUrl)
-.\Invoke-SmokeTests.ps1 -BaseUrl https://your-churches-app.azurewebsites.net
+npm run e2e:synthetic # seeded random walk of a deployed stack (WalkerBaseUrl); normally run on a schedule
 ```
 
-See [TESTING.md](TESTING.md) for the full E2E / smoke test guide and CI configuration.
+See [TESTING.md](TESTING.md) for the full E2E / synthetic-walker guide and CI configuration.
 
 ## Project Structure
 
@@ -118,7 +119,7 @@ src/
   app/              # Angular application
   environments/     # per-environment config (allowedHosts, etc.)
   telemetry/        # pino → Elasticsearch logging
-e2e/                # TypeScript Playwright E2E + smoke tests
+e2e/                # TypeScript Playwright E2E + synthetic walker
 instrumentation.mjs # OpenTelemetry Node SDK init (loaded via --import)
 ```
 
@@ -135,7 +136,9 @@ upload deployment artifact.
 (Production slot) via Azure OIDC. Startup command:
 `node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`
 
-**Smoke job** — `npm run e2e:smoke` against the deployed `webapp-url` (post-deploy, `main` only).
+There is no post-deploy job. The deployed app is exercised by the scheduled **synthetic walker**
+(`.github/workflows/synthetic.yml`), which signs in through Identity with a passkey and walks a
+seeded random journey twice a day.
 
 This repo deploys only the frontend + Node BFF; the Directory API and its SQL schema deploy from the
 [Directory](https://github.com/crgolden/Directory) repo (`crgolden-directory`).

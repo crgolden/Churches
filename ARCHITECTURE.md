@@ -489,7 +489,7 @@ All configuration reaches the app as App Service settings. Secret ones (`Churche
 
 Each repo deploys independently via GitHub Actions with Azure OIDC federated credentials:
 
-- **Churches** → Linux App Service: `npm ci` → lint → CI build → Vitest → Playwright E2E → SonarCloud → production build → deploy → post-deploy smoke tests.
+- **Churches** → Linux App Service: `npm ci` → lint → CI build → Vitest → Playwright E2E → SonarCloud → production build → deploy. The deployed app is exercised by the scheduled synthetic walker rather than a post-deploy job.
 - **Directory** → Windows App Service: build (compiles the `Directory.Data` dacpac) → unit tests + coverage → SonarCloud → **dacpac deployed via SqlPackage before the app** — the schema is always ahead of or equal to the code.
 - **Functions** → Function App: build + deploy (no test job).
 

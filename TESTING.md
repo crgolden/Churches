@@ -1,7 +1,7 @@
 # Testing
 
-The Churches test suite covers **frontend unit tests** (Vitest) and **browser E2E + smoke tests**
-(TypeScript Playwright). This repo tests the Angular SSR + Node BFF
+The Churches test suite covers **frontend unit tests** (Vitest) and **browser E2E + synthetic-walker
+tests** (TypeScript Playwright). This repo tests the Angular SSR + Node BFF
 stack. The Directory API has its own suite in the [Directory](https://github.com/crgolden/Directory) repo.
 
 Unit test coding standards (no control-flow in tests, etc.) are in the workspace-level
@@ -13,7 +13,6 @@ Unit test coding standards (no control-flow in tests, etc.) are in the workspace
 |------|------|----------|------------------------|------------|
 | Frontend unit | Vitest | `src/**/*.spec.ts` | No | Every push/PR |
 | E2E (regression) | Playwright (`--project=e2e`) | `e2e/` | No — Playwright manages the Node SSR server + mock Directory API | Every push/PR |
-| Smoke (post-deploy) | Playwright (`--project=smoke`) | `e2e/smoke/` | Yes — targets the deployed stack | Post-deploy only |
 | Synthetic walker | Playwright (`--project=synthetic`) | `e2e/synthetic/` | Yes — targets the deployed stack | Scheduled (`synthetic.yml`), never a merge gate |
 
 ---
@@ -51,9 +50,10 @@ because every spec shares the mock server's in-memory state; concurrent specs wo
 fulfils `/bff/user` with a fixed claim array — `authedPage` with user claims, `modPage` with
 `churches.mod=true` — so every moderator test passes regardless of which token really carried the claim,
 and `anonymousPage` fulfils it as 401. The PKCE authorization-code flow, the token exchange, and the
-userinfo call are not covered by the E2E tier, and the smoke tier does not cover them either: its five
-tests are `/health`, SPA bootstrap, two CSRF cases, and one unauthenticated 401. The discriminating test
-for where the `churches.mod` claim actually arrives from is `src/bff/routes.spec.ts`, not anything in
+userinfo call are not covered by the E2E tier. **The synthetic walker is the only tier that drives the
+real exchange**, because it signs in through the deployed Identity with a passkey rather than a mock —
+so a break in the PKCE flow surfaces there and nowhere else in this repo. The discriminating test for
+where the `churches.mod` claim actually arrives from is `src/bff/routes.spec.ts`, not anything in
 `e2e/`.
 
 **Route order in the mock matters.** `GET /churches/:slug` must be registered *after* every
@@ -93,24 +93,6 @@ gap is closed.
 
 ---
 
-## Smoke tests (post-deploy)
-
-`e2e/smoke/api.spec.ts` targets a **deployed** stack. Tests are skipped unless `SmokeBaseUrl` is set.
-
-```powershell
-# Against the deployed app (reads SmokeBaseUrl from the argument)
-.\Invoke-SmokeTests.ps1
-
-# Or a specific target
-.\Invoke-SmokeTests.ps1 -BaseUrl https://your-churches-app.azurewebsites.net
-```
-
-Smoke tests exercise: `GET /health` (must return `Healthy`), SPA bootstrap, BFF CSRF enforcement
-(requests without `X-CSRF: 1` rejected with 401), proxy reachability (search returns 200 with header),
-and unauthenticated protected endpoint (corrections POST returns 401).
-
----
-
 ## Synthetic walker
 
 `e2e/synthetic/walker.spec.ts` performs a **seeded random walk of the deployed app**: one real
@@ -118,22 +100,34 @@ login through Identity, then a weighted random sequence of read-only actions (se
 results, paginate, map view, contribute-form view — no mutating POSTs). It runs on a schedule
 from `.github/workflows/synthetic.yml` (twice daily, plus `workflow_dispatch` with a `seed`
 input) and is **never a merge gate** — it exists to catch regressions in production and to feed
-real traffic into observability. Tests skip unless `SmokeBaseUrl` is set.
+real traffic into observability. Tests skip unless `WalkerBaseUrl` is set.
+
+**This replaced the post-deploy smoke tier, which was deleted fleet-wide.** Smoke was a stopgap
+until walkers existed; once they did it was duplicate coverage that also needed its own reCAPTCHA
+exemption to log in. The five checks it ran — `/health`, SPA bootstrap, two CSRF cases and one
+unauthenticated 401 — are covered by the E2E tier against mocks, and the walker now exercises the
+same paths against production for real.
 
 Environment contract:
 
 | Variable | Meaning |
 |---|---|
-| `SmokeBaseUrl` | Deployed app URL (same switch the smoke tier uses; disables `webServer`) |
+| `WalkerBaseUrl` | Deployed app URL; also disables `webServer` |
 | `SYNTHETIC_SEED` | **Required** decimal uint32; the whole walk derives from it |
 | `SYNTHETIC_STEPS` | Optional step budget override (default 40) |
-| `TEST_USERNAME` / `TEST_PASSWORD` | Identity test account; the email must be in Identity's `ReCAPTCHATestEmails` |
-| `SYNTHETIC_MARKER` | Must equal Identity's `ReCAPTCHASyntheticMarkerSecret`; sent as `X-Synthetic-Marker` on Identity-origin requests (redirect hops can carry it to this app's own origin; never to third parties) |
+| `EMAIL1` | Identity account the walker signs in as |
+| `PASSKEY_CREDENTIAL1` | That account's passkey, as the five-field JSON Playwright's virtual authenticator returns |
+
+**The walker signs in with a passkey, not a password.** Identity evaluates the passkey branch
+*before* the CAPTCHA, so this is a first-class production auth path rather than an exemption —
+there is no marker header and no test-only code in Identity's authentication handler. No password
+is stored in CI. Who the accounts are, and how to enroll a passkey, is in `Tools/Identity/AGENTS.md`
+(private repo).
 
 Replay a failed walk with the seed from the job summary / failure message:
 
 ```powershell
-$env:SYNTHETIC_SEED = '<seed>'; $env:SmokeBaseUrl = '<deployed app URL>'; npm run e2e:synthetic
+$env:SYNTHETIC_SEED = '<seed>'; $env:WalkerBaseUrl = '<deployed app URL>'; npm run e2e:synthetic
 ```
 
 Same seed ⇒ same RNG decisions given the same action availability; divergence caused by live-data
@@ -185,7 +179,9 @@ The GitHub Actions workflow (`.github/workflows/main_crgolden-churches.yml`) run
    SonarQube Cloud no longer accepts, so "modernising" back to it breaks the step. It also needs no JDK or
    scanner setup step of its own.
 5. `npm run build` (production configuration) → `npm prune --omit=dev` → deploy to `crgolden-churches` (Linux)
-6. Post-deploy smoke (`npm run e2e:smoke` against `webapp-url`)
+
+There is no post-deploy step. The scheduled synthetic walker (`synthetic.yml`) is what exercises the
+deployed app; see [Synthetic walker](#synthetic-walker).
 
 There is no SQL dacpac in this pipeline.
 

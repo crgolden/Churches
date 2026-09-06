@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const SSR_PORT = 4000;
 const MOCK_DIR_PORT = 4001;
 
-const smokeBaseUrl = process.env['SmokeBaseUrl']?.replace(/\/$/, '');
+const walkerBaseUrl = process.env['WalkerBaseUrl']?.replace(/\/$/, '');
 
 export default defineConfig({
   testDir: './e2e',
@@ -27,18 +27,10 @@ export default defineConfig({
   projects: [
     {
       name: 'e2e',
-      testMatch: /.*\/e2e\/(?!smoke\/|synthetic\/).*\.spec\.ts$/,
+      testMatch: /.*\/e2e\/(?!synthetic\/).*\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
       fullyParallel: false,
       workers: 1,
-    },
-    {
-      name: 'smoke',
-      testDir: './e2e/smoke',
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: smokeBaseUrl ?? `http://localhost:${SSR_PORT}`,
-      },
     },
     {
       name: 'synthetic',
@@ -47,7 +39,7 @@ export default defineConfig({
       retries: 0,
       use: {
         ...devices['Desktop Chrome'],
-        baseURL: smokeBaseUrl ?? `http://localhost:${SSR_PORT}`,
+        baseURL: walkerBaseUrl ?? `http://localhost:${SSR_PORT}`,
         userAgent: `${devices['Desktop Chrome'].userAgent} crgolden-synthetic/1.0`,
         actionTimeout: 30_000,
         navigationTimeout: 60_000,
@@ -55,7 +47,7 @@ export default defineConfig({
     },
   ],
 
-  webServer: smokeBaseUrl ? undefined : [
+  webServer: walkerBaseUrl ? undefined : [
     {
       command: 'npx tsx e2e/mocks/directory-server.ts',
       port: MOCK_DIR_PORT,
