@@ -13,7 +13,7 @@
     <ul class="nav-links" [class.open]="menuOpen()">
       <li><a routerLink="/churches" (click)="menuOpen.set(false)">Browse</a></li>
       @if (auth.hasModerationScope()) {
-        <li><a routerLink="/admin/moderation" (click)="menuOpen.set(false)">Moderation</a></li>
+        <li><a id="nav-moderation" routerLink="/admin/moderation" (click)="menuOpen.set(false)">Moderation</a></li>
       }
       @if (auth.isAnonymous()) {
         <li><a [href]="auth.loginUrl" class="btn-primary nav-cta">Log in</a></li>
