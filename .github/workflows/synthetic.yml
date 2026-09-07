@@ -78,6 +78,8 @@ jobs:
           SYNTHETIC_STEPS: ${{ inputs.steps }}
           EMAIL1: ${{ secrets.EMAIL1 }}
           PASSKEY_CREDENTIAL1: ${{ secrets.PASSKEY_CREDENTIAL1 }}
+          EMAIL2: ${{ secrets.EMAIL2 }}
+          PASSKEY_CREDENTIAL2: ${{ secrets.PASSKEY_CREDENTIAL2 }}
         run: npm run e2e:synthetic
 
       - name: Assert executed test count is nonzero
