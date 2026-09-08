@@ -50,6 +50,9 @@ describe('ChurchListComponent', () => {
   });
 
   it('renders each view toggle as an anchor carrying its own href', () => {
+    component['results'].set({ ...emptySearchResult, totalCount: 1 });
+    fixture.detectChanges();
+
     const mapToggle = fixture.nativeElement.querySelector('#btn-view-map') as HTMLElement;
     expect(mapToggle.tagName).toBe('A');
     expect(mapToggle.getAttribute('href')).toContain('view=map');
@@ -74,9 +77,9 @@ describe('ChurchListComponent', () => {
     expect(previous.tagName).toBe('A');
     expect(previous.getAttribute('href')).toContain('page=1');
 
-    const numbered = Array.from(
+    const numbered: HTMLElement[] = Array.from(
       fixture.nativeElement.querySelectorAll('.page-number'),
-    ) as HTMLElement[];
+    );
     expect(numbered).toHaveLength(3);
     numbered.forEach((link, index) => {
       expect(link.tagName).toBe('A');
