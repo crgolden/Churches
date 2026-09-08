@@ -66,14 +66,6 @@ export class ChurchListComponent implements OnInit {
     return this.worshipStyles.find(s => s.value === value)?.label;
   }
 
-  protected setView(mode: ViewMode): void {
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParamsHandling: 'merge',
-      queryParams: { view: mode },
-    });
-  }
-
   protected changePageSize(size: number): void {
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -138,14 +130,6 @@ export class ChurchListComponent implements OnInit {
         this.error.set('Failed to load results. Please try again.');
         this.loading.set(false);
       },
-    });
-  }
-
-  protected goToPage(p: number): void {
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParamsHandling: 'merge',
-      queryParams: { page: p },
     });
   }
 }

@@ -36,30 +36,36 @@
           </select>
         </div>
         <div class="view-toggle" role="group" aria-label="Result view">
-          <button
+          <a
             id="btn-view-grid"
-            type="button"
             class="btn-ghost"
             [class.active]="view() === 'grid'"
-            (click)="setView('grid')">
+            [routerLink]="[]"
+            [queryParams]="{ view: 'grid' }"
+            queryParamsHandling="merge"
+            [attr.aria-current]="view() === 'grid' ? 'true' : null">
             Grid
-          </button>
-          <button
+          </a>
+          <a
             id="btn-view-list"
-            type="button"
             class="btn-ghost"
             [class.active]="view() === 'list'"
-            (click)="setView('list')">
+            [routerLink]="[]"
+            [queryParams]="{ view: 'list' }"
+            queryParamsHandling="merge"
+            [attr.aria-current]="view() === 'list' ? 'true' : null">
             List
-          </button>
-          <button
+          </a>
+          <a
             id="btn-view-map"
-            type="button"
             class="btn-ghost"
             [class.active]="view() === 'map'"
-            (click)="setView('map')">
+            [routerLink]="[]"
+            [queryParams]="{ view: 'map' }"
+            queryParamsHandling="merge"
+            [attr.aria-current]="view() === 'map' ? 'true' : null">
             Map
-          </button>
+          </a>
         </div>
         <a routerLink="/" class="btn-ghost">&larr; Refine search</a>
       </div>
@@ -134,16 +140,39 @@
         </span>
         @if (totalPages() > 1) {
           <div class="page-buttons">
-            <button id="btn-prev-page" class="btn-ghost" [disabled]="page() === 1" (click)="goToPage(page() - 1)">&larr; Previous</button>
+            @if (page() > 1) {
+              <a
+                id="btn-prev-page"
+                class="btn-ghost"
+                [routerLink]="[]"
+                [queryParams]="{ page: page() - 1 }"
+                queryParamsHandling="merge"
+                rel="prev">&larr; Previous</a>
+            } @else {
+              <button id="btn-prev-page" type="button" class="btn-ghost" disabled>&larr; Previous</button>
+            }
             @for (p of pageWindow(); track p) {
-              <button
+              <a
                 class="btn-ghost page-number"
                 [class.active]="p === page()"
-                (click)="goToPage(p)">
+                [routerLink]="[]"
+                [queryParams]="{ page: p }"
+                queryParamsHandling="merge"
+                [attr.aria-current]="p === page() ? 'page' : null">
                 {{ p }}
-              </button>
+              </a>
             }
-            <button id="btn-next-page" class="btn-ghost" [disabled]="page() >= totalPages()" (click)="goToPage(page() + 1)">Next &rarr;</button>
+            @if (page() < totalPages()) {
+              <a
+                id="btn-next-page"
+                class="btn-ghost"
+                [routerLink]="[]"
+                [queryParams]="{ page: page() + 1 }"
+                queryParamsHandling="merge"
+                rel="next">Next &rarr;</a>
+            } @else {
+              <button id="btn-next-page" type="button" class="btn-ghost" disabled>Next &rarr;</button>
+            }
           </div>
         }
       </nav>

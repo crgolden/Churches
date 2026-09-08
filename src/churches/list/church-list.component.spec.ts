@@ -49,25 +49,50 @@ describe('ChurchListComponent', () => {
     expect(component['worshipStyleLabel'](999)).toBeUndefined();
   });
 
-  it('setView updates the view query param', () => {
-    const router = TestBed.inject(Router);
-    const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-    component['setView']('list');
-    expect(spy).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({ queryParams: { view: 'list' } }),
-    );
+  it('renders each view toggle as an anchor carrying its own href', () => {
+    const mapToggle = fixture.nativeElement.querySelector('#btn-view-map') as HTMLElement;
+    expect(mapToggle.tagName).toBe('A');
+    expect(mapToggle.getAttribute('href')).toContain('view=map');
   });
 
   it('defaults to grid view', () => {
     expect(component['view']()).toBe('grid');
   });
 
-  it('goToPage navigates with updated page queryParam', async () => {
-    const router = TestBed.inject(Router);
-    const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-    component['goToPage'](3);
-    expect(spy).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { page: 3 } }));
+  it('renders every pagination control as an anchor carrying its own href', () => {
+    const pageSize = 20;
+    const pagedTotalCount = pageSize * 3;
+    component['results'].set({ ...emptySearchResult, totalCount: pagedTotalCount });
+    component['page'].set(2);
+    fixture.detectChanges();
+
+    const next = fixture.nativeElement.querySelector('#btn-next-page') as HTMLElement;
+    expect(next.tagName).toBe('A');
+    expect(next.getAttribute('href')).toContain('page=3');
+
+    const previous = fixture.nativeElement.querySelector('#btn-prev-page') as HTMLElement;
+    expect(previous.tagName).toBe('A');
+    expect(previous.getAttribute('href')).toContain('page=1');
+
+    const numbered = Array.from(
+      fixture.nativeElement.querySelectorAll('.page-number'),
+    ) as HTMLElement[];
+    expect(numbered).toHaveLength(3);
+    numbered.forEach((link, index) => {
+      expect(link.tagName).toBe('A');
+      expect(link.getAttribute('href')).toContain(`page=${index + 1}`);
+    });
+  });
+
+  it('renders a disabled button, not a link, where there is no page to go to', () => {
+    const pageSize = 20;
+    component['results'].set({ ...emptySearchResult, totalCount: pageSize * 2 });
+    component['page'].set(1);
+    fixture.detectChanges();
+
+    const previous = fixture.nativeElement.querySelector('#btn-prev-page') as HTMLButtonElement;
+    expect(previous.tagName).toBe('BUTTON');
+    expect(previous.disabled).toBe(true);
   });
 
   it('changePageSize navigates with updated pageSize and resets page to 1', () => {
