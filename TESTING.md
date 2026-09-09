@@ -212,4 +212,4 @@ sonar-scanner `
 
 The coverage **score is read from SonarCloud, never hand-maintained** here. Build a per-method table
 only when SonarCloud flags a method with **cognitive complexity > 15 AND uncovered conditions > 0**.
-See `../AGENTS/DESIGN-LANGUAGE.md` and `../AGENTS/TESTING-COVERAGE.md`.
+See [../AGENTS/COVERAGE/METHOD.md](../AGENTS/COVERAGE/METHOD.md).
