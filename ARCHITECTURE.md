@@ -230,7 +230,7 @@ JWT Bearer validation against Identity with `ValidateAudience = false` and `MapI
 - Free text → full-text `CONTAINSTABLE` over `(CanonicalName, City)`, AND-ing prefix terms; the rank drives the default relevance sort.
 - Location → `dbo.fn_HaversineDistance` (miles, Earth radius 3958.8) filters within `radiusMiles` (default 25) and powers the distance sort.
 - Schedule filters (`dayOfWeek`, `startTimeBefore/After`) → an `EXISTS` subquery against `ServiceSchedules`.
-- Paging → `COUNT(*) OVER()` window count in the same query; `pageSize` clamped to 1–50.
+- Paging → a separate `COUNT(*)` statement over the same `FROM`/`WHERE`, then the page (two result sets from one command); `pageSize` clamped to 1–50.
 
 ### Data model
 
