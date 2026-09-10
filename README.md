@@ -98,13 +98,13 @@ calls of its own.
 
 ```powershell
 npm install
-npm start            # ng serve — SPA/component dev (no SSR/BFF), http://localhost:4200
+npm start            # ng serve — dev server with SSR via server.ts, http://localhost:56432; /bff and /directory/api go through src/proxy.conf.js (ASPNETCORE_URLS)
 npm run build        # SSR production build → dist/churches.client/{server,browser}
 npm run build:ci     # SSR build with the ci environment (allowedHosts=localhost)
 npm run serve:ssr    # run the full SSR + BFF: node --import ./instrumentation.mjs dist/churches.client/server/server.mjs
 npm run lint         # ESLint
 npx vitest run       # unit tests (Vitest); add --coverage for LCOV
-npm run e2e          # build:ci + Playwright E2E vs the real Node server + mock Directory/OIDC (self-builds)
+npm run e2e          # build:ci + Playwright E2E vs the real Node server + mock Directory API; /bff/* is route-mocked (self-builds)
 npm run e2e:synthetic # seeded random walk of a deployed stack (WalkerBaseUrl); normally run on a schedule
 ```
 

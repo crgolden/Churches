@@ -84,7 +84,7 @@ Middleware mounts in this exact order (`src/server.ts`):
 ```mermaid
 flowchart TD
     A["Incoming request<br/>(trust proxy = 1)"] --> B{"Host allowed?<br/>AngularNodeAppEngine allowedHosts"}
-    B --- BN["no"] --> B1["Rejected — prevents SSRF /<br/>silent CSR fallback"]
+    B --- BN["no"] --> B1["400 Bad Request<br/>(SSRF guard)"]
     B --- BY["yes"] --> C{"GET /health?"}
     C --- CY["yes"] --> C1["200 'Healthy'<br/>(before logging — keeps logs clean)"]
     C --- CN["no"] --> D["requestLogger (pino)"]
@@ -103,7 +103,7 @@ flowchart TD
 
 Two details here matter more than they look:
 
-- **`allowedHosts` is an SSRF guard with an SEO failure mode.** Angular SSR rejects requests whose `Host` header isn't allow-listed — but the rejection is a *silent fallback to client-side rendering*, which defeats server-rendered SEO without any error. The allow-list is sourced per environment via `fileReplacements` (`src/environments/`); dev and CI allow only `localhost`. Any new production hostname must be added there.
+- **`allowedHosts` is an SSRF guard, and a host outside it is a hard 400.** `@angular/ssr` answers a request whose `Host` (or `X-Forwarded-Host`) is not allow-listed with `400 Bad Request` and the body `Header "host" with value "…" is not allowed`, while `/health` (Express, ahead of the engine) keeps answering 200. The allow-list is sourced per environment via `fileReplacements` (`src/environments/`); dev and CI allow only `localhost`. Any new production hostname must be added there.
 - **The proxy is hand-rolled, not `http-proxy-middleware`.** `src/bff/proxy.ts` uses `fetch` directly because it needs token-aware behavior a generic proxy doesn't have (next section).
 
 ### Authentication
@@ -181,7 +181,7 @@ The split is deliberate: anonymous routes are `RenderMode.Server` because they a
 
 - **Zoneless** change detection (`provideZonelessChangeDetection()`) with hydration + event replay.
 - `AuthService` exposes signals; `hasModerationScope` is true when the claim `churches.mod === 'true'`. `authGuard` hard-navigates to `/bff/login` (a full page load — the login flow is server-side); `modGuard` returns a UrlTree to `/`.
-- **That claim reaches the browser from the access token, not only from the ID token.** `/bff/callback` merges `tokens.claims()` and `fetchUserInfo(...)` with `accessTokenClaims(...)`, which decodes the access-token payload and copies a short allowlist — currently just `churches.mod`. The claim is minted on both paths today (it is an `ApiScopeClaim` on the `directory` scope *and* an `IdentityResourceClaim` on `profile`), and the merge is idempotent, so this is belt-and-braces rather than a behaviour change. It exists so that removing the `profile` attachment — which leaks the flag to every client in the fleet that requests `profile` — cannot silently strip moderators of their moderation UI while server-side enforcement in Directory keeps working. Note the E2E suite mocks `/bff/user` wholesale and so cannot detect which path the claim arrived by; the discriminating test is in `src/bff/routes.spec.ts`.
+- **That claim reaches the browser from the access token.** `churches.mod` is attached to the `directory` API scope and to no identity resource, so it is absent from the ID token and from userinfo. `/bff/callback` merges `tokens.claims()` and `fetchUserInfo(...)` with `accessTokenClaims(...)`, which decodes the access-token payload and copies a short allowlist — currently just `churches.mod`. Server-side enforcement in Directory does not depend on this merge; the browser's moderation UI does. The E2E suite mocks `/bff/user` wholesale and cannot detect which path the claim arrived by; the discriminating test is in `src/bff/routes.spec.ts`.
 - Two HTTP interceptors: `appInterceptor` adds `X-CSRF: 1`, a per-request `X-Request-ID`, and `withCredentials`; `ssrAbsoluteUrlInterceptor` rewrites relative URLs to absolute during SSR (Node's `fetch` can't resolve relative URLs).
 - Maps are Leaflet, loaded via dynamic import and guarded with `isPlatformBrowser` — Leaflet touches `window` and would crash SSR.
 
