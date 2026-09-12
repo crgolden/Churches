@@ -7,18 +7,12 @@ import { logger } from '../telemetry/logging';
 
 declare module 'express-session' {
   interface SessionData {
-    /** PKCE code verifier — present only during the login flow. */
     pkceCodeVerifier?: string;
-    /** OAuth state — present only during the login flow. */
     oauthState?: string;
-    /** OAuth 2.0 access token for the Directory API. */
     accessToken?: string;
     refreshToken?: string;
-    /** OIDC ID token (used as id_token_hint for RP-initiated logout). */
     idToken?: string;
-    /** Unix ms at which the access token expires (undefined = unknown). */
     tokenExpiresAt?: number;
-    /** Claims returned by the userinfo endpoint, formatted for /bff/user. */
     claims?: { type: string; value: string }[];
   }
 }

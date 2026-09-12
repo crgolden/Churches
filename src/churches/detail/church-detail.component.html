@@ -8,7 +8,7 @@
   </div>
 } @else if (church()) {
   <div class="page-container page-section">
-    <a class="back-link btn-ghost" href="#" (click)="$event.preventDefault(); back()">&larr; Search results</a>
+    <button id="btn-back" type="button" class="back-link btn-ghost" (click)="back()">&larr; Search results</button>
     <article class="church-detail card">
       <header class="detail-header">
         <h1 id="church-name">{{ church()!.canonicalName }}</h1>

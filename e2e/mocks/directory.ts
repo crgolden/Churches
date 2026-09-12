@@ -1,14 +1,3 @@
-/**
- * Mock Directory API.
- *
- * Contract: routes carry no path prefix, because the Node SSR server's `directoryProxy` strips the
- * `/directory/api` mount prefix before forwarding. Tests mutate state only through the control API
- * at `/_test/*`.
- *
- * This is a real HTTP server rather than `page.route` interception because the calls it answers are
- * made by Node during SSR, and Playwright can only intercept requests the browser makes.
- */
-
 import express, { type Express, type Request, type Response } from 'express';
 
 export const CorrectionStatus = { Pending: 0, Approved: 1, Rejected: 2 } as const;

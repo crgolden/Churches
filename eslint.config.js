@@ -3,6 +3,7 @@ const eslint = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const angular = require('angular-eslint');
 const prettierConfig = require('eslint-config-prettier');
+const crgoldenAngular = require('@crgolden/modules/eslint-angular');
 
 module.exports = tseslint.config(
   {
@@ -30,6 +31,10 @@ module.exports = tseslint.config(
       '@typescript-eslint/unbound-method': ['error', { ignoreStatic: true }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'no-inline-comments': 'error',
+      'crgolden/no-component-navigation': [
+        'error',
+        { exemptMethods: ['search', 'changeSort', 'changePageSize'] },
+      ],
     },
   },
   {
@@ -53,6 +58,13 @@ module.exports = tseslint.config(
       ...angular.configs.templateRecommended,
       ...angular.configs.templateAccessibility,
     ],
-    rules: {},
+    plugins: { crgolden: crgoldenAngular },
+    rules: {
+      'crgolden/no-click-navigation': 'error',
+    },
+  },
+  {
+    files: ['**/*.ts'],
+    plugins: { crgolden: crgoldenAngular },
   },
 );

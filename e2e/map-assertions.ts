@@ -1,4 +1,5 @@
 import { expect } from './fixtures.js';
+import { computedStyleOf } from './computed-style.js';
 import type { Page } from '@playwright/test';
 
 export async function expectTileLayerMounted(page: Page, tilesId: string): Promise<void> {
@@ -10,15 +11,9 @@ export async function expectLeafletStylesheetApplied(
   mapId: string,
   tilesId: string,
 ): Promise<void> {
-  const tileLayerPosition = await page.evaluate(
-    id => getComputedStyle(document.getElementById(id)!).position,
-    tilesId,
-  );
+  const tileLayerPosition = await computedStyleOf(page, tilesId, 'position');
   expect(tileLayerPosition).toBe('absolute');
 
-  const mapContainerOverflow = await page.evaluate(
-    id => getComputedStyle(document.getElementById(id)!).overflow,
-    mapId,
-  );
+  const mapContainerOverflow = await computedStyleOf(page, mapId, 'overflow');
   expect(mapContainerOverflow).toContain('hidden');
 }

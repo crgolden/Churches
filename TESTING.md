@@ -36,7 +36,10 @@ No live servers needed. Playwright manages two local servers for the test run, s
 Angular bootstrap hits the mock directly):
 
 1. **Mock Directory API** (`npx tsx e2e/mocks/directory-server.ts`, port 4001) — handles
-   `/directory/api/*` routes and the `/_test/*` control API used by test helpers.
+   `/directory/api/*` routes and the `/_test/*` control API used by test helpers. Its routes carry no
+   path prefix, because the SSR server's `directoryProxy` strips `/directory/api` before forwarding.
+   It is a real HTTP server rather than `page.route` interception because Node makes these calls
+   during SSR, and Playwright can only intercept requests the browser makes.
 2. **Node SSR + BFF server** (port 4000) — starts the built `dist/churches.client/server/server.mjs`
    with in-memory session store, dummy OIDC values, and `DirectoryApiAddress` pointing at the mock.
 

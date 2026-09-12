@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /bff/
 
 Sitemap: https://crgolden-churches.azurewebsites.net/sitemap-index.xml

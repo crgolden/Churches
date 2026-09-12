@@ -1,4 +1,5 @@
 import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
+import { computedStyleOf } from './computed-style.js';
 import { expectLeafletStylesheetApplied, expectTileLayerMounted } from './map-assertions.js';
 
 test.describe('ChurchDetail', () => {
@@ -88,13 +89,9 @@ test.describe('ChurchDetail', () => {
 
     await expect(page.locator("label[for='schedule-day']")).toBeVisible();
     await expect(page.locator("label[for='schedule-time']")).toBeVisible();
-    const gridDisplay = await page.evaluate(
-      () => getComputedStyle(document.querySelector('#schedule-add-grid')!).display,
-    );
+    const gridDisplay = await computedStyleOf(page, 'schedule-add-grid', 'display');
     expect(gridDisplay).toBe('grid');
-    const gridRowGap = await page.evaluate(
-      () => getComputedStyle(document.querySelector('#schedule-add-grid')!).rowGap,
-    );
+    const gridRowGap = await computedStyleOf(page, 'schedule-add-grid', 'row-gap');
     expect(gridRowGap).not.toBe('0px');
     expect(gridRowGap).not.toBe('normal');
 
