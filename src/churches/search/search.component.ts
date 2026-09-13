@@ -1,10 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
-import { catchError, of } from 'rxjs';
-import { ChurchApiService } from '../../shared/church.service';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SeoService } from '../../shared/seo.service';
-import { DAYS_OF_WEEK, US_STATES, WORSHIP_STYLES } from '../../shared/models';
+import { DAYS_OF_WEEK, Denomination, US_STATES, WORSHIP_STYLES } from '../../shared/models';
 
 @Component({
   selector: 'app-search',
@@ -14,7 +11,7 @@ import { DAYS_OF_WEEK, US_STATES, WORSHIP_STYLES } from '../../shared/models';
 })
 export class SearchComponent implements OnInit {
   private readonly router = inject(Router);
-  private readonly churchService = inject(ChurchApiService);
+  private readonly route = inject(ActivatedRoute);
   private readonly seo = inject(SeoService);
 
   protected readonly keyword = signal('');
@@ -32,9 +29,8 @@ export class SearchComponent implements OnInit {
   protected readonly worshipStyles = WORSHIP_STYLES;
   protected readonly daysOfWeek = DAYS_OF_WEEK;
   protected readonly usStates = US_STATES;
-  protected readonly denominations = toSignal(
-    this.churchService.getDenominations().pipe(catchError(() => of([]))),
-    { initialValue: [] },
+  protected readonly denominations = signal<Denomination[]>(
+    (this.route.snapshot.data['denominations'] ?? []) as Denomination[],
   );
 
   ngOnInit(): void {

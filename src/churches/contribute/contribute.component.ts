@@ -30,12 +30,7 @@ export class ContributeComponent implements OnInit {
   protected readonly fields = CORRECTABLE_FIELDS;
 
   ngOnInit(): void {
-    const slug = this.route.snapshot.paramMap.get('slug');
-    if (!slug) return;
-    this.api.getChurchBySlug(slug).subscribe({
-      next: c => this.church.set(c),
-      error: () => { void this.router.navigate(['/']); },
-    });
+    this.church.set(this.route.snapshot.data['church'] as Church);
   }
 
   protected submit(): void {

@@ -1,9 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChurchListComponent } from './church-list.component';
-import { provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { ViewportScroller } from '@angular/common';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { BehaviorSubject } from 'rxjs';
 import { vi } from 'vitest';
 
 describe('ChurchListComponent', () => {
@@ -11,11 +12,16 @@ describe('ChurchListComponent', () => {
   let fixture: ComponentFixture<ChurchListComponent>;
   let controller: HttpTestingController;
   let scrollSpy: ReturnType<typeof vi.fn>;
+  let queryParams$: BehaviorSubject<Record<string, string>>;
+  let routeData$: BehaviorSubject<Record<string, unknown>>;
 
   const emptySearchResult = { items: [], totalCount: 0, page: 1, pageSize: 20 };
 
   beforeEach(async () => {
     scrollSpy = vi.fn();
+
+    queryParams$ = new BehaviorSubject<Record<string, string>>({});
+    routeData$ = new BehaviorSubject<Record<string, unknown>>({ results: emptySearchResult });
 
     await TestBed.configureTestingModule({
       imports: [ChurchListComponent],
@@ -24,6 +30,14 @@ describe('ChurchListComponent', () => {
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         { provide: ViewportScroller, useValue: { scrollToPosition: scrollSpy } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            queryParams: queryParams$,
+            data: routeData$,
+            snapshot: { queryParams: {}, data: { results: emptySearchResult } },
+          },
+        },
       ],
     }).compileComponents();
 
@@ -31,8 +45,6 @@ describe('ChurchListComponent', () => {
     component = fixture.componentInstance;
     controller = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-
-    controller.expectOne((r) => r.url.includes('/search')).flush(emptySearchResult);
   });
 
   afterEach(() => controller.verify());
@@ -118,8 +130,8 @@ describe('ChurchListComponent', () => {
     );
   });
 
-  it('scrolls to top after a query-params-driven load', () => {
-    expect(scrollSpy).toHaveBeenCalledWith([0, 0]);
+  it('leaves scrolling to the router, so a back navigation can restore the reader position', () => {
+    expect(scrollSpy).not.toHaveBeenCalled();
   });
 
   describe('paging computeds', () => {

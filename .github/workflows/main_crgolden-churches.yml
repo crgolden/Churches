@@ -47,6 +47,9 @@ jobs:
       - name: Type-check E2E specs
         run: npm run typecheck:e2e
 
+      - name: Type-check unit specs
+        run: npm run typecheck:spec
+
       - name: Run unit tests with coverage
         run: npm run test:coverage
 

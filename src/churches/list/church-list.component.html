@@ -1,8 +1,4 @@
-@if (loading()) {
-  <div class="page-container page-section">
-    <p class="text-muted">Loading results...</p>
-  </div>
-} @else if (error()) {
+@if (error()) {
   <div class="page-container page-section">
     <p class="text-error">{{ error() }}</p>
   </div>

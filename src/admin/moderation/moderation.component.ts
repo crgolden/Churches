@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { ChurchApiService } from '../../shared/church.service';
 import { PagedResult, UserCorrection } from '../../shared/models';
 
@@ -12,15 +13,22 @@ import { PagedResult, UserCorrection } from '../../shared/models';
 })
 export class ModerationComponent implements OnInit {
   private readonly api = inject(ChurchApiService);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly corrections = signal<PagedResult<UserCorrection> | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
   ngOnInit(): void {
-    this.load();
+    const resolved = (this.route.snapshot.data['corrections'] ?? null) as PagedResult<UserCorrection> | null;
+    if (resolved === null) {
+      this.error.set('Failed to load corrections.');
+      return;
+    }
+    this.corrections.set(resolved);
   }
 
+  /** Post-mutation refetch only: approve/reject change the list, so it is re-read after they land. */
   private load(): void {
     this.loading.set(true);
     this.api.getCorrections(0).subscribe({

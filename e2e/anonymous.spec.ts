@@ -2,6 +2,41 @@ import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js
 import type { ChurchRecord } from './fixtures.js';
 import { expectLeafletStylesheetApplied, expectTileLayerMounted } from './map-assertions.js';
 
+const SCROLL_RESTORE_TOLERANCE_PX = 40;
+
+function churchNumbered(index: number): ChurchRecord {
+  const padded = String(index).padStart(3, '0');
+  return {
+    id: crypto.randomUUID(),
+    canonicalName: `Church ${padded}`,
+    slug: `church-${padded}-city-tx`,
+    latitude: 30.0,
+    longitude: -97.0,
+    street: null,
+    city: 'City',
+    state: 'TX',
+    zip: '78700',
+    phoneNumber: null,
+    website: null,
+    emailAddress: null,
+    denominationId: null,
+    worshipStyle: 1,
+    primaryLanguage: 'English',
+    acceptsLGBTQ: null,
+    wheelchairAccessible: null,
+    hasNursery: null,
+    hasYouthProgram: null,
+    confidenceScore: 0.5,
+    lastVerifiedAt: null,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    schedules: [],
+    ministries: [],
+    campuses: [],
+  };
+}
+
 test.describe('SSR — raw HTML assertions', () => {
   test('churches list page is server-rendered with SEO tags', async ({ request, store }) => {
     await store.reset();
@@ -270,4 +305,48 @@ test.describe('ChurchList', () => {
     await page.waitForURL('**/churches/first-baptist-church-austin-tx**');
     await expect(page.locator('#church-name')).toContainText('First Baptist Church Austin');
   });
+
+  test('paging forward scrolls to the top of the new page', async ({
+    anonymousPage: page,
+    store,
+  }) => {
+    await store.reset();
+    for (let i = 0; i < 25; i++) {
+      await store.seedChurch(churchNumbered(i));
+    }
+
+    await page.goto('/churches?q=Church&page=1&pageSize=20');
+    await expect(page.locator('#btn-next-page')).toBeEnabled();
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    await page.locator('#btn-next-page').click();
+    await page.waitForURL('**page=2**');
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
+  test.fixme(
+    'going back restores the reader position',
+    async ({ anonymousPage: page, store }) => {
+      await store.reset();
+      for (let i = 0; i < 25; i++) {
+        await store.seedChurch(churchNumbered(i));
+      }
+
+      await page.goto('/churches?q=Church&page=1&pageSize=20');
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+      const readerPosition = await page.evaluate(() => window.scrollY);
+
+      await page.locator('#btn-next-page').click();
+      await page.waitForURL('**page=2**');
+
+      await page.goBack();
+      await page.waitForURL('**page=1**');
+      await expect
+        .poll(() => page.evaluate(() => window.scrollY))
+        .toBeGreaterThanOrEqual(readerPosition - SCROLL_RESTORE_TOLERANCE_PX);
+    },
+  );
 });

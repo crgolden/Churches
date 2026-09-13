@@ -54,8 +54,21 @@ export class ChurchDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.slug = this.route.snapshot.paramMap.get('slug');
-    if (!this.slug) return;
-    this.loadChurch();
+    this.applyChurch((this.route.snapshot.data['church'] ?? null) as Church | null);
+  }
+
+  private applyChurch(church: Church | null): void {
+    if (church === null) {
+      this.error.set('Church not found.');
+      if (this.responseInit) {
+        this.responseInit.status = 404;
+      }
+      this.seo.setNoIndex();
+      return;
+    }
+    this.error.set(null);
+    this.church.set(church);
+    this.seo.setChurchMeta(church);
   }
 
   protected worshipStyleLabel(value: number): string {

@@ -31,6 +31,7 @@ module.exports = tseslint.config(
       '@typescript-eslint/unbound-method': ['error', { ignoreStatic: true }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'no-inline-comments': 'error',
+      'crgolden/no-component-data-fetch': 'error',
       'crgolden/no-component-navigation': [
         'error',
         { exemptMethods: ['search', 'changeSort', 'changePageSize'] },

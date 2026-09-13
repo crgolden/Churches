@@ -29,6 +29,9 @@ const GRACE_CHURCH: Church = {
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
   isActive: true,
+  schedules: [],
+  ministries: [],
+  campuses: [],
 };
 
 describe('SeoService', () => {

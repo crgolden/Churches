@@ -335,7 +335,8 @@ describe('directoryProxy', () => {
       body: undefined,
     });
 
-    (req as Record<string, unknown>)[Symbol.asyncIterator] = async function* () {
+    const streamingReq = req as unknown as { [Symbol.asyncIterator]: () => AsyncGenerator<string> };
+    streamingReq[Symbol.asyncIterator] = async function* () {
       yield '{"test":true}';
     };
 

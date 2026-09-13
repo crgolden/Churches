@@ -62,6 +62,9 @@ describe('ChurchMapComponent', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isActive: true,
+      schedules: [],
+      ministries: [],
+      campuses: [],
     },
     distanceMiles: null,
   });
@@ -93,10 +96,7 @@ describe('ChurchMapComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    const L = await import('leaflet');
-    const onCalls = vi.mocked(L.default.marker).mock.results
-      .map((r: { value: { on: ReturnType<typeof vi.fn> } }) => r.value.on.mock.calls as [string, () => void][])
-      .flat();
+    const onCalls = markerStub.on.mock.calls as [string, () => void][];
     const handler = onCalls.find(c => c[0] === 'click')?.[1];
     handler?.();
 

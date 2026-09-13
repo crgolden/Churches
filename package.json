@@ -14,6 +14,7 @@
     "e2e": "npm run build:ci && playwright test --project=e2e",
     "e2e:synthetic": "playwright test --project=synthetic",
     "typecheck:e2e": "tsc -p tsconfig.e2e.json",
+    "typecheck:spec": "tsc -p tsconfig.spec.json --noEmit",
     "playwright:install": "playwright install --with-deps chromium"
   },
   "private": true,
@@ -62,7 +63,7 @@
     "@angular/build": "^22.1.7",
     "@angular/cli": "^22.1.7",
     "@angular/compiler-cli": "^22.1.5",
-    "@crgolden/modules": "0.3.5",
+    "@crgolden/modules": "0.4.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@types/express": "^5.0.6",

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ContributeComponent } from './contribute.component';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
@@ -22,7 +22,12 @@ describe('ContributeComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ContributeComponent],
-      providers: [provideRouter([]), provideHttpClient(withXhr()), provideHttpClientTesting()],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withXhr()),
+        provideHttpClientTesting(),
+        { provide: ActivatedRoute, useValue: { snapshot: { data: { church: mockChurch } } } },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ContributeComponent);
@@ -37,8 +42,13 @@ describe('ContributeComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('submit does nothing when church is null', () => {
-    expect(component['church']()).toBeNull();
+  it('takes the church from the resolver rather than fetching it', () => {
+    expect(component['church']()).toBe(mockChurch as never);
+    controller.expectNone(() => true);
+  });
+
+  it('submit does nothing when there is no church', () => {
+    component['church'].set(null);
     component['submit']();
     controller.expectNone(() => true);
   });
