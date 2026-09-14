@@ -28,8 +28,7 @@ export class ModerationComponent implements OnInit {
     this.corrections.set(resolved);
   }
 
-  /** Post-mutation refetch only: approve/reject change the list, so it is re-read after they land. */
-  private load(): void {
+  private reloadAfterMutation(): void {
     this.loading.set(true);
     this.api.getCorrections(0).subscribe({
       next: result => { this.corrections.set(result); this.loading.set(false); },
@@ -39,14 +38,14 @@ export class ModerationComponent implements OnInit {
 
   protected approve(id: string): void {
     this.api.approveCorrection(id).subscribe({
-      next: () => this.load(),
+      next: () => this.reloadAfterMutation(),
       error: () => this.error.set('Failed to approve correction.'),
     });
   }
 
   protected reject(id: string): void {
     this.api.rejectCorrection(id).subscribe({
-      next: () => this.load(),
+      next: () => this.reloadAfterMutation(),
       error: () => this.error.set('Failed to reject correction.'),
     });
   }

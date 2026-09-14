@@ -46,12 +46,16 @@ describe('searchParamsFrom', () => {
     expect(params['pageSize']).toBe(requestedPageSize);
   });
 
-  it('sends no filter for one the reader cleared, rather than an empty one', () => {
-    const params = searchParamsFrom({ denominationId: '', sort: '', startTimeAfter: '' });
+  it('sends nothing for a filter the reader cleared, exactly as for one never set', () => {
+    const cleared = searchParamsFrom({ denominationId: '', sort: '', startTimeAfter: '' });
+    const neverSet = searchParamsFrom({});
 
-    expect(params['denominationId']).toBeUndefined();
-    expect(params['sort']).toBeUndefined();
-    expect(params['startTimeAfter']).toBeUndefined();
+    expect(cleared['denominationId']).toBeUndefined();
+    expect(cleared['sort']).toBeUndefined();
+    expect(cleared['startTimeAfter']).toBeUndefined();
+    expect(neverSet['denominationId']).toBeUndefined();
+    expect(neverSet['sort']).toBeUndefined();
+    expect(neverSet['startTimeAfter']).toBeUndefined();
   });
 
   it('reads the accessibility filter as a boolean, including its false case', () => {

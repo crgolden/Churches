@@ -4,11 +4,6 @@ import { catchError, EMPTY, Observable } from 'rxjs';
 import { ChurchApiService } from '../../shared/church.service';
 import { Church } from '../../shared/models';
 
-/**
- * Correcting a church that cannot be loaded has no page to render, so this route redirects rather
- * than degrading to an inline state. The redirect lives here, not in the component, so the
- * component neither fetches nor navigates.
- */
 export const contributeChurchResolver: ResolveFn<Church> = (
   route: ActivatedRouteSnapshot,
 ): Observable<Church> => {

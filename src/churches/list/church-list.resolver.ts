@@ -6,7 +6,6 @@ import { SearchPagedResult } from '../../shared/models';
 
 export const DEFAULT_PAGE_SIZE = 20;
 
-/** An absent filter and a blank one mean the same thing to the API: send neither. */
 function omitBlank(value: string | undefined): string | undefined {
   return value === undefined || value.length === 0 ? undefined : value;
 }
