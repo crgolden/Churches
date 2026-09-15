@@ -24,7 +24,7 @@ npx vitest run             # one-shot
 npx vitest run --coverage  # LCOV → coverage/lcov.info
 ```
 
-Vitest runs with `pool: threads`, `fileParallelism: false`, `testTimeout: 15000`. Angular 22 is zoneless —
+Vitest runs with `pool: threads` and `fileParallelism: false`. Angular 22 is zoneless —
 always call `fixture.detectChanges()` manually.
 
 ---
@@ -118,8 +118,7 @@ Environment contract:
 | `WalkerBaseUrl` | Deployed app URL; also disables `webServer` |
 | `SYNTHETIC_SEED` | **Required** decimal uint32; the whole walk derives from it |
 | `SYNTHETIC_STEPS` | Optional step budget override (default 40) |
-| `EMAIL1` | Identity account the walker signs in as |
-| `PASSKEY_CREDENTIAL1` | That account's passkey, as the five-field JSON Playwright's virtual authenticator returns |
+| `PASSKEY_CREDENTIAL1` | The walker account's passkey, as the five-field JSON Playwright's virtual authenticator returns |
 
 **The walker signs in with a passkey, not a password.** Identity evaluates the passkey branch
 *before* the CAPTCHA, so this is a first-class production auth path rather than an exemption —
@@ -159,9 +158,9 @@ which is what makes a failure reproducible in practice.
 - **A walker timeout may be a performance finding rather than a test defect, so diagnose before
   raising a timeout.** Step 37 of a walk failed asserting `#result-count`, and the cause was a
   genuinely slow unfiltered search in Directory — fixed there, not papered over here. Post-
-  navigation assertions still route through `expectRendered` with an explicit timeout, because a
-  walker on a shared CI runner needs more headroom than Playwright's 5s default; that headroom
-  must never be the *answer* to a slow page.
+  navigation assertions route through `expectRendered`, which carries no timeout of its own
+  ([CODE-STYLE.md](../AGENTS/CODE-STYLE.md) rule 17): a page that needs more than Playwright's
+  default to render is the finding, not a reason for headroom.
 - Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`; the secret
   marker header goes to Identity-origin requests and, via redirect propagation, this app's own
   origin — never to third-party hosts (verified from a trace network log).

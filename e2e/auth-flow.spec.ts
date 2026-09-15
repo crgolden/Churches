@@ -9,7 +9,7 @@ test.describe('AuthFlow', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/contribute/first-baptist-church-austin-tx');
-    await page.waitForURL('**/bff/login**', { timeout: 10_000 });
+    await page.waitForURL('**/bff/login**');
     expect(page.url()).toContain('returnUrl');
   });
 

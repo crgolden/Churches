@@ -241,8 +241,7 @@ describe('applySession', () => {
 
     applySession(makeApp() as unknown as Express);
 
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-
-    expect(logger.error).toHaveBeenCalledWith({ err: connectError }, '[Redis] Initial connect failed');
+    await vi.waitFor(() =>
+      expect(logger.error).toHaveBeenCalledWith({ err: connectError }, '[Redis] Initial connect failed'));
   });
 });

@@ -3,10 +3,9 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 const SEARCH_KEYWORDS = ['grace', 'first', 'community', 'hope', 'faith', 'trinity', 'christ', 'saint'] as const;
 const SEARCH_STATES = ['TX', 'CA', 'FL', 'OH', 'GA', 'NC', 'PA', 'WA'] as const;
-const RENDER_TIMEOUT_MS = 30_000;
 
 async function expectRendered(locator: Locator): Promise<void> {
-  await expect(locator).toBeVisible({ timeout: RENDER_TIMEOUT_MS });
+  await expect(locator).toBeVisible();
 }
 
 async function expectResultsRendered(page: Page): Promise<void> {

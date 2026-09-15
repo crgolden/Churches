@@ -22,7 +22,7 @@ test.describe('ModerationQueue', () => {
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
 
     await page.goto('/admin/moderation');
-    await page.waitForFunction(() => window.location.pathname === '/', { timeout: 10_000 });
+    await page.waitForFunction(() => window.location.pathname === '/');
     expect(new URL(page.url()).pathname).toBe('/');
   });
 

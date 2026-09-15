@@ -18,7 +18,7 @@ test.describe('EdgeCases', () => {
 
     await page.goto('/');
     await page.goto('/churches/first-baptist-church-austin-tx', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(500);
+    await page.waitForFunction(() => document.querySelectorAll('[ngh]').length === 0);
 
     expect(errors).toHaveLength(0);
   });
@@ -37,7 +37,7 @@ test.describe('EdgeCases', () => {
 
     await page.goto('/');
     await page.goto('/churches/first-baptist-church-austin-tx', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(500);
+    await page.waitForFunction(() => document.querySelectorAll('[ngh]').length === 0);
 
     expect(errors).toHaveLength(0);
   });

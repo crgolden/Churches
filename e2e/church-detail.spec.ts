@@ -103,14 +103,14 @@ test.describe('ChurchDetail', () => {
     await scheduleResponsePromise;
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('#church-schedules')).toContainText('Wednesday 19:00', { timeout: 15_000 });
-    await expect(page.locator('#church-schedules')).toContainText('Midweek Prayer', { timeout: 15_000 });
+    await expect(page.locator('#church-schedules')).toContainText('Wednesday 19:00');
+    await expect(page.locator('#church-schedules')).toContainText('Midweek Prayer');
 
     const deleteResponsePromise = page.waitForResponse(r => r.url().includes('/schedules') && r.request().method() === 'DELETE');
     await page.locator("#church-schedules button[aria-label='Delete schedule']").click();
     await deleteResponsePromise;
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('#church-schedules li')).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.locator('#church-schedules li')).toHaveCount(0);
   });
 
   test('as moderator, can add a ministry', async ({ modPage: page, store }) => {
@@ -128,6 +128,6 @@ test.describe('ChurchDetail', () => {
     await ministryResponsePromise;
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('#church-ministries')).toContainText('Recovery Group', { timeout: 15_000 });
+    await expect(page.locator('#church-ministries')).toContainText('Recovery Group');
   });
 });

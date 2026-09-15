@@ -41,8 +41,6 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         baseURL: walkerBaseUrl ?? `http://localhost:${SSR_PORT}`,
         userAgent: `${devices['Desktop Chrome'].userAgent} crgolden-synthetic/1.0`,
-        actionTimeout: 30_000,
-        navigationTimeout: 60_000,
       },
     },
   ],

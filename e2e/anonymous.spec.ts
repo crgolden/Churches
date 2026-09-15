@@ -1,8 +1,16 @@
+import type { Page } from '@playwright/test';
 import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
 import type { ChurchRecord } from './fixtures.js';
 import { expectLeafletStylesheetApplied, expectTileLayerMounted } from './map-assertions.js';
 
 const SCROLL_RESTORE_TOLERANCE_PX = 40;
+
+function clickWithoutScrollingTheTargetIntoView(page: Page, selector: string): Promise<number> {
+  return page.evaluate((sel) => {
+    document.querySelector<HTMLElement>(sel)?.click();
+    return window.scrollY;
+  }, selector);
+}
 
 function churchNumbered(index: number): ChurchRecord {
   const padded = String(index).padStart(3, '0');
@@ -159,6 +167,11 @@ test.describe('SearchForm', () => {
   test('Near Me button click produces no console errors', async ({ anonymousPage: page, store }) => {
     await store.reset();
     await store.seedChurch(FIRST_BAPTIST_AUSTIN);
+    await page.context().grantPermissions(['geolocation']);
+    await page.context().setGeolocation({
+      latitude: FIRST_BAPTIST_AUSTIN.latitude,
+      longitude: FIRST_BAPTIST_AUSTIN.longitude,
+    });
 
     const errors: string[] = [];
     page.on('console', msg => {
@@ -167,7 +180,7 @@ test.describe('SearchForm', () => {
 
     await page.goto('/');
     await page.locator('#btn-near-me').click();
-    await page.waitForTimeout(500);
+    await expect(page.locator('#location-note')).toBeVisible();
 
     const unexpected = errors.filter(e => !e.includes('/bff/user') && !e.includes('401'));
     expect(unexpected).toHaveLength(0);
@@ -326,27 +339,26 @@ test.describe('ChurchList', () => {
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   });
 
-  test.fixme(
-    'going back restores the reader position',
-    async ({ anonymousPage: page, store }) => {
-      await store.reset();
-      for (let i = 0; i < 25; i++) {
-        await store.seedChurch(churchNumbered(i));
-      }
+  test('going back restores the reader position', async ({ anonymousPage: page, store }) => {
+    await store.reset();
+    for (let i = 0; i < 25; i++) {
+      await store.seedChurch(churchNumbered(i));
+    }
 
-      await page.goto('/churches?q=Church&page=1&pageSize=20');
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-      const readerPosition = await page.evaluate(() => window.scrollY);
+    await page.goto('/churches?q=Church&page=1&pageSize=20');
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    const readerPosition = await page.evaluate(() => window.scrollY);
 
-      await page.locator('#btn-next-page').click();
-      await page.waitForURL('**page=2**');
+    const positionAtNavigation = await clickWithoutScrollingTheTargetIntoView(page, '#btn-next-page');
+    expect(positionAtNavigation).toBe(readerPosition);
 
-      await page.goBack();
-      await page.waitForURL('**page=1**');
-      await expect
-        .poll(() => page.evaluate(() => window.scrollY))
-        .toBeGreaterThanOrEqual(readerPosition - SCROLL_RESTORE_TOLERANCE_PX);
-    },
-  );
+    await page.waitForURL('**page=2**');
+
+    await page.goBack();
+    await page.waitForURL('**page=1**');
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThanOrEqual(readerPosition - SCROLL_RESTORE_TOLERANCE_PX);
+  });
 });

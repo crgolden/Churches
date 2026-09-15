@@ -205,19 +205,16 @@ export const test = base.extend<ChurchesFixtures>({
 
   anonymousPage: async ({ page }, use) => {
     await applyAnonymousRoutes(page);
-    page.setDefaultTimeout(60_000);
     await use(page);
   },
 
   authedPage: async ({ page }, use) => {
     await applyAuthRoutes(page, USER_CLAIMS);
-    page.setDefaultTimeout(60_000);
     await use(page);
   },
 
   modPage: async ({ page }, use) => {
     await applyAuthRoutes(page, MOD_CLAIMS);
-    page.setDefaultTimeout(60_000);
     await use(page);
   },
 });

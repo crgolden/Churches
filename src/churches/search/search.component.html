@@ -27,7 +27,7 @@
              view rendered empty. Toggling an existing element's binding updates reliably. -->
         <p class="location-error" [hidden]="!locationError()">{{ locationError() }}</p>
         @if (lat() !== null && !locationError()) {
-          <p class="location-note">Using your location for nearby results</p>
+          <p id="location-note" class="location-note">Using your location for nearby results</p>
         }
 
         <div class="filter-grid">
