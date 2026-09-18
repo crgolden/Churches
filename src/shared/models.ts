@@ -84,7 +84,7 @@ export interface SearchPagedResult {
 export interface UserCorrection {
   id: string;
   churchId: string;
-  userId: string;
+  userId: string | null;
   field: string;
   oldValue: string | null;
   newValue: string;

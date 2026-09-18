@@ -70,7 +70,7 @@ export interface CampusRecord {
 export interface CorrectionRecord {
   id: string;
   churchId: string;
-  userId: string;
+  userId: string | null;
   field: string;
   oldValue: string | null;
   newValue: string;
@@ -428,7 +428,7 @@ export function createDirectoryApp(): Express {
     const record: CorrectionRecord = {
       id: newId(),
       churchId,
-      userId: 'e2e-user-id',
+      userId: newId(),
       field,
       oldValue: (body['oldValue'] as string | null) ?? null,
       newValue,
@@ -448,7 +448,7 @@ export function createDirectoryApp(): Express {
     corrections.set(correction.id, {
       ...correction,
       status: CorrectionStatus.Approved,
-      reviewedBy: 'e2e-mod-id',
+      reviewedBy: newId(),
       reviewedAt: now(),
     });
     res.status(204).end();
@@ -460,7 +460,7 @@ export function createDirectoryApp(): Express {
     corrections.set(correction.id, {
       ...correction,
       status: CorrectionStatus.Rejected,
-      reviewedBy: 'e2e-mod-id',
+      reviewedBy: newId(),
       reviewedAt: now(),
     });
     res.status(204).end();

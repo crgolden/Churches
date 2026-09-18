@@ -273,7 +273,8 @@ erDiagram
         uniqueidentifier ChurchId FK
         nvarchar Type "correction | merge (from dedup)"
         nvarchar Status "pending | approved | rejected"
-        nvarchar UserId "'system' for dedup suggestions"
+        uniqueidentifier UserId "submitter's sub; NULL for dedup suggestions"
+        uniqueidentifier ReviewedBy "moderator's sub"
     }
     ChurchAttributes {
         uniqueidentifier ChurchId FK
@@ -368,7 +369,7 @@ This is why the Directory API never has to defend against concurrent pipeline wr
 | `ContributionProcessor` | queue `contributions` | Insert pending `UserCorrections` row (does not apply the correction) |
 | `Email` | queue `email` | Deliver via Resend (used by Identity + Infrastructure alerts) |
 | `CrawlSchedulerWorker` | timer `0 0 */6 * * *` | Enqueue recrawls for sources older than `CrawlRefreshDays` (30), batches of 100 |
-| `DeduplicationJob` | timer `0 0 4 * * *` | 0.1-mile geo-grid + Jaro-Winkler ≥ 0.85 name similarity → writes `merge`-type `UserCorrections` rows (UserId `system`) for moderator review — it never auto-merges |
+| `DeduplicationJob` | timer `0 0 4 * * *` | 0.1-mile geo-grid + Jaro-Winkler ≥ 0.85 name similarity → writes `merge`-type `UserCorrections` rows (UserId `NULL`) for moderator review — it never auto-merges |
 | `SitemapGenerator` | timer `0 0 3 * * *` | Active church slugs, chunked to 50,000 URLs each → `$web/sitemaps/sitemap-{n}.xml.gz` (gzipped) + `$web/sitemap-index.xml` (URLs based on `ChurchesBaseUrl`) |
 | `QueueDepthMonitorJob` | timer `0 */15 * * * *` | Active + dead-letter message-count gauges for all 7 queues (needs Service Bus Data Owner) |
 | `BulkImportJob` | HTTP `POST /api/bulk-import?source=irs\|osm&blobPath=…` (admin key) | Seed from IRS 990 CSV / OSM JSON in `imports` container |
@@ -392,7 +393,7 @@ sequenceDiagram
     D-->>C: 202-style accept
     SB->>CP: deliver message
     CP->>DB: INSERT pending correction
-    Note over DB: DeduplicationJob also inserts<br/>'merge'-type rows here (UserId = system)
+    Note over DB: DeduplicationJob also inserts<br/>'merge'-type rows here (UserId = NULL)
     M->>C: review at /admin/moderation
     C->>D: PATCH /corrections/{id}/approve | reject (churches.mod)
     D->>DB: apply / mark rejected (direct write)

@@ -5,7 +5,7 @@ function pendingCorrection(): Omit<CorrectionRecord, 'createdAt'> {
   return {
     id: crypto.randomUUID(),
     churchId: FIRST_BAPTIST_AUSTIN.id,
-    userId: 'some-user-id',
+    userId: crypto.randomUUID(),
     field: 'street',
     oldValue: '901 Trinity St',
     newValue: '999 New St',
