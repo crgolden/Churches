@@ -21,7 +21,7 @@ import {
   type ScheduleRecord,
 } from './mocks/directory.js';
 import { e2eContract } from './mocks/e2e-contract.js';
-import { abortMapTiles } from './map-tiles.js';
+import { answerMapTilesWithNoContent } from './map-tiles.js';
 import { MediaTypes } from './media-type-constants.js';
 import { OidcClaimTypes } from './oidc-constants.js';
 import { CHURCHES_URL } from '../src/app/app-paths';
@@ -234,19 +234,19 @@ export const test = base.extend<ChurchesFixtures>({
   },
 
   anonymousPage: async ({ page }, use) => {
-    await abortMapTiles(page);
+    await answerMapTilesWithNoContent(page);
     await applyAnonymousRoutes(page);
     await use(page);
   },
 
   authedPage: async ({ page }, use) => {
-    await abortMapTiles(page);
+    await answerMapTilesWithNoContent(page);
     await applyAuthRoutes(page, USER_CLAIMS);
     await use(page);
   },
 
   modPage: async ({ page }, use) => {
-    await abortMapTiles(page);
+    await answerMapTilesWithNoContent(page);
     await applyAuthRoutes(page, MOD_CLAIMS);
     await use(page);
   },

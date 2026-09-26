@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TransferState } from '@angular/core';
 import { AuthService } from './auth.service';
 import type { Claim } from './claim';
+import { FETCHES_SESSION_ON_STARTUP } from './session-fetch';
 import { BFF_USER_RELATIVE_PATH, BffPaths, ClaimTypes, MODERATOR_CLAIM_VALUE, SID_QUERY_PARAMETER } from '../shared/bff-contract';
 
 const ALICE = crypto.randomUUID();
@@ -104,10 +105,42 @@ describe('AuthService', () => {
     expect(result).toEqual([]);
   });
 
+  it('fetches the session by default, so a browser and a rendered request both ask bff/user', () => {
+    expect(TestBed.inject(FETCHES_SESSION_ON_STARTUP)).toBe(true);
+  });
+
   it('initialize returns empty session when bff/user errors', () => {
     let result: Claim[] | null = null;
     service.initialize().subscribe((s) => (result = s));
     controller.expectOne(BFF_USER_RELATIVE_PATH).flush('', { status: HttpStatusCode.Unauthorized, statusText: crypto.randomUUID() });
     expect(result).toEqual([]);
+  });
+});
+
+describe('AuthService while the startup session fetch is off', () => {
+  let service: AuthService;
+  let controller: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        AuthService,
+        provideHttpClient(withXhr()),
+        provideHttpClientTesting(),
+        { provide: FETCHES_SESSION_ON_STARTUP, useValue: false },
+      ],
+    });
+    service = TestBed.inject(AuthService);
+    controller = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => controller.verify());
+
+  it('initialize asks bff/user nothing and leaves the visitor anonymous', () => {
+    let result: Claim[] | null = null;
+    service.initialize().subscribe((s) => (result = s));
+    controller.expectNone(BFF_USER_RELATIVE_PATH);
+    expect(result).toEqual([]);
+    expect(service.isAnonymous()).toBe(true);
   });
 });
