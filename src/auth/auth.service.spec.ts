@@ -1,8 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { HttpStatusCode, provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TransferState } from '@angular/core';
 import { AuthService } from './auth.service';
 import type { Claim } from './claim';
+import { BFF_USER_RELATIVE_PATH, BffPaths, ClaimTypes, MODERATOR_CLAIM_VALUE, SID_QUERY_PARAMETER } from '../shared/bff-contract';
+
+const ALICE = crypto.randomUUID();
+const BOB = crypto.randomUUID();
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -31,12 +36,12 @@ describe('AuthService', () => {
   });
 
   it('initialize fetches bff/user and updates signals', () => {
-    const claims: Claim[] = [{ type: 'name', value: 'Alice' }];
+    const claims: Claim[] = [{ type: ClaimTypes.name, value: ALICE }];
     service.initialize().subscribe();
-    controller.expectOne('bff/user').flush(claims);
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush(claims);
     expect(service.isAuthenticated()).toBe(true);
     expect(service.isAnonymous()).toBe(false);
-    expect(service.username()).toBe('Alice');
+    expect(service.username()).toBe(ALICE);
   });
 
   it('session returns empty array when unauthenticated', () => {
@@ -44,24 +49,25 @@ describe('AuthService', () => {
   });
 
   it('hasModerationScope returns true when claim present', () => {
-    const claims: Claim[] = [{ type: 'churches.mod', value: 'true' }];
+    const claims: Claim[] = [{ type: ClaimTypes.moderator, value: MODERATOR_CLAIM_VALUE }];
     service.initialize().subscribe();
-    controller.expectOne('bff/user').flush(claims);
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush(claims);
     expect(service.hasModerationScope()).toBe(true);
   });
 
   it('hasModerationScope returns false when claim absent', () => {
-    const claims: Claim[] = [{ type: 'name', value: 'Bob' }];
+    const claims: Claim[] = [{ type: ClaimTypes.name, value: BOB }];
     service.initialize().subscribe();
-    controller.expectOne('bff/user').flush(claims);
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush(claims);
     expect(service.hasModerationScope()).toBe(false);
   });
 
   it('logoutUrl returns the bff:logout_url claim value when authenticated', () => {
-    const claims: Claim[] = [{ type: 'bff:logout_url', value: '/bff/logout?sid=abc' }];
+    const logoutUrl = `${BffPaths.logout}?${SID_QUERY_PARAMETER}=${crypto.randomUUID()}`;
+    const claims: Claim[] = [{ type: ClaimTypes.logoutUrl, value: logoutUrl }];
     service.initialize().subscribe();
-    controller.expectOne('bff/user').flush(claims);
-    expect(service.logoutUrl()).toBe('/bff/logout?sid=abc');
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush(claims);
+    expect(service.logoutUrl()).toBe(logoutUrl);
   });
 
   it('logoutUrl returns null when unauthenticated', () => {
@@ -70,16 +76,38 @@ describe('AuthService', () => {
 
   it('refresh re-fetches bff/user', () => {
     service.initialize().subscribe();
-    controller.expectOne('bff/user').flush([]);
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush([]);
     service.refresh();
-    controller.expectOne('bff/user').flush([{ type: 'name', value: 'Bob' }]);
-    expect(service.username()).toBe('Bob');
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush([{ type: ClaimTypes.name, value: BOB }]);
+    expect(service.username()).toBe(BOB);
+  });
+
+  it('asks bff/user for the session and never carries it through TransferState', () => {
+    const claims: Claim[] = [{ type: ClaimTypes.name, value: ALICE }];
+
+    service.initialize().subscribe();
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush(claims);
+
+    expect(service.isAuthenticated()).toBe(true);
+    expect(service.username()).toBe(ALICE);
+
+    const transferred = TestBed.inject(TransferState).toJson();
+    expect(transferred).not.toContain(ALICE);
+  });
+
+  it('treats the null body bff/user answers an anonymous visitor with as signed out', () => {
+    let result: Claim[] | null = null;
+    service.initialize().subscribe((s) => (result = s));
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush(null);
+    expect(service.isAnonymous()).toBe(true);
+    expect(service.isAuthenticated()).toBe(false);
+    expect(result).toEqual([]);
   });
 
   it('initialize returns empty session when bff/user errors', () => {
     let result: Claim[] | null = null;
     service.initialize().subscribe((s) => (result = s));
-    controller.expectOne('bff/user').flush('', { status: 401, statusText: 'Unauthorized' });
+    controller.expectOne(BFF_USER_RELATIVE_PATH).flush('', { status: HttpStatusCode.Unauthorized, statusText: crypto.randomUUID() });
     expect(result).toEqual([]);
   });
 });

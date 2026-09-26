@@ -1,5 +1,6 @@
 import { expect } from './fixtures.js';
 import { computedStyleOf } from './computed-style.js';
+import { CssValues } from './css-constants.js';
 import type { Page } from '@playwright/test';
 
 export async function expectTileLayerMounted(page: Page, tilesId: string): Promise<void> {
@@ -12,8 +13,8 @@ export async function expectLeafletStylesheetApplied(
   tilesId: string,
 ): Promise<void> {
   const tileLayerPosition = await computedStyleOf(page, tilesId, 'position');
-  expect(tileLayerPosition).toBe('absolute');
+  expect(tileLayerPosition).toBe(CssValues.absolute);
 
   const mapContainerOverflow = await computedStyleOf(page, mapId, 'overflow');
-  expect(mapContainerOverflow).toContain('hidden');
+  expect(mapContainerOverflow).toContain(CssValues.hidden);
 }

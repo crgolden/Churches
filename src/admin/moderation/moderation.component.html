@@ -1,39 +1,71 @@
-<div class="page-container page-section moderation-page">
-  <h1 id="moderation-title">Moderation Queue</h1>
+<div crgPageContainer crgPageSection>
+  <h1 id="moderation-title" class="mb-6">Moderation Queue</h1>
+  <p id="moderation-error-announcement" class="sr-only" [attr.role]="ariaRoles.status">{{ error() }}</p>
   @if (error()) {
-    <p class="text-error">{{ error() }}</p>
+    <p id="moderation-error" class="m-0 text-meta text-danger">{{ error() }}</p>
+  }
+  <p id="moderation-notice-announcement" class="sr-only" [attr.role]="ariaRoles.status">{{ notice() }}</p>
+  @if (notice()) {
+    <p id="moderation-notice" class="text-meta text-text-muted">{{ notice() }}</p>
   }
   @if (loading()) {
-    <p class="text-muted">Loading...</p>
+    <p class="text-meta text-text-muted">Loading...</p>
   } @else if ((corrections()?.items?.length ?? 0) === 0) {
-    <div class="table-card card">
-      <p id="moderation-empty" class="empty-state text-muted">No pending corrections.</p>
+    <div crgCard class="overflow-x-auto">
+      <p id="moderation-empty" class="p-8 text-center text-meta text-text-muted">No pending corrections.</p>
     </div>
   } @else {
-    <div class="table-card card">
-      <table>
+    <div crgCard class="overflow-x-auto">
+      <table class="w-full min-w-[640px] border-collapse text-meta">
         <thead>
           <tr>
-            <th class="eyebrow">Church</th>
-            <th class="eyebrow">Field</th>
-            <th class="eyebrow">Old Value</th>
-            <th class="eyebrow">New Value</th>
-            <th class="eyebrow">Submitted</th>
-            <th class="eyebrow">Actions</th>
+            <th appEyebrow class="border-b border-line bg-accent/5 px-4 py-3 text-left">Church</th>
+            <th appEyebrow class="border-b border-line bg-accent/5 px-4 py-3 text-left">Field</th>
+            <th appEyebrow class="border-b border-line bg-accent/5 px-4 py-3 text-left">Old Value</th>
+            <th appEyebrow class="border-b border-line bg-accent/5 px-4 py-3 text-left">New Value</th>
+            <th appEyebrow class="border-b border-line bg-accent/5 px-4 py-3 text-left">Submitted</th>
+            <th appEyebrow class="border-b border-line bg-accent/5 px-4 py-3 text-left">Actions</th>
           </tr>
         </thead>
         <tbody>
           @for (c of corrections()?.items ?? []; track c.id) {
-            <tr [attr.id]="'correction-row-' + $index">
-              <td [attr.id]="'correction-church-' + $index">{{ c.churchName ?? c.churchId }}</td>
-              <td [attr.id]="'correction-field-' + $index">{{ c.field }}</td>
-              <td [attr.id]="'correction-old-value-' + $index">{{ c.oldValue ?? '&mdash;' }}</td>
-              <td [attr.id]="'correction-new-value-' + $index">{{ c.newValue }}</td>
-              <td [attr.id]="'correction-submitted-' + $index">{{ c.createdAt | date }}</td>
-              <td>
-                <div class="actions">
-                  <button [attr.id]="'btn-approve-' + $index" class="btn-primary btn-sm" (click)="approve(c.id)">Approve</button>
-                  <button [attr.id]="'btn-reject-' + $index" class="btn-ghost btn-ghost-danger btn-sm" (click)="reject(c.id)">Reject</button>
+            <tr class="[&:last-child>td]:border-b-0" [attr.id]="'correction-row-' + $index" [attr.data-correction-id]="c.id">
+              <td class="border-b border-line px-4 py-3 align-middle" [attr.id]="'correction-church-' + $index">
+                @if (c.churchSlug) {
+                  <a [attr.id]="'correction-church-link-' + $index" [routerLink]="['/churches', c.churchSlug]">{{ c.churchName ?? c.churchId }}</a>
+                } @else {
+                  {{ c.churchName ?? c.churchId }}
+                }
+              </td>
+              <td class="border-b border-line px-4 py-3 align-middle" [attr.id]="'correction-field-' + $index">{{ c.field }}</td>
+              <td class="border-b border-line px-4 py-3 align-middle" [attr.id]="'correction-old-value-' + $index">{{ c.oldValue ?? '&mdash;' }}</td>
+              <td class="border-b border-line px-4 py-3 align-middle" [attr.id]="'correction-new-value-' + $index">
+                @if (isMerge(c)) {
+                  @if (c.targetChurchSlug) {
+                    <a [attr.id]="'correction-target-link-' + $index" [routerLink]="['/churches', c.targetChurchSlug]">{{ c.targetChurchName ?? c.newValue }}</a>
+                  } @else {
+                    {{ c.targetChurchName ?? c.newValue }}
+                  }
+                } @else {
+                  {{ c.newValue }}
+                }
+              </td>
+              <td class="border-b border-line px-4 py-3 align-middle" [attr.id]="'correction-submitted-' + $index">{{ c.createdAt | date }}</td>
+              <td class="border-b border-line px-4 py-3 align-middle">
+                <div class="flex gap-2">
+                  @if (isMerge(c)) {
+                    <button
+                      [attr.id]="'btn-keep-church-' + $index"
+                      crgButtonPrimarySmall
+                      (click)="approve(c.id, c.churchId)">Keep {{ c.churchName ?? c.churchId }}</button>
+                    <button
+                      [attr.id]="'btn-keep-target-' + $index"
+                      crgButtonPrimarySmall
+                      (click)="approve(c.id, c.newValue)">Keep {{ c.targetChurchName ?? c.newValue }}</button>
+                  } @else {
+                    <button [attr.id]="'btn-approve-' + $index" crgButtonPrimarySmall (click)="approve(c.id)">Approve</button>
+                  }
+                  <button [attr.id]="'btn-reject-' + $index" crgButtonGhostDangerSmall (click)="reject(c.id)">Reject</button>
                 </div>
               </td>
             </tr>
@@ -41,5 +73,32 @@
         </tbody>
       </table>
     </div>
+    @if (totalPages() > 1) {
+      <nav aria-label="Moderation queue pages">
+        <span id="moderation-showing" class="text-meta text-text-muted">
+          Page {{ page() }} of {{ totalPages() }} &mdash; {{ corrections()?.totalCount }} pending
+        </span>
+        <div>
+          @if (page() > 1) {
+            <a
+              id="btn-prev-corrections"
+              crgButtonGhost
+              [routerLink]="[]"
+              [queryParams]="{ page: page() - 1 }"
+              queryParamsHandling="merge"
+              rel="prev">&larr; Previous</a>
+          }
+          @if (page() < totalPages()) {
+            <a
+              id="btn-next-corrections"
+              crgButtonGhost
+              [routerLink]="[]"
+              [queryParams]="{ page: page() + 1 }"
+              queryParamsHandling="merge"
+              rel="next">Next &rarr;</a>
+          }
+        </div>
+      </nav>
+    }
   }
 </div>

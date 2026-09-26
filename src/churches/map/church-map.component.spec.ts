@@ -1,7 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
+import {
+  LARGEST_PERCENT,
+  newDisplayName,
+  newMemberOf,
+  newPathSegment,
+  newPercent,
+  newText,
+  newUtcInstant,
+  randomIntBetween,
+} from '@crgolden/modules/testing';
 import { ChurchMapComponent } from './church-map.component';
-import type { SearchResult } from '../../shared/models';
+import { US_STATES, WORSHIP_STYLES, type SearchResult } from '../../shared/models';
+import { CHURCH_MAP_TILES_ID, MARKER_CLICK_EVENT } from './map-ids';
 
 const tileLayerElement = document.createElement('div');
 
@@ -36,31 +47,31 @@ describe('ChurchMapComponent', () => {
   let component: ChurchMapComponent;
   let fixture: ComponentFixture<ChurchMapComponent>;
 
-  const makeResult = (slug: string, lat: number, lng: number): SearchResult => ({
+  const makeResult = (): SearchResult => ({
     church: {
       id: crypto.randomUUID(),
-      canonicalName: slug,
-      slug,
-      latitude: lat,
-      longitude: lng,
+      canonicalName: newDisplayName(),
+      slug: newPathSegment(),
+      latitude: randomIntBetween(-89, 90),
+      longitude: randomIntBetween(-179, 180),
       street: null,
-      city: 'Denver',
-      state: 'CO',
-      zip: '80201',
+      city: newText(),
+      state: newMemberOf(US_STATES).code,
+      zip: newText(),
       phoneNumber: null,
       website: null,
       emailAddress: null,
       denominationId: null,
-      worshipStyle: 1,
-      primaryLanguage: 'English',
+      worshipStyle: newMemberOf(WORSHIP_STYLES).value,
+      primaryLanguage: newText(),
       acceptsLGBTQ: null,
       wheelchairAccessible: null,
       hasNursery: null,
       hasYouthProgram: null,
-      confidenceScore: 0.9,
+      confidenceScore: newPercent() / LARGEST_PERCENT,
       lastVerifiedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: newUtcInstant(),
+      updatedAt: newUtcInstant(),
       isActive: true,
       schedules: [],
       ministries: [],
@@ -92,22 +103,19 @@ describe('ChurchMapComponent', () => {
     const emitted: string[] = [];
     component.markerClick.subscribe((slug: string) => emitted.push(slug));
 
-    fixture.componentRef.setInput('items', [makeResult('grace-church', 39.7, -104.9)]);
+    fixture.componentRef.setInput('items', [makeResult()]);
     fixture.detectChanges();
     await fixture.whenStable();
 
     const onCalls = markerStub.on.mock.calls as [string, () => void][];
-    const handler = onCalls.find(c => c[0] === 'click')?.[1];
+    const handler = onCalls.find(c => c[0] === MARKER_CLICK_EVENT)?.[1];
     handler?.();
 
     expect(component.markerClick).toBeTruthy();
   });
 
   it('accepts items signal input without throwing', async () => {
-    const items: SearchResult[] = [
-      makeResult('a', 39.7, -104.9),
-      makeResult('b', 39.8, -105.0),
-    ];
+    const items: SearchResult[] = [makeResult(), makeResult()];
     fixture.componentRef.setInput('items', items);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -117,7 +125,7 @@ describe('ChurchMapComponent', () => {
   it('names the tile layer so a test can select it without a Leaflet class', async () => {
     fixture.detectChanges();
 
-    await vi.waitFor(() => expect(tileLayerElement.id).toBe('church-map-tiles'));
+    await vi.waitFor(() => expect(tileLayerElement.id).toBe(CHURCH_MAP_TILES_ID));
   });
 
 });

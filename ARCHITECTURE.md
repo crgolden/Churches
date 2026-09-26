@@ -88,7 +88,7 @@ flowchart TD
     B --- BY["yes"] --> C{"GET /health?"}
     C --- CY["yes"] --> C1["200 'Healthy'<br/>(before logging — keeps logs clean)"]
     C --- CN["no"] --> D["requestLogger (pino)"]
-    D --> E["applySession<br/>(connect-redis, or in-memory when RedisHost unset)"]
+    D --> E["applySession<br/>(connect-redis, or in-memory when SessionStore=memory)"]
     E --> F{"/bff/* ?"}
     F --- FY["yes"] --> F1["BFF router<br/>login / callback / user / logout"]
     F --- FN["no"] --> G{"/directory/api/** ?"}
@@ -131,8 +131,8 @@ sequenceDiagram
 ```
 
 - The session cookie is `sameSite: 'lax'` — `Strict` breaks the OIDC callback (the redirect back from Identity is a cross-site navigation, so a Strict cookie wouldn't be sent and the callback couldn't find the session's PKCE verifier). `secure` in production.
-- Sessions live in Redis via `connect-redis` when `RedisHost` is set and `SessionStore` is not `memory`; otherwise `express-session`'s built-in `MemoryStore`, whose sessions don't survive a restart. Note what does *not* enter that decision: `NODE_ENV` has no say in which store is chosen. It governs only whether the Redis socket uses TLS, and it makes `applySession` warn when it has selected `MemoryStore` in production — which is the one combination the environment variable can detect but not prevent.
-- `/bff/user` returns the session's claims (requires the `X-CSRF` header) and appends a `bff:logout_url` claim carrying the session ID; `/bff/logout` verifies that sid matches the live session before doing RP-initiated logout at Identity. `/bff/login` and `/bff/callback` are browser-navigation redirects, not XHR/fetch calls, so they're exempt from the `X-CSRF` check — PKCE plus the `state` parameter protect them instead; `/bff/logout`'s CSRF protection is the server-issued `sid` query parameter rather than the header.
+- Sessions live in Redis via `connect-redis` unless `SessionStore=memory` selects `express-session`'s built-in `MemoryStore`, whose sessions don't survive a restart. **Nothing falls back silently**: without `SessionStore=memory`, a missing `RedisHost` or a missing or non-integer `RedisPort` throws at startup, and so does a missing `SessionSecret` (`src/bff/settings.ts`), so the process never runs on an in-memory store or a per-process secret by accident. `NODE_ENV` has no say in which store is chosen. It governs only whether the Redis socket uses TLS, and it makes `applySession` warn when `SessionStore=memory` is set in production.
+- `/bff/user` returns the session's claims (requires the `X-CSRF` header) and appends a `bff:logout_url` claim carrying the session ID. A visitor with no session gets `200` with a `null` body: a non-2xx would put a line in the browser console that no script can suppress. The body must be `null` and never `[]`, because `AuthService` reads a non-null body as signed in, and `null` keeps "no session" distinct from "a session with no claims". This is the shape of Duende BFF's `AnonymousSessionResponse.Response200` option. `src/bff/routes.spec.ts` pins the exact body. `/bff/logout` verifies that sid matches the live session before doing RP-initiated logout at Identity. `/bff/login` and `/bff/callback` are browser-navigation redirects, not XHR/fetch calls, so they're exempt from the `X-CSRF` check — PKCE plus the `state` parameter protect them instead; `/bff/logout`'s CSRF protection is the server-issued `sid` query parameter rather than the header.
 - Known quirk: `/bff/login` accepts but ignores the `returnUrl` query parameter that `authGuard` appends — after login you land on the app root, not the page that triggered the redirect.
 
 ### Proxying to the Directory API
@@ -180,6 +180,7 @@ This gives **UserOrNone parity** with the Directory API's auth model: authentica
 The split is deliberate: anonymous routes are `RenderMode.Server` because they are the SEO surface; authenticated routes are `RenderMode.Client` because SSR has no session and would render a useless logged-out shell. `AuthService.initialize()` no-ops under `isPlatformServer` for the same reason.
 
 - **Every route that needs data gets it from a resolver, and the two church-loading resolvers fail in opposite directions on purpose.** `churchDetailResolver` degrades to `null` so the route still activates and `NotFoundComponent` can render a real 404 against the URL the reader asked for (see the SEO section). `contributeChurchResolver` redirects to `/` and emits nothing, because a correction form for a church that cannot be loaded has no page to render at all.
+- **The results pager omits Previous on the first page and Next on the last, rather than disabling them**, following the [USWDS pagination guidance](https://designsystem.digital.gov/components/pagination/). A disabled control leaves the reader to work out why it is dead, and would identify "Previous" as a link on one page and a button on another. The page the reader is on is already stated by the range indicator and `aria-current="page"`. Each page-number link carries `aria-label="Page N"`, so a screen reader announces a page rather than a bare number. `church-list.component.spec.ts` pins all three, and the synthetic walker offers a page turn only when its control is present.
 - **Zoneless** change detection (`provideZonelessChangeDetection()`) with hydration + event replay.
 - `AuthService` exposes signals; `hasModerationScope` is true when the claim `churches.mod === 'true'`. `authGuard` hard-navigates to `/bff/login` (a full page load — the login flow is server-side); `modGuard` returns a UrlTree to `/`.
 - **That claim reaches the browser from the access token.** `churches.mod` is attached to the `directory` API scope and to no identity resource, so it is absent from the ID token and from userinfo. `/bff/callback` merges `tokens.claims()` and `fetchUserInfo(...)` with `accessTokenClaims(...)`, which decodes the access-token payload and copies a short allowlist — currently just `churches.mod`. Server-side enforcement in Directory does not depend on this merge; the browser's moderation UI does. The E2E suite mocks `/bff/user` wholesale and cannot detect which path the claim arrived by; the discriminating test is in `src/bff/routes.spec.ts`.
@@ -222,7 +223,9 @@ JWT Bearer validation against Identity with `ValidateAudience = false` and `MapI
 | `Admin/` | `POST /admin/import` (CSV), `GET /admin/export` (CSV stream) | `ChurchesMod` |
 | `User/` | `GET /me` | Anonymous |
 
-> **Known quirk:** `GET /me` computes its `HasModerationScope` field by looking for a `scope = churches.mod` claim, while the `ChurchesMod` policy that actually gates moderation endpoints checks the claim `churches.mod = true`. These are different claim shapes; the two can disagree depending on how the token is minted.
+`GET /me` reports identity only and carries no moderation flag. The browser's flag is read in `src/auth/auth.service.ts` from the BFF session claim that `ACCESS_TOKEN_CLAIM_ALLOWLIST` merges at `/bff/callback` (`src/bff/routes.ts`), which is the same `churches.mod` claim the `ChurchesMod` policy enforces, so the UI and the API answer from one source.
+
+`/me` previously returned a `HasModerationScope` boolean derived from a `scope` claim carrying `churches.mod`, a shape Identity does not mint: `churches.mod` is an `ApiScopeClaim` on the `directory` scope, so it arrives under its own claim type while `scope` carries `directory`. The field was therefore false for every user, including moderators, and nothing noticed because nothing read it. It was **removed rather than corrected**: a second answer on a public response DTO is one a future client can read, and correcting it would have left two places to hold in agreement for a fact this app already computes correctly.
 
 ### Search internals
 
@@ -313,7 +316,7 @@ All church data acquisition is an Azure Functions isolated worker driven by Serv
 
 ```mermaid
 flowchart TD
-    CS["CrawlSchedulerWorker<br/>timer: every 6h<br/>re-enqueues sources older than CrawlRefreshDays (30)"]
+    CS["CrawlSchedulerWorker<br/>timer: every 6h<br/>re-enqueues sources older than CrawlRefreshDays"]
     TRG["Directory API<br/>POST /crawl-sources/{id}/trigger"]
     BIJ["BulkImportJob (HTTP admin)<br/>IRS 990 CSV / OSM JSON from 'imports' blob container"]
 
@@ -368,7 +371,7 @@ This is why the Directory API never has to defend against concurrent pipeline wr
 | `CalculateConfidenceScore` | queue `confidence-requests` | Recompute `ConfidenceScore` from attributes (`ConfidenceScoreCalculator`, lives in this repo) |
 | `ContributionProcessor` | queue `contributions` | Insert pending `UserCorrections` row (does not apply the correction) |
 | `Email` | queue `email` | Deliver via Resend (used by Identity + Infrastructure alerts) |
-| `CrawlSchedulerWorker` | timer `0 0 */6 * * *` | Enqueue recrawls for sources older than `CrawlRefreshDays` (30), batches of 100 |
+| `CrawlSchedulerWorker` | timer `0 0 */6 * * *` | Enqueue recrawls for sources older than `CrawlRefreshDays`, in batches of `CrawlSchedulerBatchSize` (both required settings) |
 | `DeduplicationJob` | timer `0 0 4 * * *` | 0.1-mile geo-grid + Jaro-Winkler ≥ 0.85 name similarity → writes `merge`-type `UserCorrections` rows (UserId `NULL`) for moderator review — it never auto-merges |
 | `SitemapGenerator` | timer `0 0 3 * * *` | Active church slugs, chunked to 50,000 URLs each → `$web/sitemaps/sitemap-{n}.xml.gz` (gzipped) + `$web/sitemap-index.xml` (URLs based on `ChurchesBaseUrl`) |
 | `QueueDepthMonitorJob` | timer `0 */15 * * * *` | Active + dead-letter message-count gauges for all 7 queues (needs Service Bus Data Owner) |

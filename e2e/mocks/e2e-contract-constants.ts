@@ -1,0 +1,1 @@
+export const E2E_CONTRACT_VARIABLE = 'E2E_CONTRACT';

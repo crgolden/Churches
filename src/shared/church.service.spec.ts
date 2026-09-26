@@ -1,7 +1,25 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { newCount, randomIntBetween } from '@crgolden/modules/testing';
 import { ChurchApiService } from './church.service';
+import { DEFAULT_PAGE_SIZE, DirectoryApi, SearchParamNames } from './directory-api';
+import { DAYS_OF_WEEK, WORSHIP_STYLES } from './models';
+import { HttpMethods } from '../bff/http-headers';
+
+const OPTIONAL_SEARCH_PARAMS = [
+  SearchParamNames.q,
+  SearchParamNames.lat,
+  SearchParamNames.lng,
+  SearchParamNames.radiusMiles,
+  SearchParamNames.state,
+  SearchParamNames.denominationId,
+  SearchParamNames.worshipStyle,
+  SearchParamNames.wheelchairAccessible,
+  SearchParamNames.dayOfWeek,
+  SearchParamNames.startTimeBefore,
+  SearchParamNames.startTimeAfter,
+];
 
 describe('ChurchApiService', () => {
   let service: ChurchApiService;
@@ -17,106 +35,120 @@ describe('ChurchApiService', () => {
 
   afterEach(() => controller.verify());
 
-  it('getDenominations hits /directory/api/denominations', () => {
+  it('getDenominations hits the denominations route', () => {
     service.getDenominations().subscribe();
-    controller.expectOne('/directory/api/denominations').flush([]);
+    controller.expectOne(DirectoryApi.denominations).flush([]);
   });
 
-  it('getChurches hits /directory/api/churches with page params', () => {
-    service.getChurches(2, 10).subscribe();
-    const req = controller.expectOne((r) => r.url.includes('/churches'));
-    expect(req.request.params.get('page')).toBe('2');
-    req.flush({ items: [], totalCount: 0, page: 2, pageSize: 10 });
+  it('getChurches hits the churches route with page params', () => {
+    const page = newCount() + 1;
+    const pageSize = newCount();
+    service.getChurches(page, pageSize).subscribe();
+    const req = controller.expectOne(r => r.url === DirectoryApi.churches);
+    expect(req.request.params.get(SearchParamNames.page)).toBe(String(page));
+    req.flush({ items: [], totalCount: 0, page, pageSize });
   });
 
-  it('getChurchBySlug hits /directory/api/churches/{slug}', () => {
-    service.getChurchBySlug('grace-church').subscribe();
-    controller.expectOne('/directory/api/churches/grace-church').flush({});
+  it('getChurchBySlug hits the church route for that slug', () => {
+    const slug = crypto.randomUUID();
+    service.getChurchBySlug(slug).subscribe();
+    controller.expectOne(DirectoryApi.church(slug)).flush({});
   });
 
-  it('search with no optional params sends only page and pageSize', () => {
-    service.search({ page: 1, pageSize: 20 }).subscribe();
-    const req = controller.expectOne((r) => r.url.includes('/search'));
-    expect(req.request.params.has('q')).toBe(false);
-    expect(req.request.params.has('lat')).toBe(false);
-    expect(req.request.params.has('lng')).toBe(false);
-    expect(req.request.params.has('radiusMiles')).toBe(false);
-    expect(req.request.params.has('state')).toBe(false);
-    expect(req.request.params.has('denominationId')).toBe(false);
-    expect(req.request.params.has('worshipStyle')).toBe(false);
-    expect(req.request.params.has('wheelchairAccessible')).toBe(false);
-    expect(req.request.params.has('dayOfWeek')).toBe(false);
-    expect(req.request.params.has('startTimeBefore')).toBe(false);
-    expect(req.request.params.has('startTimeAfter')).toBe(false);
-    expect(req.request.params.get('page')).toBe('1');
-    req.flush({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+  it.each(OPTIONAL_SEARCH_PARAMS)('search with no optional params omits %s', name => {
+    service.search({ page: 1, pageSize: DEFAULT_PAGE_SIZE }).subscribe();
+    const req = controller.expectOne(r => r.url === DirectoryApi.search);
+    expect(req.request.params.has(name)).toBe(false);
+    req.flush({ items: [], totalCount: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
+  });
+
+  it('search with no optional params still sends page', () => {
+    const page = newCount();
+    service.search({ page, pageSize: DEFAULT_PAGE_SIZE }).subscribe();
+    const req = controller.expectOne(r => r.url === DirectoryApi.search);
+    expect(req.request.params.get(SearchParamNames.page)).toBe(String(page));
+    req.flush({ items: [], totalCount: 0, page, pageSize: DEFAULT_PAGE_SIZE });
   });
 
   it('search with all optional params sends all params', () => {
+    const q = crypto.randomUUID();
+    const lat = randomIntBetween(-89, 90);
+    const lng = randomIntBetween(-179, 180);
+    const radiusMiles = newCount();
+    const state = crypto.randomUUID();
+    const denominationId = crypto.randomUUID();
+    const worshipStyle = WORSHIP_STYLES[randomIntBetween(0, WORSHIP_STYLES.length)].value;
+    const dayOfWeek = DAYS_OF_WEEK[randomIntBetween(0, DAYS_OF_WEEK.length)].value;
+    const pageSize = newCount();
+    const startTimeAfter = crypto.randomUUID();
+    const startTimeBefore = crypto.randomUUID();
     service
       .search({
-        q: 'grace',
-        lat: 39.7,
-        lng: -104.9,
-        radiusMiles: 25,
-        state: 'CO',
-        denominationId: 'den-1',
-        worshipStyle: 2,
+        q,
+        lat,
+        lng,
+        radiusMiles,
+        state,
+        denominationId,
+        worshipStyle,
         wheelchairAccessible: true,
-        dayOfWeek: 0,
-        startTimeAfter: '09:00',
-        startTimeBefore: '12:00',
+        dayOfWeek,
+        startTimeAfter,
+        startTimeBefore,
         page: 1,
-        pageSize: 10,
+        pageSize,
       })
       .subscribe();
-    const req = controller.expectOne((r) => r.url.includes('/search'));
-    expect(req.request.params.get('q')).toBe('grace');
-    expect(req.request.params.get('lat')).toBe('39.7');
-    expect(req.request.params.get('lng')).toBe('-104.9');
-    expect(req.request.params.get('radiusMiles')).toBe('25');
-    expect(req.request.params.get('state')).toBe('CO');
-    expect(req.request.params.get('denominationId')).toBe('den-1');
-    expect(req.request.params.get('worshipStyle')).toBe('2');
-    expect(req.request.params.get('wheelchairAccessible')).toBe('true');
-    expect(req.request.params.get('dayOfWeek')).toBe('0');
-    expect(req.request.params.get('startTimeAfter')).toBe('09:00');
-    expect(req.request.params.get('startTimeBefore')).toBe('12:00');
-    req.flush({ items: [], totalCount: 0, page: 1, pageSize: 10 });
+    const req = controller.expectOne(r => r.url === DirectoryApi.search);
+    expect(req.request.params.get(SearchParamNames.q)).toBe(q);
+    expect(req.request.params.get(SearchParamNames.lat)).toBe(String(lat));
+    expect(req.request.params.get(SearchParamNames.lng)).toBe(String(lng));
+    expect(req.request.params.get(SearchParamNames.radiusMiles)).toBe(String(radiusMiles));
+    expect(req.request.params.get(SearchParamNames.state)).toBe(state);
+    expect(req.request.params.get(SearchParamNames.denominationId)).toBe(denominationId);
+    expect(req.request.params.get(SearchParamNames.worshipStyle)).toBe(String(worshipStyle));
+    expect(req.request.params.get(SearchParamNames.wheelchairAccessible)).toBe(String(true));
+    expect(req.request.params.get(SearchParamNames.dayOfWeek)).toBe(String(dayOfWeek));
+    expect(req.request.params.get(SearchParamNames.startTimeAfter)).toBe(startTimeAfter);
+    expect(req.request.params.get(SearchParamNames.startTimeBefore)).toBe(startTimeBefore);
+    req.flush({ items: [], totalCount: 0, page: 1, pageSize });
   });
 
   it('getCorrections without status omits status param', () => {
     service.getCorrections().subscribe();
-    const req = controller.expectOne((r) => r.url.includes('/corrections'));
-    expect(req.request.params.has('status')).toBe(false);
-    req.flush({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+    const req = controller.expectOne(r => r.url === DirectoryApi.corrections);
+    expect(req.request.params.has(SearchParamNames.status)).toBe(false);
+    req.flush({ items: [], totalCount: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
   });
 
   it('getCorrections with status includes status param', () => {
-    service.getCorrections(1).subscribe();
-    const req = controller.expectOne((r) => r.url.includes('/corrections'));
-    expect(req.request.params.get('status')).toBe('1');
-    req.flush({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+    const status = newCount();
+    service.getCorrections(status).subscribe();
+    const req = controller.expectOne(r => r.url === DirectoryApi.corrections);
+    expect(req.request.params.get(SearchParamNames.status)).toBe(String(status));
+    req.flush({ items: [], totalCount: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
   });
 
-  it('submitCorrection posts to /directory/api/corrections', () => {
-    service.submitCorrection('id-1', 'phone', '555-old', '555-new').subscribe();
-    const req = controller.expectOne('/directory/api/corrections');
-    expect(req.request.method).toBe('POST');
-    req.flush({ id: 'new-id' });
+  it('submitCorrection posts to the corrections route', () => {
+    service.submitCorrection(crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()).subscribe();
+    const req = controller.expectOne(DirectoryApi.corrections);
+    expect(req.request.method).toBe(HttpMethods.post);
+    req.flush({ id: crypto.randomUUID() });
   });
 
-  it('approveCorrection patches /directory/api/corrections/{id}/approve', () => {
-    service.approveCorrection('c-1').subscribe();
-    const req = controller.expectOne('/directory/api/corrections/c-1/approve');
-    expect(req.request.method).toBe('PATCH');
+  it('approveCorrection patches the approve route for that correction', () => {
+    const id = crypto.randomUUID();
+    service.approveCorrection(id).subscribe();
+    const req = controller.expectOne(DirectoryApi.approveCorrection(id));
+    expect(req.request.method).toBe(HttpMethods.patch);
     req.flush(null);
   });
 
-  it('rejectCorrection patches /directory/api/corrections/{id}/reject', () => {
-    service.rejectCorrection('c-1').subscribe();
-    const req = controller.expectOne('/directory/api/corrections/c-1/reject');
-    expect(req.request.method).toBe('PATCH');
+  it('rejectCorrection patches the reject route for that correction', () => {
+    const id = crypto.randomUUID();
+    service.rejectCorrection(id).subscribe();
+    const req = controller.expectOne(DirectoryApi.rejectCorrection(id));
+    expect(req.request.method).toBe(HttpMethods.patch);
     req.flush(null);
   });
 });

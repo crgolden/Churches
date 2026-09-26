@@ -1,13 +1,22 @@
+import { newHttpsAddress, newText } from '@crgolden/modules/testing';
+import { BffSettingKeys, InvalidSettingError } from './settings';
+
 vi.mock('openid-client', () => ({
   discovery: vi.fn(),
 }));
 
-const ENV_KEYS = ['OidcAuthority', 'ChurchesClientId', 'ChurchesClientSecret'];
+const ENV_KEYS = [BffSettingKeys.OidcAuthority, BffSettingKeys.ClientId, BffSettingKeys.ClientSecret];
+
+const VALID_SETTINGS = {
+  authority: newHttpsAddress(),
+  clientId: newText(),
+  clientSecret: newText(),
+};
 
 function setValidEnv(): void {
-  process.env['OidcAuthority'] = 'https://identity.example.com';
-  process.env['ChurchesClientId'] = 'churches-client';
-  process.env['ChurchesClientSecret'] = 'client-secret';
+  process.env[BffSettingKeys.OidcAuthority] = VALID_SETTINGS.authority;
+  process.env[BffSettingKeys.ClientId] = VALID_SETTINGS.clientId;
+  process.env[BffSettingKeys.ClientSecret] = VALID_SETTINGS.clientSecret;
 }
 
 function clearEnv(): void {
@@ -34,20 +43,20 @@ describe('getOidcConfig', () => {
 
   it('calls discovery with the configured authority, client id, and secret', async () => {
     setValidEnv();
-    discoveryMock.mockResolvedValue({ issuer: 'https://identity.example.com' });
+    discoveryMock.mockResolvedValue({ issuer: VALID_SETTINGS.authority });
 
     await getOidcConfig();
 
     expect(discoveryMock).toHaveBeenCalledWith(
-      new URL('https://identity.example.com'),
-      'churches-client',
-      'client-secret',
+      new URL(VALID_SETTINGS.authority),
+      VALID_SETTINGS.clientId,
+      VALID_SETTINGS.clientSecret,
     );
   });
 
   it('returns the value produced by discovery', async () => {
     setValidEnv();
-    const fakeConfig = { issuer: 'https://identity.example.com' };
+    const fakeConfig = { issuer: VALID_SETTINGS.authority };
     discoveryMock.mockResolvedValue(fakeConfig);
 
     const result = await getOidcConfig();
@@ -57,7 +66,7 @@ describe('getOidcConfig', () => {
 
   it('returns the cached config on subsequent calls without calling discovery again', async () => {
     setValidEnv();
-    discoveryMock.mockResolvedValue({ issuer: 'cached' });
+    discoveryMock.mockResolvedValue({ issuer: newText() });
 
     const first = await getOidcConfig();
     const second = await getOidcConfig();
@@ -66,27 +75,12 @@ describe('getOidcConfig', () => {
     expect(second).toBe(first);
   });
 
-  it('throws when OidcAuthority is missing', async () => {
-    process.env['ChurchesClientId'] = 'id';
-    process.env['ChurchesClientSecret'] = 'secret';
+  it.each(ENV_KEYS)('throws naming %s when it is missing', async missing => {
+    setValidEnv();
+    delete process.env[missing];
     discoveryMock.mockResolvedValue({});
 
-    await expect(getOidcConfig()).rejects.toThrow('OidcAuthority');
-  });
-
-  it('throws when ChurchesClientId is missing', async () => {
-    process.env['OidcAuthority'] = 'https://identity.example.com';
-    process.env['ChurchesClientSecret'] = 'secret';
-    discoveryMock.mockResolvedValue({});
-
-    await expect(getOidcConfig()).rejects.toThrow('ChurchesClientId');
-  });
-
-  it('throws when ChurchesClientSecret is missing', async () => {
-    process.env['OidcAuthority'] = 'https://identity.example.com';
-    process.env['ChurchesClientId'] = 'id';
-    discoveryMock.mockResolvedValue({});
-
-    await expect(getOidcConfig()).rejects.toThrow('ChurchesClientSecret');
+    await expect(getOidcConfig()).rejects.toThrow(new InvalidSettingError(missing));
+    expect(discoveryMock).not.toHaveBeenCalled();
   });
 });

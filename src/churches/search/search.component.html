@@ -1,38 +1,40 @@
-<section class="hero">
-  <div class="hero-content page-container">
-    <h1 id="search-title">Find Your Church Home</h1>
-    <p class="hero-sub">
+<section class="bg-linear-135 from-accent to-accent-deep pt-20 pb-16 text-on-fill">
+  <div class="mx-auto max-w-hero px-6 max-sm:px-4">
+    <h1 id="search-title" class="mb-3 text-hero text-on-fill max-md:text-stat">Find Your Church Home</h1>
+    <p class="mb-8 max-w-lead text-lead text-on-fill/85">
       Discover congregations across the United States by location, worship style,
       and what matters to your family.
     </p>
-    <div class="search-card card">
+    <div crgCard class="p-6">
       <form (submit)="$event.preventDefault(); search()">
-        <div class="search-row">
+        <div class="mb-4 flex flex-wrap gap-3">
           <label for="search-keyword" class="sr-only">Church name or city</label>
           <input
             id="search-keyword"
+            class="min-w-[200px] flex-1"
             #kw
             type="text"
             placeholder="Church name or city"
             [value]="keyword()"
             (input)="keyword.set(kw.value)"
           />
-          <button id="btn-near-me" type="button" class="btn-secondary" (click)="useLocation()" [disabled]="locating()">
+          <button id="btn-near-me" type="button" crgButtonSecondary class="shrink-0 max-md:w-full" (click)="useLocation()" [disabled]="locating()">
             {{ locating() ? 'Locating…' : 'Near Me' }}
           </button>
         </div>
 
-        <!-- Kept always-in-DOM with [hidden] rather than @if: locationError is set from the async
-             geolocation callback, and under zoneless CD an interpolation inside a freshly-@if-created
-             view rendered empty. Toggling an existing element's binding updates reliably. -->
-        <p class="location-error" [hidden]="!locationError()">{{ locationError() }}</p>
-        @if (lat() !== null && !locationError()) {
-          <p id="location-note" class="location-note">Using your location for nearby results</p>
+        <p id="location-error-announcement" class="sr-only" [attr.role]="ariaRoles.status">{{ locationError() }}</p>
+        @if (locationError()) {
+          <p id="location-error" class="mb-3 text-note text-danger">{{ locationError() }}</p>
+        }
+        <p id="location-note-announcement" class="sr-only" [attr.role]="ariaRoles.status">{{ locationNote() }}</p>
+        @if (locationNote()) {
+          <p id="location-note" class="mb-3 text-note text-text-muted">{{ locationNote() }}</p>
         }
 
-        <div class="filter-grid">
-          <div class="filter-field">
-            <label for="search-state">State</label>
+        <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
+          <div class="flex min-w-0 flex-col gap-1">
+            <label for="search-state" class="text-small font-medium text-text-muted">State</label>
             <input
               id="search-state"
               #st
@@ -40,6 +42,8 @@
               list="us-states"
               placeholder="Any state"
               autocomplete="off"
+              aria-describedby="search-state-error"
+              [attr.aria-invalid]="stateError() ? 'true' : null"
               [value]="state()"
               (input)="state.set(st.value)"
               (change)="commitState(st.value)"
@@ -49,10 +53,14 @@
                 <option [value]="s.code" label="{{ s.name }}"></option>
               }
             </datalist>
+            <p id="search-state-error-announcement" class="sr-only" [attr.role]="ariaRoles.status">{{ stateError() }}</p>
+            @if (stateError()) {
+              <p id="search-state-error" class="m-0 text-meta text-danger">{{ stateError() }}</p>
+            }
           </div>
 
-          <div class="filter-field">
-            <label for="search-worship-style">Worship style</label>
+          <div class="flex min-w-0 flex-col gap-1">
+            <label for="search-worship-style" class="text-small font-medium text-text-muted">Worship style</label>
             <select id="search-worship-style" #ws (change)="worshipStyle.set(ws.value ? +ws.value : null)">
               <option value="">Any worship style</option>
               @for (style of worshipStyles; track style.value) {
@@ -62,8 +70,8 @@
           </div>
 
           @if (denominations().length > 0) {
-            <div class="filter-field">
-              <label for="search-denomination">Denomination</label>
+            <div class="flex min-w-0 flex-col gap-1">
+              <label for="search-denomination" class="text-small font-medium text-text-muted">Denomination</label>
               <select id="search-denomination" #denom (change)="denominationId.set(denom.value || null)">
                 <option value="">Any denomination</option>
                 @for (d of denominations(); track d.id) {
@@ -73,8 +81,8 @@
             </div>
           }
 
-          <div class="filter-field">
-            <label for="search-day">Service day</label>
+          <div class="flex min-w-0 flex-col gap-1">
+            <label for="search-day" class="text-small font-medium text-text-muted">Service day</label>
             <select id="search-day" #day (change)="dayOfWeek.set(day.value ? +day.value : null)">
               <option value="">Any day</option>
               @for (d of daysOfWeek; track d.value) {
@@ -83,8 +91,8 @@
             </select>
           </div>
 
-          <div class="filter-field">
-            <label for="search-time-after">Service starts after</label>
+          <div class="flex min-w-0 flex-col gap-1">
+            <label for="search-time-after" class="text-small font-medium text-text-muted">Service starts after</label>
             <input
               id="search-time-after"
               #ta
@@ -94,8 +102,8 @@
             />
           </div>
 
-          <div class="filter-field">
-            <label for="search-time-before">…and before</label>
+          <div class="flex min-w-0 flex-col gap-1">
+            <label for="search-time-before" class="text-small font-medium text-text-muted">…and before</label>
             <input
               id="search-time-before"
               #tb
@@ -106,9 +114,10 @@
           </div>
         </div>
 
-        <label for="search-wheelchair" class="checkbox-label">
+        <label for="search-wheelchair" class="mb-4 flex cursor-pointer items-center gap-2 text-meta whitespace-nowrap">
           <input
             id="search-wheelchair"
+            class="m-0"
             #wa
             type="checkbox"
             [checked]="wheelchairAccessible() === true"
@@ -117,35 +126,37 @@
           <span>Wheelchair accessible</span>
         </label>
 
-        <button id="btn-search" type="submit" class="btn-primary search-submit">Search Churches</button>
+        <button id="btn-search" type="submit" crgButtonPrimary class="w-full">Search Churches</button>
       </form>
     </div>
   </div>
 </section>
 
-<section class="value-props">
-  <div class="page-container">
-    <div class="props-grid">
-      <div class="prop-card card">
-        <div class="prop-num">10,000+</div>
-        <h3>Churches</h3>
-        <p>
+<section class="bg-canvas py-16">
+  <div crgPageContainer>
+    <div class="grid grid-cols-3 gap-6 max-md:grid-cols-1">
+      <div crgCard class="p-6 text-center">
+        @if (churchCount() !== null) {
+          <div id="church-count" class="mb-2 font-heading text-stat font-bold text-accent">{{ churchCount() | number }}</div>
+        }
+        <h2 class="mb-2 text-card-title">Churches</h2>
+        <p class="m-0 text-meta text-text-muted">
           A comprehensive, growing directory of congregations from every denomination
           and tradition across all 50 states.
         </p>
       </div>
-      <div class="prop-card card">
-        <div class="prop-num">&#9673;</div>
-        <h3>Search by Location</h3>
-        <p>
+      <div crgCard class="p-6 text-center">
+        <div class="mb-2 font-heading text-stat font-bold text-accent" aria-hidden="true">&#9673;</div>
+        <h2 class="mb-2 text-card-title">Search by Location</h2>
+        <p class="m-0 text-meta text-text-muted">
           Find churches near you with distance estimates, or search by city and state
           to explore anywhere in the country.
         </p>
       </div>
-      <div class="prop-card card">
-        <div class="prop-num">&#10003;</div>
-        <h3>Filter What Matters</h3>
-        <p>
+      <div crgCard class="p-6 text-center">
+        <div class="mb-2 font-heading text-stat font-bold text-accent" aria-hidden="true">&#10003;</div>
+        <h2 class="mb-2 text-card-title">Filter What Matters</h2>
+        <p class="m-0 text-meta text-text-muted">
           Narrow by worship style, accessibility features, and programs for families
           to find the right fit.
         </p>
@@ -154,24 +165,24 @@
   </div>
 </section>
 
-<section class="how-it-works">
-  <div class="page-container">
-    <h2>How It Works</h2>
-    <div class="steps-grid">
-      <div class="step">
-        <div class="step-num">1</div>
-        <h4>Search</h4>
-        <p>Enter a city, church name, or use your current location to get started.</p>
+<section class="border-t border-line bg-surface py-16">
+  <div crgPageContainer>
+    <h2 class="mb-12 text-center">How It Works</h2>
+    <div class="grid grid-cols-3 gap-8 max-md:grid-cols-1">
+      <div class="text-center">
+        <div class="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-accent font-heading text-lead font-bold text-on-fill" aria-hidden="true">1</div>
+        <h3 class="mb-[0.4rem] text-minor">Search</h3>
+        <p class="m-0 text-meta text-text-muted">Enter a city, church name, or use your current location to get started.</p>
       </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <h4>Browse Results</h4>
-        <p>See matching churches with addresses, distances, worship styles, and website links.</p>
+      <div class="text-center">
+        <div class="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-accent font-heading text-lead font-bold text-on-fill" aria-hidden="true">2</div>
+        <h3 class="mb-[0.4rem] text-minor">Browse Results</h3>
+        <p class="m-0 text-meta text-text-muted">See matching churches with addresses, distances, worship styles, and website links.</p>
       </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <h4>Plan Your Visit</h4>
-        <p>View full details and get directions to churches that look like the right fit.</p>
+      <div class="text-center">
+        <div class="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-accent font-heading text-lead font-bold text-on-fill" aria-hidden="true">3</div>
+        <h3 class="mb-[0.4rem] text-minor">Plan Your Visit</h3>
+        <p class="m-0 text-meta text-text-muted">View full details and get directions to churches that look like the right fit.</p>
       </div>
     </div>
   </div>

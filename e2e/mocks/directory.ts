@@ -1,6 +1,15 @@
+import { constants } from 'node:http2';
 import express, { type Express, type Request, type Response } from 'express';
+import { DEFAULT_PAGE_SIZE, DirectoryRoutes, SearchParamNames } from '../../src/shared/directory-api';
+import { CORRECTABLE_FIELDS, FieldKinds } from '../../src/shared/correctable-fields';
+import type { CampusInput, CorrectionInput, MinistryInput, ScheduleInput } from '../../src/shared/church.service';
+import { MERGE_FIELD } from '../../src/shared/models';
+import { CorrectionStatus, DirectoryLimits, DirectoryRefusals } from './directory-constants';
+import { e2eContract } from './e2e-contract';
 
-export const CorrectionStatus = { Pending: 0, Approved: 1, Rejected: 2 } as const;
+export const ControlRoutes = e2eContract().controlRoutes;
+
+export { CorrectionStatus };
 export type CorrectionStatusValue = (typeof CorrectionStatus)[keyof typeof CorrectionStatus];
 
 export interface ChurchRecord {
@@ -79,13 +88,56 @@ export interface CorrectionRecord {
   reviewedAt: string | null;
   createdAt: string;
   churchName: string | null;
+  targetChurchName: string | null;
+  churchSlug: string | null;
+  targetChurchSlug: string | null;
 }
 
 const churches = new Map<string, ChurchRecord>();
 const corrections = new Map<string, CorrectionRecord>();
 
+const TEXT_FIELDS: ReadonlySet<string> = new Set(
+  CORRECTABLE_FIELDS.filter(field => field.kind === FieldKinds.text).map(field => field.key),
+);
+
+const RouteParam = {
+  churchId: newRouteParamName(),
+  id: newRouteParamName(),
+  slug: newRouteParamName(),
+} as const;
+
+function newRouteParamName(): string {
+  return `p${crypto.randomUUID().replaceAll('-', '')}`;
+}
+
 function newId(): string {
   return crypto.randomUUID();
+}
+
+function applyCorrection(correction: CorrectionRecord, survivingId: string | undefined): string | null {
+  if (correction.field === MERGE_FIELD) {
+    if (survivingId === undefined) { return DirectoryRefusals.mergeSurvivorMissing; }
+    if (survivingId !== correction.churchId && survivingId !== correction.newValue) {
+      return DirectoryRefusals.mergeSurvivorNotInSuggestion;
+    }
+    const absorbedId = survivingId === correction.churchId ? correction.newValue : correction.churchId;
+    const absorbed = churches.get(absorbedId);
+    if (absorbed) { churches.set(absorbedId, { ...absorbed, isActive: false }); }
+    for (const pending of [...corrections.values()]) {
+      if (pending.status === CorrectionStatus.Pending && pending.field === MERGE_FIELD
+        && (pending.churchId === absorbedId || pending.newValue === absorbedId)) {
+        corrections.set(pending.id, { ...pending, status: CorrectionStatus.Rejected, reviewedBy: newId(), reviewedAt: now() });
+      }
+    }
+    return null;
+  }
+
+  if (!TEXT_FIELDS.has(correction.field)) { return `'${correction.field}' is not a field this app can apply.`; }
+  const column = correction.field as keyof ChurchRecord;
+  const church = churches.get(correction.churchId);
+  if (!church?.isActive) { return DirectoryRefusals.churchInactive; }
+  churches.set(church.id, { ...church, [column]: correction.newValue, updatedAt: now() });
+  return null;
 }
 
 function now(): string {
@@ -96,117 +148,14 @@ function getActiveChurches(): ChurchRecord[] {
   return [...churches.values()].filter(c => c.isActive);
 }
 
-export const FIRST_BAPTIST_AUSTIN: ChurchRecord = {
-  id: '11111111-1111-1111-1111-111111111111',
-  canonicalName: 'First Baptist Church Austin',
-  slug: 'first-baptist-church-austin-tx',
-  latitude: 30.2672,
-  longitude: -97.7431,
-  street: '901 Trinity St',
-  city: 'Austin',
-  state: 'TX',
-  zip: '78701',
-  phoneNumber: '(512) 476-2625',
-  website: 'https://fbcaustin.org',
-  emailAddress: 'info@fbcaustin.org',
-  denominationId: null,
-  worshipStyle: 1,
-  primaryLanguage: 'English',
-  acceptsLGBTQ: null,
-  wheelchairAccessible: true,
-  hasNursery: true,
-  hasYouthProgram: true,
-  confidenceScore: 0.85,
-  lastVerifiedAt: null,
-  isActive: true,
-  createdAt: now(),
-  updatedAt: now(),
-  schedules: [
-    {
-      id: 'aaaaaaaa-0000-0000-0000-000000000001',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      campusId: null,
-      dayOfWeek: 0,
-      startTime: '10:00:00',
-      description: 'Sunday Worship',
-      createdAt: now(),
-      updatedAt: now(),
-    },
-    {
-      id: 'aaaaaaaa-0000-0000-0000-000000000002',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      campusId: null,
-      dayOfWeek: 3,
-      startTime: '19:00:00',
-      description: 'Bible Study',
-      createdAt: now(),
-      updatedAt: now(),
-    },
-  ],
-  ministries: [
-    {
-      id: 'bbbbbbbb-0000-0000-0000-000000000001',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      name: 'Youth Group',
-      description: 'For teens',
-      createdAt: now(),
-      updatedAt: now(),
-    },
-    {
-      id: 'bbbbbbbb-0000-0000-0000-000000000002',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      name: 'Food Bank',
-      description: null,
-      createdAt: now(),
-      updatedAt: now(),
-    },
-  ],
-  campuses: [
-    {
-      id: 'cccccccc-0000-0000-0000-000000000001',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      name: 'North Campus',
-      street: '1200 N Lamar Blvd',
-      city: 'Austin',
-      state: 'TX',
-      zip: '78703',
-      latitude: 30.29,
-      longitude: -97.75,
-      createdAt: now(),
-      updatedAt: now(),
-    },
-  ],
-};
-
-export const MOSAIC_AUSTIN: ChurchRecord = {
-  id: '22222222-2222-2222-2222-222222222222',
-  canonicalName: 'Mosaic Church Austin',
-  slug: 'mosaic-church-austin-tx',
-  latitude: 30.27,
-  longitude: -97.75,
-  street: null,
-  city: 'Austin',
-  state: 'TX',
-  zip: '78702',
-  phoneNumber: null,
-  website: null,
-  emailAddress: null,
-  denominationId: null,
-  worshipStyle: 2,
-  primaryLanguage: 'English',
-  acceptsLGBTQ: null,
-  wheelchairAccessible: null,
-  hasNursery: null,
-  hasYouthProgram: null,
-  confidenceScore: 0.2,
-  lastVerifiedAt: null,
-  isActive: true,
-  createdAt: now(),
-  updatedAt: now(),
-  schedules: [],
-  ministries: [],
-  campuses: [],
-};
+function pagingFrom(req: Request): { page: number; pageSize: number } {
+  const requestedPage = Number((req.query[SearchParamNames.page] as string | undefined) ?? 1);
+  const requestedPageSize = Number((req.query[SearchParamNames.pageSize] as string | undefined) ?? DEFAULT_PAGE_SIZE);
+  return {
+    page: Math.max(1, requestedPage),
+    pageSize: Math.min(DirectoryLimits.maxPageSize, Math.max(1, requestedPageSize)),
+  };
+}
 
 function routeParam(req: Request, name: string): string {
   const value = req.params[name];
@@ -221,13 +170,13 @@ export function createDirectoryApp(): Express {
   const app = express();
   app.use(express.json());
 
-  app.post('/_test/reset', (_req: Request, res: Response) => {
+  app.post(ControlRoutes.reset, (_req: Request, res: Response) => {
     churches.clear();
     corrections.clear();
-    res.status(204).end();
+    res.status(constants.HTTP_STATUS_NO_CONTENT).end();
   });
 
-  app.post('/_test/churches', (req: Request, res: Response) => {
+  app.post(ControlRoutes.churches, (req: Request, res: Response) => {
     const church: ChurchRecord = req.body as ChurchRecord;
     church.schedules ??= [];
     church.ministries ??= [];
@@ -235,32 +184,31 @@ export function createDirectoryApp(): Express {
     church.createdAt ??= now();
     church.updatedAt ??= now();
     churches.set(church.id, church);
-    res.status(201).json({ id: church.id });
+    res.status(constants.HTTP_STATUS_CREATED).json({ id: church.id });
   });
 
-  app.post('/_test/corrections', (req: Request, res: Response) => {
+  app.post(ControlRoutes.corrections, (req: Request, res: Response) => {
     const correction: CorrectionRecord = req.body as CorrectionRecord;
     correction.createdAt ??= now();
     corrections.set(correction.id, correction);
-    res.status(201).json({ id: correction.id });
+    res.status(constants.HTTP_STATUS_CREATED).json({ id: correction.id });
   });
 
-  app.get('/denominations', (_req: Request, res: Response) => {
+  app.get(DirectoryRoutes.denominations, (_req: Request, res: Response) => {
     res.json([]);
   });
 
-  app.get('/search', (req: Request, res: Response) => {
-    const q = (req.query['q'] as string | undefined)?.toLowerCase();
-    const state = req.query['state'] as string | undefined;
-    const worshipStyle = req.query['worshipStyle']
-      ? parseInt(req.query['worshipStyle'] as string, 10)
+  app.get(DirectoryRoutes.search, (req: Request, res: Response) => {
+    const q = (req.query[SearchParamNames.q] as string | undefined)?.toLowerCase();
+    const state = req.query[SearchParamNames.state] as string | undefined;
+    const worshipStyle = req.query[SearchParamNames.worshipStyle]
+      ? parseInt(req.query[SearchParamNames.worshipStyle] as string, 10)
       : undefined;
     const wheelchairAccessible =
-      req.query['wheelchairAccessible'] !== undefined
-        ? req.query['wheelchairAccessible'] === 'true'
+      req.query[SearchParamNames.wheelchairAccessible] !== undefined
+        ? req.query[SearchParamNames.wheelchairAccessible] === String(true)
         : undefined;
-    const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10));
-    const pageSize = Math.min(50, Math.max(1, parseInt((req.query['pageSize'] as string) ?? '20', 10)));
+    const { page, pageSize } = pagingFrom(req);
 
     let results = getActiveChurches();
 
@@ -293,9 +241,8 @@ export function createDirectoryApp(): Express {
     });
   });
 
-  app.get('/churches', (req: Request, res: Response) => {
-    const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10));
-    const pageSize = Math.min(50, Math.max(1, parseInt((req.query['pageSize'] as string) ?? '20', 10)));
+  app.get(DirectoryRoutes.churches, (req: Request, res: Response) => {
+    const { page, pageSize } = pagingFrom(req);
 
     const all = getActiveChurches().sort((a, b) =>
       a.canonicalName.localeCompare(b.canonicalName),
@@ -306,103 +253,102 @@ export function createDirectoryApp(): Express {
     res.json({ items, totalCount: total, page, pageSize });
   });
 
-  app.post('/churches/:churchId/schedules', (req: Request, res: Response) => {
-    const church = churches.get(routeParam(req, 'churchId'));
-    if (!church) { res.status(404).end(); return; }
+  app.post(`${DirectoryRoutes.churches}/:${RouteParam.churchId}${DirectoryRoutes.schedules}`, (req: Request, res: Response) => {
+    const church = churches.get(routeParam(req, RouteParam.churchId));
+    if (!church) { res.status(constants.HTTP_STATUS_NOT_FOUND).end(); return; }
 
     const record: ScheduleRecord = {
       id: newId(),
       churchId: church.id,
       campusId: null,
-      dayOfWeek: (req.body as Record<string, unknown>)['dayOfWeek'] as number,
-      startTime: (req.body as Record<string, unknown>)['startTime'] as string,
-      description: ((req.body as Record<string, unknown>)['description'] as string | null) ?? null,
+      dayOfWeek: (req.body as ScheduleInput).dayOfWeek,
+      startTime: (req.body as ScheduleInput).startTime,
+      description: (req.body as ScheduleInput).description ?? null,
       createdAt: now(),
       updatedAt: now(),
     };
     church.schedules = [...church.schedules, record];
-    res.status(201).json({ id: record.id });
+    res.status(constants.HTTP_STATUS_CREATED).json({ id: record.id });
   });
 
-  app.delete('/schedules/:id', (req: Request, res: Response) => {
+  app.delete(`${DirectoryRoutes.schedules}/:${RouteParam.id}`, (req: Request, res: Response) => {
     let found = false;
     for (const church of churches.values()) {
-      const idx = church.schedules.findIndex(s => s.id === req.params['id']);
+      const idx = church.schedules.findIndex(s => s.id === routeParam(req, RouteParam.id));
       if (idx >= 0) {
-        church.schedules = church.schedules.filter(s => s.id !== req.params['id']);
+        church.schedules = church.schedules.filter(s => s.id !== routeParam(req, RouteParam.id));
         found = true;
         break;
       }
     }
-    res.status(found ? 204 : 404).end();
+    res.status(found ? constants.HTTP_STATUS_NO_CONTENT : constants.HTTP_STATUS_NOT_FOUND).end();
   });
 
-  app.post('/churches/:churchId/ministries', (req: Request, res: Response) => {
-    const church = churches.get(routeParam(req, 'churchId'));
-    if (!church) { res.status(404).end(); return; }
+  app.post(`${DirectoryRoutes.churches}/:${RouteParam.churchId}${DirectoryRoutes.ministries}`, (req: Request, res: Response) => {
+    const church = churches.get(routeParam(req, RouteParam.churchId));
+    if (!church) { res.status(constants.HTTP_STATUS_NOT_FOUND).end(); return; }
 
     const record: MinistryRecord = {
       id: newId(),
       churchId: church.id,
-      name: (req.body as Record<string, unknown>)['name'] as string,
-      description: ((req.body as Record<string, unknown>)['description'] as string | null) ?? null,
+      name: (req.body as MinistryInput).name,
+      description: (req.body as MinistryInput).description ?? null,
       createdAt: now(),
       updatedAt: now(),
     };
     church.ministries = [...church.ministries, record];
-    res.status(201).json({ id: record.id });
+    res.status(constants.HTTP_STATUS_CREATED).json({ id: record.id });
   });
 
-  app.delete('/ministries/:id', (req: Request, res: Response) => {
+  app.delete(`${DirectoryRoutes.ministries}/:${RouteParam.id}`, (req: Request, res: Response) => {
     let found = false;
     for (const church of churches.values()) {
-      const idx = church.ministries.findIndex(m => m.id === req.params['id']);
+      const idx = church.ministries.findIndex(m => m.id === routeParam(req, RouteParam.id));
       if (idx >= 0) {
-        church.ministries = church.ministries.filter(m => m.id !== req.params['id']);
+        church.ministries = church.ministries.filter(m => m.id !== routeParam(req, RouteParam.id));
         found = true;
         break;
       }
     }
-    res.status(found ? 204 : 404).end();
+    res.status(found ? constants.HTTP_STATUS_NO_CONTENT : constants.HTTP_STATUS_NOT_FOUND).end();
   });
 
-  app.post('/churches/:churchId/campuses', (req: Request, res: Response) => {
-    const church = churches.get(routeParam(req, 'churchId'));
-    if (!church) { res.status(404).end(); return; }
+  app.post(`${DirectoryRoutes.churches}/:${RouteParam.churchId}${DirectoryRoutes.campuses}`, (req: Request, res: Response) => {
+    const church = churches.get(routeParam(req, RouteParam.churchId));
+    if (!church) { res.status(constants.HTTP_STATUS_NOT_FOUND).end(); return; }
 
     const record: CampusRecord = {
       id: newId(),
       churchId: church.id,
-      name: (req.body as Record<string, unknown>)['name'] as string,
-      street: ((req.body as Record<string, unknown>)['street'] as string | null) ?? null,
-      city: (req.body as Record<string, unknown>)['city'] as string,
-      state: (req.body as Record<string, unknown>)['state'] as string,
-      zip: (req.body as Record<string, unknown>)['zip'] as string,
-      latitude: (req.body as Record<string, unknown>)['latitude'] as number,
-      longitude: (req.body as Record<string, unknown>)['longitude'] as number,
+      name: (req.body as CampusInput).name,
+      street: (req.body as CampusInput).street ?? null,
+      city: (req.body as CampusInput).city,
+      state: (req.body as CampusInput).state,
+      zip: (req.body as CampusInput).zip,
+      latitude: (req.body as CampusInput).latitude,
+      longitude: (req.body as CampusInput).longitude,
       createdAt: now(),
       updatedAt: now(),
     };
     church.campuses = [...church.campuses, record];
-    res.status(201).json({ id: record.id });
+    res.status(constants.HTTP_STATUS_CREATED).json({ id: record.id });
   });
 
-  app.delete('/campuses/:id', (req: Request, res: Response) => {
+  app.delete(`${DirectoryRoutes.campuses}/:${RouteParam.id}`, (req: Request, res: Response) => {
     let found = false;
     for (const church of churches.values()) {
-      const idx = church.campuses.findIndex(c => c.id === req.params['id']);
+      const idx = church.campuses.findIndex(c => c.id === routeParam(req, RouteParam.id));
       if (idx >= 0) {
-        church.campuses = church.campuses.filter(c => c.id !== req.params['id']);
+        church.campuses = church.campuses.filter(c => c.id !== routeParam(req, RouteParam.id));
         found = true;
         break;
       }
     }
-    res.status(found ? 204 : 404).end();
+    res.status(found ? constants.HTTP_STATUS_NO_CONTENT : constants.HTTP_STATUS_NOT_FOUND).end();
   });
 
-  app.get('/corrections', (req: Request, res: Response) => {
-    const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10));
-    const pageSize = Math.min(50, Math.max(1, parseInt((req.query['pageSize'] as string) ?? '20', 10)));
+  app.get(DirectoryRoutes.corrections, (req: Request, res: Response) => {
+    const { page, pageSize } = pagingFrom(req);
 
     const all = [...corrections.values()]
       .filter(c => c.status === CorrectionStatus.Pending)
@@ -413,65 +359,71 @@ export function createDirectoryApp(): Express {
     res.json({ items, totalCount: total, page, pageSize });
   });
 
-  app.post('/corrections', (req: Request, res: Response) => {
-    const body = req.body as Record<string, unknown>;
-    const churchId = body['churchId'] as string | undefined;
-    if (!churchId) { res.status(400).end(); return; }
+  app.post(DirectoryRoutes.corrections, (req: Request, res: Response) => {
+    const body = req.body as Partial<CorrectionInput>;
+    const churchId = body.churchId;
+    if (!churchId) { res.status(constants.HTTP_STATUS_BAD_REQUEST).end(); return; }
 
     const church = churches.get(churchId);
-    if (!church) { res.status(404).end(); return; }
+    if (!church) { res.status(constants.HTTP_STATUS_NOT_FOUND).end(); return; }
 
-    const field = body['field'] as string | undefined;
-    const newValue = body['newValue'] as string | undefined;
-    if (!field || !newValue) { res.status(400).end(); return; }
+    const field = body.field;
+    const newValue = body.newValue;
+    if (!field || !newValue) { res.status(constants.HTTP_STATUS_BAD_REQUEST).end(); return; }
 
     const record: CorrectionRecord = {
       id: newId(),
       churchId,
       userId: newId(),
       field,
-      oldValue: (body['oldValue'] as string | null) ?? null,
+      oldValue: body.oldValue ?? null,
       newValue,
       status: CorrectionStatus.Pending,
       reviewedBy: null,
       reviewedAt: null,
       createdAt: now(),
       churchName: church.canonicalName,
+      targetChurchName: churches.get(newValue)?.canonicalName ?? null,
+      churchSlug: church.slug,
+      targetChurchSlug: churches.get(newValue)?.slug ?? null,
     };
     corrections.set(record.id, record);
-    res.status(201).json(record);
+    res.status(constants.HTTP_STATUS_CREATED).json(record);
   });
 
-  app.patch('/corrections/:id/approve', (req: Request, res: Response) => {
-    const correction = corrections.get(routeParam(req, 'id'));
-    if (!correction || correction.status !== CorrectionStatus.Pending) { res.status(404).end(); return; }
+  app.patch(`${DirectoryRoutes.corrections}/:${RouteParam.id}${DirectoryRoutes.approve}`, (req: Request, res: Response) => {
+    const correction = corrections.get(routeParam(req, RouteParam.id));
+    if (!correction || correction.status !== CorrectionStatus.Pending) { res.status(constants.HTTP_STATUS_NOT_FOUND).end(); return; }
+    const survivingId: unknown = req.query[SearchParamNames.survivingId];
+    const refusal = applyCorrection(correction, typeof survivingId === 'string' ? survivingId : undefined);
+    if (refusal !== null) { res.status(constants.HTTP_STATUS_BAD_REQUEST).json(refusal); return; }
     corrections.set(correction.id, {
       ...correction,
       status: CorrectionStatus.Approved,
       reviewedBy: newId(),
       reviewedAt: now(),
     });
-    res.status(204).end();
+    res.status(constants.HTTP_STATUS_NO_CONTENT).end();
   });
 
-  app.patch('/corrections/:id/reject', (req: Request, res: Response) => {
-    const correction = corrections.get(routeParam(req, 'id'));
-    if (!correction || correction.status !== CorrectionStatus.Pending) { res.status(404).end(); return; }
+  app.patch(`${DirectoryRoutes.corrections}/:${RouteParam.id}${DirectoryRoutes.reject}`, (req: Request, res: Response) => {
+    const correction = corrections.get(routeParam(req, RouteParam.id));
+    if (!correction || correction.status !== CorrectionStatus.Pending) { res.status(constants.HTTP_STATUS_NOT_FOUND).end(); return; }
     corrections.set(correction.id, {
       ...correction,
       status: CorrectionStatus.Rejected,
       reviewedBy: newId(),
       reviewedAt: now(),
     });
-    res.status(204).end();
+    res.status(constants.HTTP_STATUS_NO_CONTENT).end();
   });
 
-  app.get('/churches/:slug', (req: Request, res: Response) => {
-    const slug = routeParam(req, 'slug');
+  app.get(DirectoryRoutes.church(`:${RouteParam.slug}`), (req: Request, res: Response) => {
+    const slug = routeParam(req, RouteParam.slug);
     const church = [...churches.values()].find(
       c => c.slug === slug && c.isActive,
     );
-    if (!church) { res.status(404).end(); return; }
+    if (!church) { res.status(constants.HTTP_STATUS_NOT_FOUND).end(); return; }
     res.json(church);
   });
 

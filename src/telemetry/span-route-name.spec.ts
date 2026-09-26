@@ -1,5 +1,13 @@
 import type { Request, Response, NextFunction } from 'express';
-import { nameSpansByRoute, routeTemplateFor } from './span-route-name';
+import {
+  HTTP_ROUTE_ATTRIBUTE,
+  nameSpansByRoute,
+  RESPONSE_FINISHED_EVENT,
+  ROOT_ROUTE,
+  routeTemplateFor,
+  UNMATCHED_SUFFIX,
+} from './span-route-name';
+import { HttpMethods } from '../bff/http-headers';
 
 const { getActiveSpan } = vi.hoisted(() => ({ getActiveSpan: vi.fn() }));
 
@@ -8,8 +16,12 @@ vi.mock('@opentelemetry/api', async (importOriginal) => {
   return { ...actual, trace: { ...actual.trace, getActiveSpan } };
 });
 
+function segment(): string {
+  return `/${crypto.randomUUID()}`;
+}
+
 function makeReq(parts: Partial<Request>): Request {
-  return { method: 'GET', path: '/', baseUrl: '', ...parts } as Request;
+  return { method: HttpMethods.get, path: ROOT_ROUTE, baseUrl: '', ...parts } as Request;
 }
 
 function makeRes() {
@@ -18,32 +30,41 @@ function makeRes() {
     on: vi.fn((event: string, cb: () => void) => {
       (listeners[event] ??= []).push(cb);
     }),
-    finish: () => (listeners['finish'] ?? []).forEach((cb) => cb()),
+    finish: () => (listeners[RESPONSE_FINISHED_EVENT] ?? []).forEach((cb) => cb()),
   } as unknown as Response & { finish: () => void };
 }
 
 describe('routeTemplateFor', () => {
   it('joins the mount point to the matched route pattern', () => {
-    expect(routeTemplateFor(makeReq({ baseUrl: '/bff', route: { path: '/login' } as never }))).toBe('/bff/login');
+    const mount = segment();
+    const route = segment();
+
+    expect(routeTemplateFor(makeReq({ baseUrl: mount, route: { path: route } as never }))).toBe(`${mount}${route}`);
   });
 
   it('keeps a parameterised pattern rather than the concrete value', () => {
-    const req = makeReq({ route: { path: '/sitemaps/:file' } as never, path: '/sitemaps/chunk-3.xml' });
+    const collection = segment();
+    const pattern = `${collection}/:file`;
+    const req = makeReq({ route: { path: pattern } as never, path: `${collection}${segment()}` });
 
-    expect(routeTemplateFor(req)).toBe('/sitemaps/:file');
+    expect(routeTemplateFor(req)).toBe(pattern);
   });
 
   it('buckets a mounted proxy that matched no inner route', () => {
-    expect(routeTemplateFor(makeReq({ baseUrl: '/directory/api', path: '/churches/abc' }))).toBe('/directory/api/*');
+    const mount = segment();
+
+    expect(routeTemplateFor(makeReq({ baseUrl: mount, path: `${segment()}${segment()}` }))).toBe(`${mount}${UNMATCHED_SUFFIX}`);
   });
 
   it('buckets an unmounted path by its first segment, so slugs cannot mint span names', () => {
-    expect(routeTemplateFor(makeReq({ path: '/churches/grace-community' }))).toBe('/churches/*');
-    expect(routeTemplateFor(makeReq({ path: '/churches/first-baptist' }))).toBe('/churches/*');
+    const collection = segment();
+
+    expect(routeTemplateFor(makeReq({ path: `${collection}${segment()}` }))).toBe(`${collection}${UNMATCHED_SUFFIX}`);
+    expect(routeTemplateFor(makeReq({ path: `${collection}${segment()}` }))).toBe(`${collection}${UNMATCHED_SUFFIX}`);
   });
 
   it('names the root request /', () => {
-    expect(routeTemplateFor(makeReq({ path: '/' }))).toBe('/');
+    expect(routeTemplateFor(makeReq({ path: ROOT_ROUTE }))).toBe(ROOT_ROUTE);
   });
 });
 
@@ -53,15 +74,16 @@ describe('nameSpansByRoute', () => {
   it('renames the span only once the response is finished and the route is known', () => {
     const span = { updateName: vi.fn(), setAttribute: vi.fn() };
     getActiveSpan.mockReturnValue(span);
-    const req = makeReq({ method: 'GET', route: { path: '/sitemap-index.xml' } as never });
+    const route = segment();
+    const req = makeReq({ method: HttpMethods.get, route: { path: route } as never });
     const res = makeRes();
 
     nameSpansByRoute(req, res, vi.fn() as NextFunction);
     expect(span.updateName).not.toHaveBeenCalled();
 
     res.finish();
-    expect(span.updateName).toHaveBeenCalledWith('GET /sitemap-index.xml');
-    expect(span.setAttribute).toHaveBeenCalledWith('http.route', '/sitemap-index.xml');
+    expect(span.updateName).toHaveBeenCalledWith(`GET ${route}`);
+    expect(span.setAttribute).toHaveBeenCalledWith(HTTP_ROUTE_ATTRIBUTE, route);
   });
 
   it('continues the chain when nothing is being traced', () => {

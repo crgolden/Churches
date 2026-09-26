@@ -23,6 +23,10 @@ const deploymentEnvironment = (
   'development'
 ).toLowerCase();
 
+if (process.env.NODE_ENV === 'production' && (alloyEndpoint === undefined || !URL.canParse(alloyEndpoint))) {
+  throw new Error("Invalid 'AlloyEndpoint'.");
+}
+
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 
 const resource = resourceFromAttributes({
@@ -31,19 +35,9 @@ const resource = resourceFromAttributes({
   'deployment.environment': deploymentEnvironment,
 });
 
-function safe(label, factory) {
-  try {
-    return factory();
-  } catch (err) {
-    console.warn(`[telemetry] skipping ${label}:`, err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
 const spanProcessors = [];
 if (alloyEndpoint) {
-  const exporter = safe('OTLP trace exporter', () => new OTLPTraceExporter({ url: alloyEndpoint }));
-  if (exporter) spanProcessors.push(new BatchSpanProcessor(exporter));
+  spanProcessors.push(new BatchSpanProcessor(new OTLPTraceExporter({ url: alloyEndpoint })));
 }
 
 const tracerProvider = new NodeTracerProvider({ resource, spanProcessors });
@@ -51,8 +45,10 @@ tracerProvider.register();
 
 const readers = [];
 if (alloyEndpoint) {
-  const exporter = safe('OTLP metric exporter', () => new OTLPMetricExporter({ url: alloyEndpoint }));
-  if (exporter) readers.push(new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60000 }));
+  readers.push(new PeriodicExportingMetricReader({
+    exporter: new OTLPMetricExporter({ url: alloyEndpoint }),
+    exportIntervalMillis: 60000,
+  }));
 }
 
 const meterProvider = new MeterProvider({ resource, readers });
@@ -60,8 +56,7 @@ metrics.setGlobalMeterProvider(meterProvider);
 
 const logProcessors = [];
 if (alloyEndpoint) {
-  const exporter = safe('OTLP log exporter', () => new OTLPLogExporter({ url: alloyEndpoint }));
-  if (exporter) logProcessors.push(new BatchLogRecordProcessor(exporter));
+  logProcessors.push(new BatchLogRecordProcessor(new OTLPLogExporter({ url: alloyEndpoint })));
 }
 
 const loggerProvider = new LoggerProvider({ resource, processors: logProcessors });

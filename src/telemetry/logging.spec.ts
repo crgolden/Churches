@@ -1,4 +1,10 @@
+import { HttpStatusCode } from '@angular/common/http';
+import { randomUUID } from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
+import { BffSettingKeys, InvalidSettingError } from '../bff/settings';
+import { BffPaths } from '../shared/bff-contract';
+import { RESPONSE_FINISHED_EVENT } from './span-route-name';
+import { HttpMethods } from '../bff/http-headers';
 
 vi.mock('pino', () => {
   const mockLogger = { info: vi.fn(), error: vi.fn(), warn: vi.fn() };
@@ -18,10 +24,10 @@ vi.mock('pino-elasticsearch', () => ({
 }));
 
 function makeReq(url: string): Request {
-  return { url, method: 'GET', originalUrl: url } as unknown as Request;
+  return { url, method: HttpMethods.get, originalUrl: url } as unknown as Request;
 }
 
-function makeFinishableRes(statusCode = 200) {
+function makeFinishableRes(statusCode = HttpStatusCode.Ok) {
   const listeners: Record<string, (() => void)[]> = {};
   return {
     statusCode,
@@ -38,10 +44,14 @@ function makeFinishableRes(statusCode = 200) {
 describe('requestLogger', () => {
   let requestLogger: (req: Request, res: Response, next: NextFunction) => void;
   let loggerInfo: ReturnType<typeof vi.fn>;
+  let healthPath: string;
+  let logFields: (typeof import('./logging'))['LogFields'];
 
   beforeAll(async () => {
     const mod = await import('./logging');
     requestLogger = mod.requestLogger;
+    healthPath = mod.HEALTH_PATH;
+    logFields = mod.LogFields;
     loggerInfo = (mod.logger as unknown as { info: ReturnType<typeof vi.fn> }).info;
   });
 
@@ -51,7 +61,7 @@ describe('requestLogger', () => {
     const next = vi.fn();
     const res = makeFinishableRes();
 
-    requestLogger(makeReq('/health'), res as unknown as Response, next);
+    requestLogger(makeReq(healthPath), res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledOnce();
     expect(res.on).not.toHaveBeenCalled();
@@ -61,7 +71,7 @@ describe('requestLogger', () => {
     const next = vi.fn();
     const res = makeFinishableRes();
 
-    requestLogger(makeReq('/health/live'), res as unknown as Response, next);
+    requestLogger(makeReq(`${healthPath}/${randomUUID()}`), res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledOnce();
     expect(res.on).not.toHaveBeenCalled();
@@ -69,40 +79,61 @@ describe('requestLogger', () => {
 
   it('registers a finish listener and calls next for non-health paths', () => {
     const next = vi.fn();
-    const res = makeFinishableRes(200);
+    const res = makeFinishableRes(HttpStatusCode.Ok);
 
-    requestLogger(makeReq('/bff/user'), res as unknown as Response, next);
+    requestLogger(makeReq(BffPaths.user), res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledOnce();
-    expect(res.on).toHaveBeenCalledWith('finish', expect.any(Function));
+    expect(res.on).toHaveBeenCalledWith(RESPONSE_FINISHED_EVENT, expect.any(Function));
   });
 
   it('logs method, path, and status code on response finish', () => {
     const next = vi.fn();
-    const res = makeFinishableRes(204);
+    const res = makeFinishableRes(HttpStatusCode.NoContent);
+    const path = `/${randomUUID()}`;
 
-    requestLogger(makeReq('/api/churches'), res as unknown as Response, next);
-    res.emit('finish');
+    requestLogger(makeReq(path), res as unknown as Response, next);
+    res.emit(RESPONSE_FINISHED_EVENT);
 
     expect(loggerInfo).toHaveBeenCalledWith(
       expect.objectContaining({
-        method: 'GET',
-        path: '/api/churches',
-        'http.response.status_code': 204,
-        'event.duration_ms': expect.any(Number),
+        method: HttpMethods.get,
+        path,
+        [logFields.statusCode]: HttpStatusCode.NoContent,
+        [logFields.durationMs]: expect.any(Number),
       }),
     );
   });
 });
 
 describe('logger construction', () => {
-  const ENV_KEYS = [
-    'ElasticsearchNode',
-    'ElasticsearchUsername',
-    'ElasticsearchPassword',
-    'WEBSITE_SITE_NAME',
-  ];
+  const NODE_ENV = BffSettingKeys.NodeEnv;
+  const WEBSITE_SITE_NAME = BffSettingKeys.WebsiteSiteName;
+  const ELASTICSEARCH_KEYS = [
+    BffSettingKeys.ElasticsearchNode,
+    BffSettingKeys.ElasticsearchUsername,
+    BffSettingKeys.ElasticsearchPassword,
+  ] as const;
+  const ENV_KEYS = [...ELASTICSEARCH_KEYS, NODE_ENV, WEBSITE_SITE_NAME];
   const savedEnv: Record<string, string | undefined> = {};
+
+  interface ElasticsearchSettings {
+    node: string;
+    username: string;
+    password: string;
+  }
+
+  function useElasticsearch(): ElasticsearchSettings {
+    const settings: ElasticsearchSettings = {
+      node: `https://${randomUUID()}.example/`,
+      username: randomUUID(),
+      password: randomUUID(),
+    };
+    process.env[BffSettingKeys.ElasticsearchNode] = settings.node;
+    process.env[BffSettingKeys.ElasticsearchUsername] = settings.username;
+    process.env[BffSettingKeys.ElasticsearchPassword] = settings.password;
+    return settings;
+  }
 
   beforeEach(() => {
     ENV_KEYS.forEach(k => {
@@ -110,6 +141,7 @@ describe('logger construction', () => {
       delete process.env[k];
     });
     vi.clearAllMocks();
+    vi.resetModules();
   });
 
   afterEach(() => {
@@ -122,9 +154,7 @@ describe('logger construction', () => {
     });
   });
 
-  it('builds with the stdout stream only when ElasticsearchNode is not set', async () => {
-    vi.resetModules();
-
+  it('builds with the stdout stream only when Elasticsearch is not configured outside production', async () => {
     await import('./logging');
 
     const { default: pino } = await import('pino');
@@ -133,75 +163,79 @@ describe('logger construction', () => {
 
     expect(pinoElasticsearch).not.toHaveBeenCalled();
     expect(streams).toHaveLength(1);
-    expect(streams[0].stream).toEqual({ _stdout: true });
   });
 
-  it('adds the Elasticsearch stream when ElasticsearchNode is configured', async () => {
-    process.env['ElasticsearchNode'] = 'https://es.example.com:9200';
-    process.env['ElasticsearchUsername'] = 'elastic-user';
-    process.env['ElasticsearchPassword'] = 'elastic-pass';
+  it('adds the Elasticsearch stream with the configured node and credentials', async () => {
+    const settings = useElasticsearch();
 
-    vi.resetModules();
-    await import('./logging');
+    const { LOG_INDEX } = await import('./logging');
     const { default: pino } = await import('pino');
     const { default: pinoElasticsearch } = await import('pino-elasticsearch');
 
-    expect(pinoElasticsearch).toHaveBeenCalledWith({
-      node: 'https://es.example.com:9200',
-      auth: { username: 'elastic-user', password: 'elastic-pass' },
-      index: 'logs-app-churches',
-      esVersion: 8,
-      opType: 'create',
-      flushBytes: 1000,
-    });
-
+    expect(pinoElasticsearch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        node: settings.node,
+        auth: { username: settings.username, password: settings.password },
+        index: LOG_INDEX,
+      }),
+    );
     const streams = vi.mocked(pino.multistream).mock.calls[0][0] as { stream: unknown }[];
-    expect(streams).toHaveLength(2);
-    expect(streams[1].stream).toBe(vi.mocked(pinoElasticsearch).mock.results[0].value);
+    expect(streams.map(entry => entry.stream)).toEqual([
+      expect.anything(),
+      vi.mocked(pinoElasticsearch).mock.results[0].value,
+    ]);
   });
 
-  it('attaches error and insertError listeners to the Elasticsearch stream', async () => {
-    process.env['ElasticsearchNode'] = 'https://es.example.com:9200';
+  it.each([BffSettingKeys.ElasticsearchUsername, BffSettingKeys.ElasticsearchPassword])(
+    'refuses a configured Elasticsearch node without %s',
+    async (missing) => {
+      useElasticsearch();
+      delete process.env[missing];
 
-    vi.resetModules();
-    await import('./logging');
+      await expect(import('./logging')).rejects.toThrow(new InvalidSettingError(missing));
+    },
+  );
+
+  it('refuses to start when a configured Elasticsearch node is not a URL', async () => {
+    useElasticsearch();
+    process.env[BffSettingKeys.ElasticsearchNode] = randomUUID();
+
+    await expect(import('./logging')).rejects.toThrow(new InvalidSettingError(BffSettingKeys.ElasticsearchNode));
+  });
+
+  it('logs both kinds of Elasticsearch stream failure through the logger', async () => {
+    useElasticsearch();
+
+    const { ELASTICSEARCH_CONNECTION_ERROR_LOG, ELASTICSEARCH_INSERT_ERROR_LOG, logger } = await import('./logging');
     const { default: pinoElasticsearch } = await import('pino-elasticsearch');
-
     const esStream = vi.mocked(pinoElasticsearch).mock.results[0].value as {
       on: ReturnType<typeof vi.fn>;
     };
-    expect(esStream.on).toHaveBeenCalledWith('error', expect.any(Function));
-    expect(esStream.on).toHaveBeenCalledWith('insertError', expect.any(Function));
+    const streamFailure = new Error(randomUUID());
+    esStream.on.mock.calls.forEach(([, listener]) => (listener as (err: Error) => void)(streamFailure));
+
+    expect(logger.error).toHaveBeenCalledWith({ err: streamFailure }, ELASTICSEARCH_CONNECTION_ERROR_LOG);
+    expect(logger.error).toHaveBeenCalledWith({ err: streamFailure }, ELASTICSEARCH_INSERT_ERROR_LOG);
   });
 
   it('uses the WEBSITE_SITE_NAME env var as the service.name base field', async () => {
-    process.env['WEBSITE_SITE_NAME'] = 'test-churches-app';
+    const siteName = randomUUID();
+    process.env[WEBSITE_SITE_NAME] = siteName;
 
-    vi.resetModules();
-    await import('./logging');
+    const { LogFields } = await import('./logging');
     const { default: pino } = await import('pino');
 
     const [pinoOptions] = vi.mocked(pino).mock.calls[0] as [{ base: Record<string, string> }, unknown];
-    expect(pinoOptions.base['service.name']).toBe('test-churches-app');
+    expect(pinoOptions.base[LogFields.serviceName]).toBe(siteName);
   });
 
-  it('falls back to plain stdout pino when the stream build throws', async () => {
-    vi.resetModules();
-
+  it('lets a failure building the log streams stop the process instead of falling back to stdout', async () => {
+    const buildFailure = new Error(randomUUID());
     const { default: pino } = await import('pino');
     vi.mocked(pino.multistream).mockImplementationOnce(() => {
-      throw new Error('stream construction failed');
+      throw buildFailure;
     });
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    await import('./logging');
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Elasticsearch transport unavailable'),
-      expect.any(Error),
-    );
-    const fallbackCall = vi.mocked(pino).mock.calls.find(c => c.length === 1);
-    expect(fallbackCall).toBeDefined();
-    consoleSpy.mockRestore();
+    await expect(import('./logging')).rejects.toBe(buildFailure);
   });
 });

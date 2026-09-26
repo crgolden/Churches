@@ -15,6 +15,7 @@ import { routes } from './app.routes';
 import { appInterceptor } from './app.interceptor';
 import { ssrAbsoluteUrlInterceptor } from './ssr-absolute-url.interceptor';
 import { AppTitleStrategy } from './app-title-strategy';
+import { provideBrowserScrollRestorationWhenLeavingTheDocument } from '@crgolden/modules/angular';
 import { AuthService } from '../auth/auth.service';
 
 export const appConfig: ApplicationConfig = {
@@ -25,6 +26,7 @@ export const appConfig: ApplicationConfig = {
       routes,
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
     ),
+    provideBrowserScrollRestorationWhenLeavingTheDocument(),
     provideHttpClient(withFetch(), withInterceptors([ssrAbsoluteUrlInterceptor, appInterceptor])),
     provideAppInitializer(() => inject(AuthService).initialize()),
     { provide: TitleStrategy, useClass: AppTitleStrategy },

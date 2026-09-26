@@ -2,9 +2,7 @@
 
 [![Build and deploy Node.js app to Azure Web App - crgolden-churches](https://github.com/crgolden/Churches/actions/workflows/main_crgolden-churches.yml/badge.svg)](https://github.com/crgolden/Churches/actions/workflows/main_crgolden-churches.yml)
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=crgolden_Churches&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=crgolden_Churches)
-
-[![Synthetic walker](https://github.com/crgolden/Churches/actions/workflows/synthetic.yml/badge.svg)](https://github.com/crgolden/Churches/actions/workflows/synthetic.yml)
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=crgolden_Churches)](https://sonarcloud.io/summary/new_code?id=crgolden_Churches)
 
 The end-user surface of a nationwide U.S. church discovery platform: an **Angular 22 SSR** application
 with a **Node.js Express** Backend-for-Frontend (BFF), served by a single Node process. The BFF holds
@@ -53,23 +51,26 @@ traces/metrics → Grafana Alloy; structured logs → Elasticsearch (`pino-elast
 
 The full local stack needs the Identity server and the Directory API running, plus the local config:
 
-**Environment variables (set in your shell):**
+**Environment variables (`.env.local`, gitignored; `npm start` and `serve:ssr` load it):**
 
 ```
+PORT=4000
 OidcAuthority=https://localhost:7261
 DirectoryApiAddress=https://localhost:7002
 ChurchesClientId=<dev client id>
 ChurchesClientSecret=<dev client secret>
 SessionSecret=<at-least-32-chars-dev-secret>
+SessionStore=memory
 SitemapBlobBaseUrl=https://crgolden.z13.web.core.windows.net/
 ```
 
-Session storage defaults to an in-memory store (fine for local dev — sessions just don't survive a
-restart). To use a local Redis instance instead (e.g. if you already run one for Manuals/
-Infrastructure), export `RedisHost=localhost` and `RedisPort=6379` (the code's own default of `6380`
-assumes Azure's TLS port, not a local non-TLS Redis) — `session.ts` picks Redis automatically once
-`RedisHost` is set. Don't combine `RedisHost` with `SessionStore=memory`: the latter always forces the
-in-memory store regardless of `RedisHost`, so setting both together silently ignores `RedisHost`.
+`PORT` and `SessionSecret` are required, and so are `RedisHost` and `RedisPort` unless
+`SessionStore=memory`; a missing one stops the process at startup. `SessionStore=memory` keeps sessions
+in process (they don't survive a restart). To use a local Redis instance instead (e.g. if you already
+run one for Manuals/Infrastructure), remove `SessionStore` and set `RedisHost=localhost`,
+`RedisPort=6379` and the five keepalive settings (`RedisSocketTimeoutMs`, `RedisPingIntervalMs`,
+`RedisReconnectStepMs`, `RedisReconnectMaxDelayMs`, `RedisReconnectJitterMs`; positive integers, with the
+ping interval shorter than the socket timeout); `SessionStore=memory` wins over any Redis settings.
 
 **Key Vault secrets required at runtime (production):**
 

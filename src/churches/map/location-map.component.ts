@@ -13,6 +13,9 @@ import {
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import type * as LeafletType from 'leaflet';
+import { LOCATION_MAP_ID, LOCATION_MAP_TILES_ID } from './map-ids';
+import { environment } from '../../environments/environment';
+import { AriaRoles } from '../../shared/aria-roles';
 
 export interface MapPoint {
   lat: number;
@@ -24,11 +27,20 @@ export interface MapPoint {
   selector: 'app-location-map',
   standalone: true,
   template: `
-    <div #mapEl id="location-map" class="leaflet-container" style="width:100%;height:320px;isolation:isolate"></div>
+    <div
+      #mapEl
+      [id]="mapId"
+      class="leaflet-container"
+      [attr.role]="ariaRoles.region"
+      [attr.aria-label]="mapLabel()"
+      style="width:100%;height:320px;isolation:isolate"></div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LocationMapComponent implements AfterViewInit, OnChanges, OnDestroy {
+  protected readonly ariaRoles = AriaRoles;
+  protected readonly mapId = LOCATION_MAP_ID;
+
   private readonly platformId = inject(PLATFORM_ID);
 
   readonly points = input<MapPoint[]>([]);
@@ -36,6 +48,11 @@ export class LocationMapComponent implements AfterViewInit, OnChanges, OnDestroy
   @ViewChild('mapEl') private mapElRef?: ElementRef<HTMLDivElement>;
   private map: LeafletType.Map | null = null;
   private markers: LeafletType.Marker[] = [];
+
+  protected mapLabel(): string {
+    const first = this.points()[0];
+    return first ? `Map showing the location of ${first.label}` : 'Map';
+  }
 
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
@@ -59,13 +76,13 @@ export class LocationMapComponent implements AfterViewInit, OnChanges, OnDestroy
     const L = await this.loadLeaflet();
     this.fixDefaultIcon(L);
     this.map = L.map(this.mapElRef.nativeElement).setView([39.5, -98.35], 4);
-    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tiles = L.tileLayer(environment.mapTileUrlTemplate, {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(this.map);
     const tileContainer = tiles.getContainer();
     if (tileContainer) {
-      tileContainer.id = 'location-map-tiles';
+      tileContainer.id = LOCATION_MAP_TILES_ID;
     }
     this.map.invalidateSize();
     this.renderMarkers(L);

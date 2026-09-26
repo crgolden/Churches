@@ -1,23 +1,33 @@
-import { test, expect, FIRST_BAPTIST_AUSTIN, MOSAIC_AUSTIN } from './fixtures.js';
-import type { ChurchRecord } from './fixtures.js';
+import { newText } from '@crgolden/modules/testing';
+import {
+  test,
+  expect,
+  CHURCH_WITH_DETAILS,
+  CHURCH_WITHOUT_DETAILS,
+  firstPageUrl,
+  seedChurches,
+} from './fixtures.js';
+import { churchUrl, contributeUrl } from '../src/app/app-paths';
+import { CorrectableFieldKeys } from '../src/shared/correctable-fields';
+import { DEFAULT_PAGE_SIZE, SearchParamNames } from '../src/shared/directory-api';
+import { ContributeErrors } from '../src/churches/contribute/contribute-errors';
+import { CHURCH_NAME_ID_PREFIX } from '../src/churches/list/church-list-ids';
 
 test.describe('EdgeCases', () => {
-  test('anonymous navigation across pages produces no unexpected console errors', async ({
+  test('anonymous navigation across pages produces no console errors', async ({
     anonymousPage: page,
     store,
   }) => {
     await store.reset();
-    await store.seedChurch(FIRST_BAPTIST_AUSTIN);
+    await store.seedChurch(CHURCH_WITH_DETAILS);
 
     const errors: string[] = [];
     page.on('console', msg => {
-      if (msg.type() === 'error' && !msg.text().includes('/bff/user') && !msg.text().includes('401')) {
-        errors.push(msg.text());
-      }
+      if (msg.type() === 'error') errors.push(msg.text());
     });
 
     await page.goto('/');
-    await page.goto('/churches/first-baptist-church-austin-tx', { waitUntil: 'domcontentloaded' });
+    await page.goto(churchUrl(CHURCH_WITH_DETAILS.slug), { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelectorAll('[ngh]').length === 0);
 
     expect(errors).toHaveLength(0);
@@ -28,7 +38,7 @@ test.describe('EdgeCases', () => {
     store,
   }) => {
     await store.reset();
-    await store.seedChurch(FIRST_BAPTIST_AUSTIN);
+    await store.seedChurch(CHURCH_WITH_DETAILS);
 
     const errors: string[] = [];
     page.on('console', msg => {
@@ -36,7 +46,7 @@ test.describe('EdgeCases', () => {
     });
 
     await page.goto('/');
-    await page.goto('/churches/first-baptist-church-austin-tx', { waitUntil: 'domcontentloaded' });
+    await page.goto(churchUrl(CHURCH_WITH_DETAILS.slug), { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelectorAll('[ngh]').length === 0);
 
     expect(errors).toHaveLength(0);
@@ -44,11 +54,11 @@ test.describe('EdgeCases', () => {
 
   test('inactive church is hidden from search results', async ({ anonymousPage: page, store }) => {
     await store.reset();
-    await store.seedChurch({ ...FIRST_BAPTIST_AUSTIN, isActive: false });
+    await store.seedChurch({ ...CHURCH_WITH_DETAILS, isActive: false });
 
-    await page.goto('/churches?q=Baptist&page=1&pageSize=20');
-    await expect(page.locator('[id^="church-name-"]')).toHaveCount(0);
-    await expect(page.locator('#result-count')).toContainText('0 churches found');
+    await page.goto(firstPageUrl({ [SearchParamNames.q]: CHURCH_WITH_DETAILS.canonicalName }));
+    await expect(page.locator(`[id^="${CHURCH_NAME_ID_PREFIX}"]`)).toHaveCount(0);
+    await expect(page.locator('#result-count')).toHaveAttribute('data-total-count', String(0));
   });
 
   test('inactive church on detail page shows not-found message', async ({
@@ -56,9 +66,9 @@ test.describe('EdgeCases', () => {
     store,
   }) => {
     await store.reset();
-    await store.seedChurch({ ...FIRST_BAPTIST_AUSTIN, isActive: false });
+    await store.seedChurch({ ...CHURCH_WITH_DETAILS, isActive: false });
 
-    await page.goto('/churches/first-baptist-church-austin-tx');
+    await page.goto(churchUrl(CHURCH_WITH_DETAILS.slug));
     await expect(page.locator('#church-error')).toBeVisible();
   });
 
@@ -66,23 +76,25 @@ test.describe('EdgeCases', () => {
     anonymousPage: page,
     store,
   }) => {
+    const lowConfidenceChurch = { ...CHURCH_WITHOUT_DETAILS, confidenceScore: 0 };
     await store.reset();
-    await store.seedChurch(MOSAIC_AUSTIN);
+    await store.seedChurch(lowConfidenceChurch);
 
-    await page.goto('/churches/mosaic-church-austin-tx');
-    await expect(page.locator('#church-name')).toContainText('Mosaic Church Austin');
+    await page.goto(churchUrl(lowConfidenceChurch.slug));
+    await expect(page.locator('#church-name')).toHaveAttribute('data-church-id', lowConfidenceChurch.id);
   });
 
   test('correction for field with null current value submits successfully', async ({
     authedPage: page,
     store,
   }) => {
+    const suggestedPhoneNumber = newText();
     await store.reset();
-    await store.seedChurch(MOSAIC_AUSTIN);
+    await store.seedChurch(CHURCH_WITHOUT_DETAILS);
 
-    await page.goto('/contribute/mosaic-church-austin-tx');
-    await page.locator('#field-select').selectOption('phoneNumber');
-    await page.locator('#new-value').fill('(512) 555-0100');
+    await page.goto(contributeUrl(CHURCH_WITHOUT_DETAILS.slug));
+    await page.locator('#field-select').selectOption(CorrectableFieldKeys.phoneNumber);
+    await page.locator('#new-value').fill(suggestedPhoneNumber);
     await page.locator('#btn-submit-correction').click();
     await expect(page.locator('#correction-submitted')).toBeVisible();
   });
@@ -92,13 +104,13 @@ test.describe('EdgeCases', () => {
     store,
   }) => {
     await store.reset();
-    await store.seedChurch(FIRST_BAPTIST_AUSTIN);
+    await store.seedChurch(CHURCH_WITH_DETAILS);
 
-    await page.goto('/contribute/first-baptist-church-austin-tx');
-    await page.locator('#field-select').selectOption('street');
-    await page.locator('#new-value').fill('901 Trinity St');
+    await page.goto(contributeUrl(CHURCH_WITH_DETAILS.slug));
+    await page.locator('#field-select').selectOption(CorrectableFieldKeys.street);
+    await page.locator('#new-value').fill(String(CHURCH_WITH_DETAILS.street));
     await page.locator('#btn-submit-correction').click();
-    await expect(page.locator('#correction-error')).toContainText('already has that value');
+    await expect(page.locator('#correction-error')).toHaveAttribute('data-error', ContributeErrors.alreadyHasValue);
     await expect(page.locator('#correction-submitted')).toHaveCount(0);
   });
 
@@ -107,40 +119,9 @@ test.describe('EdgeCases', () => {
     store,
   }) => {
     await store.reset();
-    for (let i = 0; i < 20; i++) {
-      const church: ChurchRecord = {
-        id: crypto.randomUUID(),
-        canonicalName: `Church ${String(i).padStart(3, '0')}`,
-        slug: `church-${String(i).padStart(3, '0')}-city-tx`,
-        latitude: 30.0,
-        longitude: -97.0,
-        street: null,
-        city: 'City',
-        state: 'TX',
-        zip: '78700',
-        phoneNumber: null,
-        website: null,
-        emailAddress: null,
-        denominationId: null,
-        worshipStyle: 1,
-        primaryLanguage: 'English',
-        acceptsLGBTQ: null,
-        wheelchairAccessible: null,
-        hasNursery: null,
-        hasYouthProgram: null,
-        confidenceScore: 0.5,
-        lastVerifiedAt: null,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        schedules: [],
-        ministries: [],
-        campuses: [],
-      };
-      await store.seedChurch(church);
-    }
+    await seedChurches(store, DEFAULT_PAGE_SIZE);
 
-    await page.goto('/churches?q=Church&page=1&pageSize=20');
+    await page.goto(firstPageUrl());
     await expect(page.locator('#btn-next-page')).toHaveCount(0);
   });
 });

@@ -1,9 +1,11 @@
+import { HttpStatusCode } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RESPONSE_INIT } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { Meta } from '@angular/platform-browser';
 import { NotFoundComponent } from './not-found.component';
 import { SeoService } from '../seo.service';
+import { MetaNames } from '../seo-contract';
 
 describe('NotFoundComponent', () => {
   let fixture: ComponentFixture<NotFoundComponent>;
@@ -23,7 +25,7 @@ describe('NotFoundComponent', () => {
 
     fixture.detectChanges();
 
-    expect(responseInit.status).toBe(404);
+    expect(responseInit.status).toBe(HttpStatusCode.NotFound);
   });
 
   it('does not throw when RESPONSE_INIT is null', async () => {
@@ -48,6 +50,6 @@ describe('NotFoundComponent', () => {
 
     fixture.detectChanges();
 
-    expect(meta.getTag('name="description"')?.content).toBeTruthy();
+    expect(meta.getTag(`name="${MetaNames.description}"`)?.content).toBeTruthy();
   });
 });

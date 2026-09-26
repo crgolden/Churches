@@ -1,8 +1,9 @@
 import { createDirectoryApp } from './directory.js';
+import { e2eContract } from './e2e-contract.js';
 
-const PORT = parseInt(process.env['MOCK_DIR_PORT'] ?? '4001', 10);
+const port = e2eContract().mockDirectoryPort;
 const app = createDirectoryApp();
 
-app.listen(PORT, () => {
-  console.log(`[MockDirectory] Listening on http://localhost:${PORT}`);
+app.listen(port, () => {
+  console.log(`[MockDirectory] Listening on http://localhost:${port}`);
 });

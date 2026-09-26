@@ -1,8 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { newDisplayName, newId, newMemberOf, newText } from '@crgolden/modules/testing';
 import { ContributeComponent } from './contribute.component';
+import { ContributeErrors } from './contribute-errors';
+import { CORRECTABLE_FIELDS, CorrectableFieldKeys } from '../../shared/correctable-fields';
+import { DirectoryApi } from '../../shared/directory-api';
+import { US_STATES, WORSHIP_STYLES } from '../../shared/models';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { HttpStatusCode, provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpMethods } from '../../bff/http-headers';
 
 describe('ContributeComponent', () => {
   let component: ContributeComponent;
@@ -10,13 +16,13 @@ describe('ContributeComponent', () => {
   let controller: HttpTestingController;
 
   const mockChurch = {
-    id: 'c-1',
-    slug: 'grace',
-    canonicalName: 'Grace Church',
-    street: '123 Main',
-    city: 'Denver',
-    state: 'CO',
-    zip: '80201',
+    id: newId(),
+    slug: newText(),
+    canonicalName: newDisplayName(),
+    street: newDisplayName(),
+    city: newText(),
+    state: newMemberOf(US_STATES).code,
+    zip: newText(),
   };
 
   beforeEach(async () => {
@@ -43,64 +49,111 @@ describe('ContributeComponent', () => {
   });
 
   it('takes the church from the resolver rather than fetching it', () => {
-    expect(component['church']()).toBe(mockChurch as never);
+    expect(component.church()).toBe(mockChurch as never);
     controller.expectNone(() => true);
   });
 
+  it('offers the fields the IRS import gets wrong, not just the text ones', () => {
+    const offered = Array.from(
+      fixture.nativeElement.querySelectorAll('#field-select option') as NodeListOf<HTMLOptionElement>,
+    ).map(option => option.value);
+
+    expect(offered).toContain(CorrectableFieldKeys.worshipStyle);
+    expect(offered).toContain(CorrectableFieldKeys.denominationId);
+    expect(offered).toContain(CorrectableFieldKeys.wheelchairAccessible);
+  });
+
+  it('names each field for a reader rather than showing the property name', () => {
+    const labels = Array.from(
+      fixture.nativeElement.querySelectorAll('#field-select option') as NodeListOf<HTMLOptionElement>,
+    ).map(option => option.textContent?.trim());
+
+    expect(labels).toEqual(expect.arrayContaining(CORRECTABLE_FIELDS.map(field => field.label)));
+    expect(labels).toEqual(expect.not.arrayContaining(CORRECTABLE_FIELDS.map(field => field.key)));
+  });
+
+  it('offers worship styles as a list rather than asking for a number', () => {
+    component.onFieldChange(CorrectableFieldKeys.worshipStyle);
+    fixture.detectChanges();
+
+    const control = fixture.nativeElement.querySelector('#new-value') as HTMLSelectElement;
+    expect(control).toBeInstanceOf(HTMLSelectElement);
+    expect(Array.from(control.options).map(o => o.textContent?.trim())).toEqual(
+      expect.arrayContaining(WORSHIP_STYLES.map(style => style.label)),
+    );
+  });
+
+  it('shows the style the directory holds, by name', () => {
+    const style = newMemberOf(WORSHIP_STYLES);
+    component.church.set({ ...mockChurch, worshipStyle: style.value } as never);
+    component.onFieldChange(CorrectableFieldKeys.worshipStyle);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('#current-value').textContent).toContain(style.label);
+  });
+
+  it('clears a value carried over from the previous field', () => {
+    component.newValue.set(newText());
+
+    component.onFieldChange(CorrectableFieldKeys.wheelchairAccessible);
+
+    expect(component.newValue()).toBe('');
+  });
+
   it('submit does nothing when there is no church', () => {
-    component['church'].set(null);
-    component['submit']();
+    component.church.set(null);
+    component.submit();
     controller.expectNone(() => true);
   });
 
   it('submit does nothing when newValue is empty', () => {
-    component['church'].set(mockChurch as never);
-    component['newValue'].set('');
-    component['submit']();
+    component.church.set(mockChurch as never);
+    component.newValue.set('');
+    component.submit();
     controller.expectNone(() => true);
   });
 
   it('submit sets error when value is unchanged', () => {
-    component['church'].set(mockChurch as never);
-    component['field'].set('canonicalName');
-    component['newValue'].set('Grace Church');
-    component['submit']();
-    expect(component['error']()).toContain('already has that value');
+    component.church.set(mockChurch as never);
+    component.field.set(CorrectableFieldKeys.canonicalName);
+    component.newValue.set(mockChurch.canonicalName);
+    component.submit();
+    expect(component.error()).toBe(ContributeErrors.alreadyHasValue);
     controller.expectNone(() => true);
   });
 
   it('submit posts correction and sets submitted on success', () => {
-    component['church'].set(mockChurch as never);
-    component['field'].set('canonicalName');
-    component['newValue'].set('New Grace Church');
-    component['submit']();
-    const req = controller.expectOne('/directory/api/corrections');
-    expect(req.request.method).toBe('POST');
-    req.flush({ id: 'new-id' });
-    expect(component['submitted']()).toBe(true);
-    expect(component['submitting']()).toBe(false);
+    component.church.set(mockChurch as never);
+    component.field.set(CorrectableFieldKeys.canonicalName);
+    component.newValue.set(newDisplayName());
+    component.submit();
+    const req = controller.expectOne(DirectoryApi.corrections);
+    expect(req.request.method).toBe(HttpMethods.post);
+    req.flush({ id: newId() });
+    expect(component.submitted()).toBe(true);
+    expect(component.submitting()).toBe(false);
   });
 
   it('submit sets error message on API failure', () => {
-    component['church'].set(mockChurch as never);
-    component['field'].set('street');
-    component['newValue'].set('456 Oak Ave');
-    component['submit']();
+    component.church.set(mockChurch as never);
+    component.field.set(CorrectableFieldKeys.street);
+    component.newValue.set(newDisplayName());
+    component.submit();
     controller
-      .expectOne('/directory/api/corrections')
-      .flush('', { status: 500, statusText: 'Error' });
-    expect(component['error']()).toContain('Failed to submit');
-    expect(component['submitting']()).toBe(false);
+      .expectOne(DirectoryApi.corrections)
+      .flush('', { status: HttpStatusCode.InternalServerError, statusText: newText() });
+    expect(component.error()).toBe(ContributeErrors.submitFailed);
+    expect(component.submitting()).toBe(false);
   });
 
   it('submit correctly passes null oldValue for field with null existing value', () => {
     const churchWithNullField = { ...mockChurch, phoneNumber: null };
-    component['church'].set(churchWithNullField as never);
-    component['field'].set('phoneNumber');
-    component['newValue'].set('555-1234');
-    component['submit']();
-    const req = controller.expectOne('/directory/api/corrections');
-    expect(req.request.body).toMatchObject({ oldValue: null, field: 'phoneNumber' });
-    req.flush({ id: 'x' });
+    component.church.set(churchWithNullField as never);
+    component.field.set(CorrectableFieldKeys.phoneNumber);
+    component.newValue.set(newText());
+    component.submit();
+    const req = controller.expectOne(DirectoryApi.corrections);
+    expect(req.request.body).toMatchObject({ oldValue: null, field: CorrectableFieldKeys.phoneNumber });
+    req.flush({ id: newId() });
   });
 });

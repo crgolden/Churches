@@ -2,6 +2,7 @@ import {
   discovery,
   type Configuration,
 } from 'openid-client';
+import { BffSettingKeys, requiredSetting, requiredUrlSetting } from './settings';
 
 let _config: Configuration | null = null;
 
@@ -10,21 +11,11 @@ export async function getOidcConfig(): Promise<Configuration> {
     return _config;
   }
 
-  const authority = process.env['OidcAuthority'];
-  const clientId = process.env['ChurchesClientId'];
-  const clientSecret = process.env['ChurchesClientSecret'];
+  const authority = requiredUrlSetting(BffSettingKeys.OidcAuthority);
+  const clientId = requiredSetting(BffSettingKeys.ClientId);
+  const clientSecret = requiredSetting(BffSettingKeys.ClientSecret);
 
-  if (!authority) {
-    throw new Error('Missing required environment variable: OidcAuthority');
-  }
-  if (!clientId) {
-    throw new Error('Missing required environment variable: ChurchesClientId');
-  }
-  if (!clientSecret) {
-    throw new Error('Missing required environment variable: ChurchesClientSecret');
-  }
-
-  _config = await discovery(new URL(authority), clientId, clientSecret);
+  _config = await discovery(authority, clientId, clientSecret);
 
   return _config;
 }

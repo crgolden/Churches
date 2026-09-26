@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, Router } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
+import { newDisplayName, newPathSegment, newText } from '@crgolden/modules/testing';
 import { contributeChurchResolver } from './contribute.resolver';
 import { ChurchApiService } from '../../shared/church.service';
 import { Church } from '../../shared/models';
 
-const CHURCH = { canonicalName: 'Grace Chapel', slug: 'grace-chapel-austin-tx' } as unknown as Church;
+const CHURCH = { canonicalName: newDisplayName(), slug: newPathSegment() } as unknown as Church;
 
 interface RunResult {
   emitted: Church[];
@@ -53,8 +54,8 @@ describe('contributeChurchResolver', () => {
 
   it('redirects home and emits nothing when the church cannot be loaded', async () => {
     const { emitted, navigatedTo } = await run(
-      { getChurchBySlug: () => throwError(() => new Error('missing')) },
-      'gone',
+      { getChurchBySlug: () => throwError(() => new Error(newText())) },
+      newPathSegment(),
     );
 
     expect(emitted).toEqual([]);

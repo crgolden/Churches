@@ -1,26 +1,29 @@
-<nav class="app-nav">
-  <div class="nav-inner page-container">
-    <a routerLink="/" class="brand">Churches</a>
+<nav class="sticky top-0 z-(--z-nav) h-(--nav-height) border-b border-line bg-surface shadow-sm max-sm:h-auto">
+  <div crgPageContainer class="flex h-full items-center justify-between max-sm:flex-wrap max-sm:py-3">
+    <a routerLink="/" class="font-heading text-brand font-bold text-accent no-underline hover:no-underline">Churches</a>
     <button
-      class="nav-toggle"
+      class="hidden cursor-pointer flex-col gap-[5px] border-none bg-transparent p-1 max-sm:flex"
       type="button"
       (click)="toggleMenu()"
       [attr.aria-expanded]="menuOpen()"
       aria-label="Toggle navigation"
     >
-      <span></span><span></span><span></span>
+      <span class="block h-0.5 w-[22px] rounded-[2px] bg-text"></span><span class="block h-0.5 w-[22px] rounded-[2px] bg-text"></span><span class="block h-0.5 w-[22px] rounded-[2px] bg-text"></span>
     </button>
-    <ul class="nav-links" [class.open]="menuOpen()">
-      <li><a routerLink="/churches" (click)="menuOpen.set(false)">Browse</a></li>
+    <ul
+      class="m-0 flex list-none items-center gap-6 p-0 max-sm:mt-2 max-sm:hidden max-sm:w-full max-sm:flex-col max-sm:items-start max-sm:gap-3 max-sm:border-t max-sm:border-line max-sm:pt-3 max-sm:pb-2 max-sm:data-[open=true]:flex"
+      [attr.data-open]="menuOpen()"
+    >
+      <li><a routerLink="/churches" class="text-detail font-medium text-text no-underline hover:text-accent hover:no-underline" (click)="menuOpen.set(false)">Browse</a></li>
       @if (auth.hasModerationScope()) {
-        <li><a id="nav-moderation" routerLink="/admin/moderation" (click)="menuOpen.set(false)">Moderation</a></li>
+        <li><a id="nav-moderation" routerLink="/admin/moderation" class="text-detail font-medium text-text no-underline hover:text-accent hover:no-underline" (click)="menuOpen.set(false)">Moderation</a></li>
       }
       @if (auth.isAnonymous()) {
-        <li><a [href]="auth.loginUrl" class="btn-primary nav-cta">Log in</a></li>
+        <li><a [href]="auth.loginUrl" crgButtonPrimarySmall>Log in</a></li>
       } @else {
-        <li class="nav-user">
-          <span>{{ auth.username() }}</span>
-          <a [href]="auth.logoutUrl()" class="btn-ghost">Log out</a>
+        <li class="flex items-center gap-3 text-meta">
+          <span class="text-text-muted">{{ auth.username() }}</span>
+          <a [href]="auth.logoutUrl()" crgButtonGhost>Log out</a>
         </li>
       }
     </ul>

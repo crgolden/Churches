@@ -1,108 +1,134 @@
 @if (loading()) {
-  <div class="page-container page-section">
-    <p class="text-muted">Loading...</p>
+  <div crgPageContainer crgPageSection>
+    <p class="text-meta text-text-muted">Loading...</p>
   </div>
 } @else if (error()) {
-  <div class="page-container page-section">
-    <p id="church-error" class="text-error">{{ error() }}</p>
+  <div crgPageContainer crgPageSection>
+    <p id="church-error" class="m-0 text-meta text-danger">{{ error() }}</p>
   </div>
-} @else if (church()) {
-  <div class="page-container page-section">
-    <button id="btn-back" type="button" class="back-link btn-ghost" (click)="back()">&larr; Search results</button>
-    <article class="church-detail card">
-      <header class="detail-header">
-        <h1 id="church-name">{{ church()!.canonicalName }}</h1>
-        <address id="church-address">
-          @if (church()!.street) { <span>{{ church()!.street }}, </span> }
-          {{ church()!.city }}, {{ church()!.state }} {{ church()!.zip }}
+} @else if (church(); as current) {
+  <div crgPageContainer crgPageSection>
+    <a id="btn-back" crgButtonGhost class="mb-6" [routerLink]="['/churches']" [queryParams]="lastSearch()">&larr; Search results</a>
+    <p id="curation-error-announcement" class="sr-only" [attr.role]="ariaRoles.status">{{ curationError() }}</p>
+    @if (curationError()) {
+      <p id="curation-error" class="m-0 text-meta text-danger">{{ curationError() }}</p>
+    }
+    <article crgCard class="overflow-hidden">
+      <header class="border-b border-line p-6">
+        <h1 id="church-name" class="mb-1" [attr.data-church-id]="current.id">{{ current.canonicalName }}</h1>
+        <address id="church-address" class="text-detail text-text-muted not-italic">
+          @if (current.street) { <span id="church-street" [attr.data-street]="current.street">{{ current.street }}, </span> }
+          {{ current.city }}, {{ current.state }} {{ current.zip }}
         </address>
       </header>
-      <div class="detail-body">
-        <div class="detail-section">
-          <h4 id="church-contact-heading" class="eyebrow">Contact</h4>
-          <div class="info-rows">
-            @if (church()!.phoneNumber) {
-              <div class="info-row">
-                <span class="info-label">Phone</span>
-                <a id="church-phone" [href]="'tel:' + church()!.phoneNumber">{{ church()!.phoneNumber }}</a>
+      <div class="grid grid-cols-2 gap-8 p-6 max-compact:grid-cols-1">
+        <div>
+          <h2 id="church-contact-heading" appEyebrow>Contact</h2>
+          <div class="flex flex-col gap-2">
+            @if (current.phoneNumber) {
+              <div class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]">
+                <span class="font-medium text-text-muted">Phone</span>
+                <a id="church-phone" [href]="'tel:' + current.phoneNumber">{{ current.phoneNumber }}</a>
               </div>
             }
-            @if (church()!.website) {
-              <div class="info-row">
-                <span class="info-label">Website</span>
-                <a id="church-website" [href]="church()!.website!" target="_blank" rel="noopener">{{ church()!.website }}</a>
+            @if (current.website; as website) {
+              <div class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]">
+                <span class="font-medium text-text-muted">Website</span>
+                <a id="church-website" [href]="website" target="_blank" rel="noopener">{{ website }}</a>
               </div>
             }
-            @if (church()!.emailAddress) {
-              <div class="info-row">
-                <span class="info-label">Email</span>
-                <a id="church-email" [href]="'mailto:' + church()!.emailAddress">{{ church()!.emailAddress }}</a>
-              </div>
-            }
-          </div>
-        </div>
-        <div class="detail-section">
-          <h4 class="eyebrow">About</h4>
-          <div class="info-rows">
-            <div class="info-row">
-              <span class="info-label">Worship Style</span>
-              <span id="church-worship-style">{{ worshipStyleLabel(church()!.worshipStyle) }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Language</span>
-              <span id="church-language">{{ church()!.primaryLanguage }}</span>
-            </div>
-            @if (church()!.wheelchairAccessible !== null) {
-              <div id="church-wheelchair" class="info-row">
-                <span class="info-label">Wheelchair Accessible</span>
-                <span>{{ church()!.wheelchairAccessible ? 'Yes' : 'No' }}</span>
-              </div>
-            }
-            @if (church()!.hasNursery !== null) {
-              <div class="info-row">
-                <span class="info-label">Nursery</span>
-                <span>{{ church()!.hasNursery ? 'Yes' : 'No' }}</span>
-              </div>
-            }
-            @if (church()!.hasYouthProgram !== null) {
-              <div class="info-row">
-                <span class="info-label">Youth Program</span>
-                <span>{{ church()!.hasYouthProgram ? 'Yes' : 'No' }}</span>
+            @if (current.emailAddress) {
+              <div class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]">
+                <span class="font-medium text-text-muted">Email</span>
+                <a id="church-email" [href]="'mailto:' + current.emailAddress">{{ current.emailAddress }}</a>
               </div>
             }
           </div>
         </div>
-        @if (church()!.schedules.length || auth.hasModerationScope()) {
-          <div class="detail-section">
-            <h4 class="eyebrow">Service Times</h4>
-            <ul id="church-schedules" class="info-rows">
-              @for (s of church()!.schedules; track s.id) {
-                <li class="info-row">
-                  <span class="info-label">{{ scheduleLabel(s) }}</span>
+        <div>
+          <h2 appEyebrow>About</h2>
+          <div class="flex flex-col gap-2">
+            <div class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]">
+              <span class="font-medium text-text-muted">Worship Style</span>
+              <span id="church-worship-style" [attr.data-worship-style]="current.worshipStyle">{{ worshipStyleLabel(current.worshipStyle) }}</span>
+            </div>
+            <div class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]">
+              <span class="font-medium text-text-muted">Language</span>
+              <span id="church-language">{{ current.primaryLanguage }}</span>
+            </div>
+            @if (current.wheelchairAccessible !== null) {
+              <div id="church-wheelchair" class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]">
+                <span class="font-medium text-text-muted">Wheelchair Accessible</span>
+                <span>{{ current.wheelchairAccessible ? 'Yes' : 'No' }}</span>
+              </div>
+            }
+            @if (current.hasNursery !== null) {
+              <div class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]">
+                <span class="font-medium text-text-muted">Nursery</span>
+                <span>{{ current.hasNursery ? 'Yes' : 'No' }}</span>
+              </div>
+            }
+            @if (current.hasYouthProgram !== null) {
+              <div class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]">
+                <span class="font-medium text-text-muted">Youth Program</span>
+                <span>{{ current.hasYouthProgram ? 'Yes' : 'No' }}</span>
+              </div>
+            }
+          </div>
+        </div>
+        @if (current.schedules.length || auth.hasModerationScope()) {
+          <div>
+            <h2 appEyebrow>Service Times</h2>
+            <ul id="church-schedules" class="flex flex-col gap-2">
+              @for (s of current.schedules; track s.id) {
+                <li class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]" [attr.id]="'church-schedule-' + $index" [attr.data-schedule-id]="s.id">
+                  <span class="font-medium text-text-muted">{{ scheduleLabel(s) }}</span>
                   <span>
                     @if (s.description) { {{ s.description }} }
                     @if (auth.hasModerationScope()) {
-                      <button type="button" class="btn-ghost mod-delete" (click)="deleteSchedule(s.id)" aria-label="Delete schedule">✕</button>
+                      @if (pendingDeleteId() === s.id) {
+                        <button
+                          type="button"
+                          [attr.id]="'schedule-delete-confirm-' + $index"
+                          appInlineDeleteButton
+                          class="ml-2"
+                          (click)="confirmDeleteSchedule(s.id)"
+                          [attr.aria-label]="'Confirm deleting the ' + scheduleLabel(s) + ' service time'">Delete</button>
+                        <button
+                          type="button"
+                          [attr.id]="'schedule-delete-cancel-' + $index"
+                          crgButtonGhost
+                          (click)="cancelDelete()"
+                          [attr.aria-label]="'Keep the ' + scheduleLabel(s) + ' service time'">Cancel</button>
+                      } @else {
+                        <button
+                          type="button"
+                          [attr.id]="'schedule-delete-' + $index"
+                          appInlineDeleteButton
+                          class="ml-2"
+                          (click)="askToDelete(s.id)"
+                          [attr.aria-label]="'Delete the ' + scheduleLabel(s) + ' service time'">✕</button>
+                      }
                     }
                   </span>
                 </li>
               }
             </ul>
             @if (auth.hasModerationScope()) {
-              <form class="mod-add" [formGroup]="scheduleForm" (ngSubmit)="addSchedule()">
-                <div id="schedule-add-grid" class="mod-add-grid">
-                  <div class="field-group">
-                    <label for="schedule-day">Day</label>
+              <form class="mt-4 border-t border-dashed border-line pt-4" [formGroup]="scheduleForm" (ngSubmit)="addSchedule()">
+                <div id="schedule-add-grid" class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 max-compact:grid-cols-1">
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="schedule-day">Day</label>
                     <select id="schedule-day" formControlName="dayOfWeek" aria-label="Day of week">
                       @for (d of daysOfWeek; track d.value) { <option [ngValue]="d.value">{{ d.label }}</option> }
                     </select>
                   </div>
-                  <div class="field-group">
-                    <label for="schedule-time">Start time</label>
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="schedule-time">Start time</label>
                     <input id="schedule-time" type="time" formControlName="startTime" aria-label="Start time" />
                   </div>
-                  <div class="field-group">
-                    <label for="schedule-desc">Description</label>
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="schedule-desc">Description</label>
                     <input
                       id="schedule-desc"
                       type="text"
@@ -116,32 +142,54 @@
                     />
                   </div>
                 </div>
-                <button type="submit" id="add-schedule" class="btn-secondary">Add service time</button>
+                <button type="submit" id="add-schedule" crgButtonSecondary>Add service time</button>
               </form>
             }
           </div>
         }
-        @if (church()!.ministries.length || auth.hasModerationScope()) {
-          <div class="detail-section">
-            <h4 class="eyebrow">Ministries</h4>
-            <ul id="church-ministries" class="info-rows">
-              @for (m of church()!.ministries; track m.id) {
-                <li class="info-row">
-                  <span class="info-label">{{ m.name }}</span>
+        @if (current.ministries.length || auth.hasModerationScope()) {
+          <div>
+            <h2 appEyebrow>Ministries</h2>
+            <ul id="church-ministries" class="flex flex-col gap-2">
+              @for (m of current.ministries; track m.id) {
+                <li class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]" [attr.id]="'church-ministry-' + $index" [attr.data-ministry-id]="m.id">
+                  <span class="font-medium text-text-muted">{{ m.name }}</span>
                   <span>
                     @if (m.description) { {{ m.description }} }
                     @if (auth.hasModerationScope()) {
-                      <button type="button" class="btn-ghost mod-delete" (click)="deleteMinistry(m.id)" aria-label="Delete ministry">✕</button>
+                      @if (pendingDeleteId() === m.id) {
+                        <button
+                          type="button"
+                          [attr.id]="'ministry-delete-confirm-' + $index"
+                          appInlineDeleteButton
+                          class="ml-2"
+                          (click)="confirmDeleteMinistry(m.id)"
+                          [attr.aria-label]="'Confirm deleting the ' + m.name + ' ministry'">Delete</button>
+                        <button
+                          type="button"
+                          [attr.id]="'ministry-delete-cancel-' + $index"
+                          crgButtonGhost
+                          (click)="cancelDelete()"
+                          [attr.aria-label]="'Keep the ' + m.name + ' ministry'">Cancel</button>
+                      } @else {
+                        <button
+                          type="button"
+                          [attr.id]="'ministry-delete-' + $index"
+                          appInlineDeleteButton
+                          class="ml-2"
+                          (click)="askToDelete(m.id)"
+                          [attr.aria-label]="'Delete the ' + m.name + ' ministry'">✕</button>
+                      }
                     }
                   </span>
                 </li>
               }
             </ul>
             @if (auth.hasModerationScope()) {
-              <form class="mod-add" [formGroup]="ministryForm" (ngSubmit)="addMinistry()">
-                <div class="mod-add-grid">
-                  <div class="field-group">
-                    <label for="ministry-name">Name</label>
+              <form class="mt-4 border-t border-dashed border-line pt-4" [formGroup]="ministryForm" (ngSubmit)="addMinistry()">
+                <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 max-compact:grid-cols-1">
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="ministry-name">Name</label>
                     <input
                       id="ministry-name"
                       type="text"
@@ -154,8 +202,8 @@
                       data-form-type="other"
                     />
                   </div>
-                  <div class="field-group">
-                    <label for="ministry-desc">Description</label>
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="ministry-desc">Description</label>
                     <input
                       id="ministry-desc"
                       type="text"
@@ -169,80 +217,111 @@
                     />
                   </div>
                 </div>
-                <button type="submit" id="add-ministry" class="btn-secondary">Add ministry</button>
+                <button type="submit" id="add-ministry" crgButtonSecondary>Add ministry</button>
               </form>
             }
           </div>
         }
-        @if (church()!.campuses.length || auth.hasModerationScope()) {
-          <div class="detail-section">
-            <h4 class="eyebrow">Campuses</h4>
-            <ul id="church-campuses" class="info-rows">
-              @for (cp of church()!.campuses; track cp.id) {
-                <li class="info-row">
-                  <span class="info-label">{{ cp.name }}</span>
+        @if (current.campuses.length || auth.hasModerationScope()) {
+          <div>
+            <h2 appEyebrow>Campuses</h2>
+            <ul id="church-campuses" class="flex flex-col gap-2">
+              @for (cp of current.campuses; track cp.id) {
+                <li class="grid grid-cols-[9rem_1fr] items-baseline gap-2 text-detail max-compact:grid-cols-1 max-compact:gap-[0.15rem]" [attr.id]="'church-campus-' + $index" [attr.data-campus-id]="cp.id">
+                  <span class="font-medium text-text-muted">{{ cp.name }}</span>
                   <span>
                     {{ campusAddress(cp) }}
                     @if (auth.hasModerationScope()) {
-                      <button type="button" class="btn-ghost mod-delete" (click)="deleteCampus(cp.id)" aria-label="Delete campus">✕</button>
+                      @if (pendingDeleteId() === cp.id) {
+                        <button
+                          type="button"
+                          [attr.id]="'campus-delete-confirm-' + $index"
+                          appInlineDeleteButton
+                          class="ml-2"
+                          (click)="confirmDeleteCampus(cp.id)"
+                          [attr.aria-label]="'Confirm deleting the ' + cp.name + ' campus'">Delete</button>
+                        <button
+                          type="button"
+                          [attr.id]="'campus-delete-cancel-' + $index"
+                          crgButtonGhost
+                          (click)="cancelDelete()"
+                          [attr.aria-label]="'Keep the ' + cp.name + ' campus'">Cancel</button>
+                      } @else {
+                        <button
+                          type="button"
+                          [attr.id]="'campus-delete-' + $index"
+                          appInlineDeleteButton
+                          class="ml-2"
+                          (click)="askToDelete(cp.id)"
+                          [attr.aria-label]="'Delete the ' + cp.name + ' campus'">✕</button>
+                      }
                     }
                   </span>
                 </li>
               }
             </ul>
             @if (auth.hasModerationScope()) {
-              <form class="mod-add" [formGroup]="campusForm" (ngSubmit)="addCampus()">
-                <div class="mod-add-grid">
-                  <div class="field-group">
-                    <label for="campus-name">Name</label>
+              <form class="mt-4 border-t border-dashed border-line pt-4" [formGroup]="campusForm" (ngSubmit)="addCampus()">
+                <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 max-compact:grid-cols-1">
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="campus-name">Name</label>
                     <input id="campus-name" type="text" formControlName="name" placeholder="e.g. North Campus" aria-label="Campus name" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
                   </div>
-                  <div class="field-group">
-                    <label for="campus-street">Street</label>
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="campus-street">Street</label>
                     <input id="campus-street" type="text" formControlName="street" placeholder="Street" aria-label="Campus street" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
                   </div>
-                  <div class="field-group">
-                    <label for="campus-city">City</label>
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="campus-city">City</label>
                     <input id="campus-city" type="text" formControlName="city" placeholder="City" aria-label="Campus city" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
                   </div>
-                  <div class="field-group">
-                    <label for="campus-state">State</label>
-                    <input id="campus-state" type="text" formControlName="state" placeholder="State" aria-label="Campus state" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="campus-state">State</label>
+                    <select id="campus-state" formControlName="state">
+                      <option [ngValue]="null">Select a state</option>
+                      @for (s of usStates; track s.code) {
+                        <option [ngValue]="s.code">{{ s.name }}</option>
+                      }
+                    </select>
                   </div>
-                  <div class="field-group">
-                    <label for="campus-zip">Zip</label>
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="campus-zip">Zip</label>
                     <input id="campus-zip" type="text" formControlName="zip" placeholder="Zip" aria-label="Campus zip" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
                   </div>
-                  <div class="field-group">
-                    <label for="campus-lat">Latitude</label>
-                    <input id="campus-lat" type="number" step="any" formControlName="latitude" placeholder="e.g. 30.27" aria-label="Campus latitude" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="campus-lat">Latitude <span class="text-meta text-text-muted">(optional)</span></label>
+                    <input id="campus-lat" type="number" step="any" formControlName="latitude" placeholder="e.g. 30.27" aria-label="Campus latitude" aria-describedby="campus-coordinates-note" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
                   </div>
-                  <div class="field-group">
-                    <label for="campus-lng">Longitude</label>
-                    <input id="campus-lng" type="number" step="any" formControlName="longitude" placeholder="e.g. -97.74" aria-label="Campus longitude" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <label class="text-small font-medium text-text-muted" for="campus-lng">Longitude <span class="text-meta text-text-muted">(optional)</span></label>
+                    <input id="campus-lng" type="number" step="any" formControlName="longitude" placeholder="e.g. -97.74" aria-label="Campus longitude" aria-describedby="campus-coordinates-note" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" />
                   </div>
                 </div>
-                <button type="submit" id="add-campus" class="btn-secondary">Add campus</button>
+                <p id="campus-coordinates-note" class="text-meta text-text-muted">
+                  Leave the coordinates blank if you don’t know them. The campus is saved without a
+                  location and won’t appear on the map until someone adds them.
+                </p>
+                <button type="submit" id="add-campus" crgButtonSecondary>Add campus</button>
               </form>
             }
           </div>
         }
       </div>
       @if (mapPoints().length) {
-        <div class="detail-section detail-section--full" id="church-map-section">
-          <h4 class="eyebrow">Location</h4>
+        <div class="px-6 pb-6" id="church-map-section">
+          <h2 appEyebrow>Location</h2>
           <app-location-map [points]="mapPoints()" />
         </div>
       }
-      <div class="detail-actions">
+      <div class="flex flex-wrap gap-3 border-t border-line p-6">
         <a
-          [href]="'https://maps.google.com/?q=' + encodeAddress(church()!)"
+          [href]="'https://maps.google.com/?q=' + encodeAddress(current)"
           target="_blank"
           rel="noopener"
-          class="btn-secondary"
+          crgButtonSecondary
         >Get Directions</a>
         @if (auth.isAuthenticated()) {
-          <a id="contribute-link" [routerLink]="['/contribute', church()!.slug]" class="btn-ghost">
+          <a id="contribute-link" [routerLink]="['/contribute', current.slug]" crgButtonGhost>
             Suggest a correction
           </a>
         }

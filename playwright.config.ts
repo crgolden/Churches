@@ -1,7 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
+import { newId, newText } from '@crgolden/modules/testing';
+import { MEMORY_SESSION_STORE } from './src/bff/settings';
+import { E2E_CONTRACT_VARIABLE, newE2eContract } from './e2e/mocks/e2e-contract';
+import e2eSettings from './e2e/e2e-settings.json';
 
-const SSR_PORT = 4000;
-const MOCK_DIR_PORT = 4001;
+const SSR_PORT = e2eSettings.ports.ssr;
+const MOCK_DIR_PORT = e2eSettings.ports.mockDirectory;
+
+process.env[E2E_CONTRACT_VARIABLE] ??= JSON.stringify(newE2eContract(MOCK_DIR_PORT));
 
 const walkerBaseUrl = process.env['WalkerBaseUrl']?.replace(/\/$/, '');
 
@@ -58,12 +64,13 @@ export default defineConfig({
       env: {
         PORT: String(SSR_PORT),
         DirectoryApiAddress: `http://localhost:${MOCK_DIR_PORT}`,
-        SessionStore: 'memory',
+        SitemapBlobBaseUrl: `http://localhost:${MOCK_DIR_PORT}/`,
+        SessionStore: MEMORY_SESSION_STORE,
         NODE_ENV: 'test',
-        ChurchesClientId: 'e2e-client-id',
-        ChurchesClientSecret: 'e2e-secret',
-        OidcAuthority: 'http://localhost:4002',
-        SessionSecret: 'e2e-test-secret-must-be-at-least-32-chars',
+        ChurchesClientId: newText(),
+        ChurchesClientSecret: newText(),
+        OidcAuthority: `http://localhost:${e2eSettings.ports.unusedOidcAuthority}`,
+        SessionSecret: `${newId()}${newId()}`,
       },
       reuseExistingServer: !process.env['CI'],
       timeout: 60_000,

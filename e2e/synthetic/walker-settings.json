@@ -1,0 +1,20 @@
+{
+  "stepBudget": { "defaultSteps": 40, "maxSteps": 500 },
+  "journeys": [
+    { "slot": 1, "role": "moderator", "moderates": true },
+    { "slot": 2, "role": "visitor", "moderates": false }
+  ],
+  "searchKeywords": ["grace", "first", "community", "hope", "faith", "trinity", "christ", "saint"],
+  "actionWeights": {
+    "go home": 2,
+    "search by keyword": 5,
+    "search by state": 3,
+    "search by worship style": 2,
+    "open a result": 5,
+    "next page of results": 2,
+    "previous page of results": 1,
+    "toggle map view": 2,
+    "view contribute form": 1,
+    "scroll the detail page to its map": 2
+  }
+}

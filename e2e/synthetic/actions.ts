@@ -1,8 +1,21 @@
 import { hasPrefix, isVisible, pickFromPrefix, type WalkerAction } from '@crgolden/modules/synthetic-walker';
 import { expect, type Locator, type Page } from '@playwright/test';
+import walkerSettings from './walker-settings.json';
+import { US_STATES } from '../../src/shared/models';
+import { CHURCH_MAP_ID } from '../../src/churches/map/map-ids';
+import { CHURCH_NAME_ID_PREFIX } from '../../src/churches/list/church-list-ids';
 
-const SEARCH_KEYWORDS = ['grace', 'first', 'community', 'hope', 'faith', 'trinity', 'christ', 'saint'] as const;
-const SEARCH_STATES = ['TX', 'CA', 'FL', 'OH', 'GA', 'NC', 'PA', 'WA'] as const;
+const SEARCH_STATES = US_STATES.map(state => state.code);
+
+const ACTION_WEIGHTS: Readonly<Record<string, number | undefined>> = walkerSettings.actionWeights;
+
+function weightOf(actionName: string): number {
+  const weight = ACTION_WEIGHTS[actionName];
+  if (weight === undefined) {
+    throw new Error(`walker-settings.json names no weight for the '${actionName}' action.`);
+  }
+  return weight;
+}
 
 async function expectRendered(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
@@ -12,10 +25,9 @@ async function expectResultsRendered(page: Page): Promise<void> {
   await expectRendered(page.locator('#result-count'));
 }
 
-export const churchesActions: readonly WalkerAction[] = [
+const unweightedActions: readonly Omit<WalkerAction, 'weight'>[] = [
   {
     name: 'go home',
-    weight: 2,
     available: () => Promise.resolve(true),
     run: async page => {
       await page.goto('/');
@@ -24,10 +36,9 @@ export const churchesActions: readonly WalkerAction[] = [
   },
   {
     name: 'search by keyword',
-    weight: 5,
     available: page => isVisible(page, '#search-keyword'),
     run: async (page, rng) => {
-      await page.fill('#search-keyword', rng.pick(SEARCH_KEYWORDS));
+      await page.fill('#search-keyword', rng.pick(walkerSettings.searchKeywords));
       await page.click('#btn-search');
       await page.waitForURL('**/churches**');
       await expectResultsRendered(page);
@@ -35,7 +46,6 @@ export const churchesActions: readonly WalkerAction[] = [
   },
   {
     name: 'search by state',
-    weight: 3,
     available: page => isVisible(page, '#search-state'),
     run: async (page, rng) => {
       await page.fill('#search-state', rng.pick(SEARCH_STATES));
@@ -46,10 +56,10 @@ export const churchesActions: readonly WalkerAction[] = [
   },
   {
     name: 'search by worship style',
-    weight: 2,
     available: page => isVisible(page, '#search-worship-style'),
     run: async (page, rng) => {
       const options = page.locator('#search-worship-style option');
+      await options.first().waitFor();
       const optionCount = await options.count();
       await page.selectOption('#search-worship-style', { index: rng.int(optionCount) });
       await page.click('#btn-search');
@@ -59,18 +69,16 @@ export const churchesActions: readonly WalkerAction[] = [
   },
   {
     name: 'open a result',
-    weight: 5,
-    available: page => hasPrefix(page, 'church-name-'),
+    available: page => hasPrefix(page, CHURCH_NAME_ID_PREFIX),
     run: async (page, rng) => {
-      const result = await pickFromPrefix(page, rng, 'church-name-');
+      const result = await pickFromPrefix(page, rng, CHURCH_NAME_ID_PREFIX);
       await result.click();
       await expectRendered(page.locator('#church-name'));
     },
   },
   {
     name: 'next page of results',
-    weight: 2,
-    available: async page => (await isVisible(page, '#btn-next-page')) && (await page.locator('#btn-next-page').isEnabled()),
+    available: page => isVisible(page, '#btn-next-page'),
     run: async page => {
       await page.click('#btn-next-page');
       await expectResultsRendered(page);
@@ -78,8 +86,7 @@ export const churchesActions: readonly WalkerAction[] = [
   },
   {
     name: 'previous page of results',
-    weight: 1,
-    available: async page => (await isVisible(page, '#btn-prev-page')) && (await page.locator('#btn-prev-page').isEnabled()),
+    available: page => isVisible(page, '#btn-prev-page'),
     run: async page => {
       await page.click('#btn-prev-page');
       await expectResultsRendered(page);
@@ -87,17 +94,15 @@ export const churchesActions: readonly WalkerAction[] = [
   },
   {
     name: 'toggle map view',
-    weight: 2,
     available: page => isVisible(page, '#btn-view-map'),
     run: async page => {
       await page.click('#btn-view-map');
-      await expectRendered(page.locator('#church-map'));
+      await expectRendered(page.locator(`#${CHURCH_MAP_ID}`));
       await page.click('#btn-view-list');
     },
   },
   {
     name: 'view contribute form',
-    weight: 1,
     available: page => isVisible(page, '#contribute-link'),
     run: async page => {
       await page.click('#contribute-link');
@@ -108,7 +113,6 @@ export const churchesActions: readonly WalkerAction[] = [
   },
   {
     name: 'scroll the detail page to its map',
-    weight: 2,
     available: page => isVisible(page, '#church-map-section'),
     run: async page => {
       await page.locator('#church-map-section').scrollIntoViewIfNeeded();
@@ -116,3 +120,8 @@ export const churchesActions: readonly WalkerAction[] = [
     },
   },
 ];
+
+export const churchesActions: readonly WalkerAction[] = unweightedActions.map(action => ({
+  ...action,
+  weight: weightOf(action.name),
+}));

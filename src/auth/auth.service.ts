@@ -1,9 +1,8 @@
-import { computed, Injectable, Signal, inject, PLATFORM_ID } from '@angular/core';
-import { isPlatformServer } from '@angular/common';
+import { computed, Injectable, Signal, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { catchError, map, Observable, of, shareReplay, Subject, switchMap, take } from 'rxjs';
+import { catchError, map, Observable, of, take, tap } from 'rxjs';
 import { Claim } from './claim';
+import { BFF_USER_RELATIVE_PATH, BffPaths, ClaimTypes, MODERATOR_CLAIM_VALUE } from '../shared/bff-contract';
 
 export type { Claim } from './claim';
 export type Session = Claim[];
@@ -11,52 +10,37 @@ export type Session = Claim[];
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
-  private readonly platformId = inject(PLATFORM_ID);
-  private readonly _refresh$ = new Subject<void>();
+  private readonly _session = signal<Claim[] | null>(null);
 
-  private readonly _fetchResult$ = this._refresh$.pipe(
-    switchMap(() =>
-      this.http.get<Claim[]>('bff/user').pipe(
-        catchError(() => of(null))
-      )
-    ),
-    shareReplay({ bufferSize: 1, refCount: true })
-  );
-
-  private readonly _fetchResult = toSignal(this._fetchResult$, {
-    initialValue: null as Claim[] | null
-  });
-
-  public readonly isAuthenticated: Signal<boolean> = computed(() => this._fetchResult() !== null);
-  public readonly isAnonymous: Signal<boolean> = computed(() => this._fetchResult() === null);
-  public readonly session: Signal<Session> = computed(() => this._fetchResult() ?? []);
+  public readonly isAuthenticated: Signal<boolean> = computed(() => this._session() !== null);
+  public readonly isAnonymous: Signal<boolean> = computed(() => this._session() === null);
+  public readonly session: Signal<Session> = computed(() => this._session() ?? []);
   public readonly hasModerationScope: Signal<boolean> = computed(() =>
-    this._fetchResult()?.some(x => x.type === 'churches.mod' && x.value === 'true') ?? false
+    this._session()?.some(x => x.type === ClaimTypes.moderator && x.value === MODERATOR_CLAIM_VALUE) ?? false
   );
   public readonly username: Signal<string | null> = computed(
-    () => this._fetchResult()?.find(x => x.type === 'name')?.value ?? null
+    () => this._session()?.find(x => x.type === ClaimTypes.name)?.value ?? null
   );
-  public readonly logoutUrl: Signal<string | null> = computed(() => {
-    const s = this._fetchResult();
-    if (!s) return null;
-    return s.find(x => x.type === 'bff:logout_url')?.value ?? null;
-  });
+  public readonly logoutUrl: Signal<string | null> = computed(
+    () => this._session()?.find(x => x.type === ClaimTypes.logoutUrl)?.value ?? null
+  );
 
-  public readonly loginUrl: string = '/bff/login';
+  public readonly loginUrl: string = BffPaths.login;
 
   public initialize(): Observable<Session> {
-    if (isPlatformServer(this.platformId)) {
-      return of([]);
-    }
-
-    this._refresh$.next();
-    return this._fetchResult$.pipe(
-      map(s => s ?? []),
-      take(1)
-    );
+    return this.fetchSession();
   }
 
   public refresh(): void {
-    this._refresh$.next();
+    this.fetchSession().subscribe();
+  }
+
+  private fetchSession(): Observable<Session> {
+    return this.http.get<Claim[] | null>(BFF_USER_RELATIVE_PATH).pipe(
+      catchError(() => of(null)),
+      tap(claims => this._session.set(claims)),
+      map(claims => claims ?? []),
+      take(1),
+    );
   }
 }

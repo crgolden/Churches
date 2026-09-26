@@ -1,11 +1,24 @@
 import type { Request, Response, NextFunction } from 'express';
 import pino, { type Logger, type StreamEntry } from 'pino';
 import pinoElasticsearch from 'pino-elasticsearch';
+import { BffSettingKeys, requiredSetting, requiredUrlSetting } from '../bff/settings';
+import { RESPONSE_FINISHED_EVENT } from './span-route-name';
 
-const serviceName = process.env['WEBSITE_SITE_NAME'] ?? 'crgolden-churches';
-const esNode = process.env['ElasticsearchNode'];
-const esUsername = process.env['ElasticsearchUsername'];
-const esPassword = process.env['ElasticsearchPassword'];
+export const LOG_INDEX = 'logs-app-churches';
+
+export const HEALTH_PATH = '/health';
+
+export const LogFields = {
+  serviceName: 'service.name',
+  statusCode: 'http.response.status_code',
+  durationMs: 'event.duration_ms',
+} as const;
+
+export const ELASTICSEARCH_CONNECTION_ERROR_LOG = '[logging] Elasticsearch connection error';
+
+export const ELASTICSEARCH_INSERT_ERROR_LOG = '[logging] Elasticsearch insert error';
+
+const serviceName = process.env[BffSettingKeys.WebsiteSiteName] ?? 'crgolden-churches';
 
 const LEVEL_NAMES: Record<string, string> = {
   trace: 'Verbose',
@@ -19,21 +32,24 @@ const LEVEL_NAMES: Record<string, string> = {
 function buildLogger(): Logger {
   const streams: StreamEntry[] = [{ stream: pino.destination(1) }];
 
-  if (esNode) {
+  if (process.env[BffSettingKeys.ElasticsearchNode] !== undefined) {
     const streamToElastic = pinoElasticsearch({
-      node: esNode,
-      auth: esUsername && esPassword ? { username: esUsername, password: esPassword } : undefined,
-      index: 'logs-app-churches',
+      node: requiredUrlSetting(BffSettingKeys.ElasticsearchNode).toString(),
+      auth: {
+        username: requiredSetting(BffSettingKeys.ElasticsearchUsername),
+        password: requiredSetting(BffSettingKeys.ElasticsearchPassword),
+      },
+      index: LOG_INDEX,
       esVersion: 8,
       opType: 'create',
       flushBytes: 1000,
     });
 
     streamToElastic.on('error', (err) =>
-      logger.error({ err }, '[logging] Elasticsearch connection error'),
+      logger.error({ err }, ELASTICSEARCH_CONNECTION_ERROR_LOG),
     );
     streamToElastic.on('insertError', (err) =>
-      logger.error({ err }, '[logging] Elasticsearch insert error'),
+      logger.error({ err }, ELASTICSEARCH_INSERT_ERROR_LOG),
     );
 
     streams.push({ stream: streamToElastic, level: 'warn' });
@@ -41,7 +57,7 @@ function buildLogger(): Logger {
 
   return pino(
     {
-      base: { 'service.name': serviceName },
+      base: { [LogFields.serviceName]: serviceName },
       messageKey: 'message',
       timestamp: pino.stdTimeFunctions.isoTime,
       formatters: {
@@ -52,29 +68,23 @@ function buildLogger(): Logger {
   );
 }
 
-let logger: Logger;
-try {
-  logger = buildLogger();
-} catch (err) {
-  console.error('[logging] Elasticsearch transport unavailable, using stdout only:', err);
-  logger = pino({ base: { 'service.name': serviceName } });
-}
+const logger: Logger = buildLogger();
 
 export { logger };
 
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
-  if (req.url.startsWith('/health')) {
+  if (req.url.startsWith(HEALTH_PATH)) {
     next();
     return;
   }
 
   const start = Date.now();
-  res.on('finish', () => {
+  res.on(RESPONSE_FINISHED_EVENT, () => {
     logger.info({
       method: req.method,
       path: req.originalUrl,
-      'http.response.status_code': res.statusCode,
-      'event.duration_ms': Date.now() - start,
+      [LogFields.statusCode]: res.statusCode,
+      [LogFields.durationMs]: Date.now() - start,
     });
   });
   next();

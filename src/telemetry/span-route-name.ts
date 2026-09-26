@@ -1,9 +1,10 @@
 import { trace } from '@opentelemetry/api';
 import type { Request, Response, NextFunction } from 'express';
 
-const HTTP_ROUTE_ATTRIBUTE = 'http.route';
-const UNMATCHED_SUFFIX = '/*';
-const ROOT_ROUTE = '/';
+export const HTTP_ROUTE_ATTRIBUTE = 'http.route';
+export const UNMATCHED_SUFFIX = '/*';
+export const ROOT_ROUTE = '/';
+export const RESPONSE_FINISHED_EVENT = 'finish';
 
 export function routeTemplateFor(req: Request): string {
   const matched = req.route as { path?: string } | undefined;
@@ -27,7 +28,7 @@ export function nameSpansByRoute(req: Request, res: Response, next: NextFunction
   const span = trace.getActiveSpan();
 
   if (span) {
-    res.on('finish', () => {
+    res.on(RESPONSE_FINISHED_EVENT, () => {
       const route = routeTemplateFor(req);
       span.updateName(`${req.method} ${route}`);
       span.setAttribute(HTTP_ROUTE_ATTRIBUTE, route);

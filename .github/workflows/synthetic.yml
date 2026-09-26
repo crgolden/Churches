@@ -58,15 +58,19 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
-        if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: npm run playwright:install
 
       - name: Resolve seed
         id: seed
+        env:
+          REQUESTED_SEED: ${{ inputs.seed }}
         run: |
-          seed="${{ inputs.seed }}"
+          seed="$REQUESTED_SEED"
           if [ -z "$seed" ]; then
             seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
+          elif ! [[ "$seed" =~ ^[0-9]+$ ]]; then
+            echo "::error::Seed must be a non-negative integer."
+            exit 1
           fi
           echo "value=$seed" >> "$GITHUB_OUTPUT"
           echo "### Synthetic walk seed: \`$seed\`" >> "$GITHUB_STEP_SUMMARY"
@@ -82,10 +86,12 @@ jobs:
 
       - name: Assert executed test count is nonzero
         if: always()
+        env:
+          SYNTHETIC_SEED: ${{ steps.seed.outputs.value }}
         run: |
           count=$(grep -o 'tests="[0-9]*"' playwright-results.xml | head -1 | grep -o '[0-9]*' || true)
           skipped=$(grep -o 'skipped="[0-9]*"' playwright-results.xml | head -1 | grep -o '[0-9]*' || true)
-          echo "Executed tests: ${count:-0} (skipped ${skipped:-0}, seed ${{ steps.seed.outputs.value }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "Executed tests: ${count:-0} (skipped ${skipped:-0}, seed ${SYNTHETIC_SEED})" >> "$GITHUB_STEP_SUMMARY"
           if [ -z "$count" ] || [ "$count" -eq 0 ] || [ "${skipped:-0}" -ge "$count" ]; then
             echo "::error::Synthetic run executed 0 tests — a vacuous green."
             exit 1

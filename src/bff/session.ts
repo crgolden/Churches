@@ -4,6 +4,15 @@ import session from 'express-session';
 import { createClient } from 'redis';
 import { RedisStore } from 'connect-redis';
 import { logger } from '../telemetry/logging';
+import {
+  BffSettingKeys,
+  InvalidSettingError,
+  isProductionEnvironment,
+  MEMORY_SESSION_STORE,
+  requiredIntegerSetting,
+  requiredPositiveIntegerSetting,
+  requiredSetting,
+} from './settings';
 
 declare module 'express-session' {
   interface SessionData {
@@ -17,32 +26,55 @@ declare module 'express-session' {
   }
 }
 
-const SOCKET_TIMEOUT_MS = 90_000;
-const PING_INTERVAL_MS = 30_000;
+export const SESSION_COOKIE_NAME = 'churches.sid';
 
-function reconnectStrategy(retries: number): number {
-  return Math.min(retries * 100, 3_000) + randomInt(200);
+
+export const MEMORY_STORE_IN_PRODUCTION_WARNING =
+  `[Session] WARNING: using MemoryStore in production. Remove ${BffSettingKeys.SessionStore}=${MEMORY_SESSION_STORE} to switch to Redis.`;
+
+export const REDIS_CONNECTION_ERROR_LOG = '[Redis] Connection error';
+
+export const RedisClientEvents = {
+  error: 'error',
+  ready: 'ready',
+} as const;
+
+export const SESSION_COOKIE_SAME_SITE = 'lax';
+
+function reconnectStrategyFromSettings(hasBeenReady: () => boolean): (retries: number, cause: Error) => number | Error {
+  const stepMs = requiredPositiveIntegerSetting(BffSettingKeys.RedisReconnectStepMs);
+  const maxDelayMs = requiredPositiveIntegerSetting(BffSettingKeys.RedisReconnectMaxDelayMs);
+  const jitterMs = requiredPositiveIntegerSetting(BffSettingKeys.RedisReconnectJitterMs);
+  return (retries: number, cause: Error) =>
+    hasBeenReady() ? Math.min(retries * stepMs, maxDelayMs) + randomInt(jitterMs) : cause;
 }
 
-export function applySession(app: Express): void {
-  const isProd = process.env['NODE_ENV'] === 'production';
+export function applySession(app: Express): Promise<void> {
+  const isProd = isProductionEnvironment();
 
-  const useMemory =
-    !process.env['RedisHost'] || process.env['SessionStore'] === 'memory';
+  const secret = requiredSetting(BffSettingKeys.SessionSecret);
+  const useMemory = process.env[BffSettingKeys.SessionStore] === MEMORY_SESSION_STORE;
 
   let store: session.Store;
+  let ready: Promise<void>;
 
   if (useMemory) {
     store = new session.MemoryStore();
+    ready = Promise.resolve();
     if (isProd) {
-      logger.warn(
-        '[Session] WARNING: using MemoryStore in production. ' +
-          'Set RedisHost (and optionally SessionStore) to switch to Redis.',
-      );
+      logger.warn(MEMORY_STORE_IN_PRODUCTION_WARNING);
     }
   } else {
-    const host = process.env['RedisHost'] ?? 'localhost';
-    const port = parseInt(process.env['RedisPort'] ?? '6380', 10);
+    const host = requiredSetting(BffSettingKeys.RedisHost);
+    const port = requiredIntegerSetting(BffSettingKeys.RedisPort);
+    const password = process.env[BffSettingKeys.RedisPassword];
+    const socketTimeout = requiredPositiveIntegerSetting(BffSettingKeys.RedisSocketTimeoutMs);
+    const pingInterval = requiredPositiveIntegerSetting(BffSettingKeys.RedisPingIntervalMs);
+    if (pingInterval >= socketTimeout) {
+      throw new InvalidSettingError(BffSettingKeys.RedisPingIntervalMs);
+    }
+    let redisHasBeenReady = false;
+    const reconnectStrategy = reconnectStrategyFromSettings(() => redisHasBeenReady);
 
     const redisClient = isProd
       ? createClient({
@@ -50,48 +82,48 @@ export function applySession(app: Express): void {
             host,
             port,
             tls: true as const,
-            socketTimeout: SOCKET_TIMEOUT_MS,
+            socketTimeout,
             reconnectStrategy,
           },
-          password: process.env['RedisPassword'],
-          pingInterval: PING_INTERVAL_MS,
+          password,
+          pingInterval,
         })
       : createClient({
           socket: {
             host,
             port,
-            socketTimeout: SOCKET_TIMEOUT_MS,
+            socketTimeout,
             reconnectStrategy,
           },
-          password: process.env['RedisPassword'],
-          pingInterval: PING_INTERVAL_MS,
+          password,
+          pingInterval,
         });
 
-    redisClient.on('error', (err: unknown) => {
-      logger.error({ err }, '[Redis] Connection error');
+    redisClient.on(RedisClientEvents.error, (err: unknown) => {
+      logger.error({ err }, REDIS_CONNECTION_ERROR_LOG);
+    });
+    redisClient.on(RedisClientEvents.ready, () => {
+      redisHasBeenReady = true;
     });
 
-    redisClient.connect().catch((err: unknown) => {
-      logger.error({ err }, '[Redis] Initial connect failed');
-    });
-
+    ready = redisClient.connect().then(() => undefined);
     store = new RedisStore({ client: redisClient });
   }
-
-  const secret = process.env['SessionSecret'] ?? crypto.randomUUID();
 
   app.use(
     session({
       store,
       secret,
-      name: 'churches.sid',
+      name: SESSION_COOKIE_NAME,
       resave: false,
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: SESSION_COOKIE_SAME_SITE,
         secure: isProd,
       },
     }),
   );
+
+  return ready;
 }

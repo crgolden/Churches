@@ -1,7 +1,11 @@
+import { HttpStatusCode } from '@angular/common/http';
 import type { Request, Response, NextFunction } from 'express';
+import { newCount, newHttpsAddress, newText } from '@crgolden/modules/testing';
+
+const oidcFakes = vi.hoisted(() => ({ issuer: `https://${crypto.randomUUID()}.example` }));
 
 vi.mock('./oidc', () => ({
-  getOidcConfig: vi.fn().mockResolvedValue({ issuer: 'https://identity.example.com' }),
+  getOidcConfig: vi.fn().mockResolvedValue({ issuer: oidcFakes.issuer }),
 }));
 
 vi.mock('openid-client', () => ({
@@ -15,6 +19,16 @@ vi.mock('../telemetry/logging', () => ({
 import { refreshTokenGrant } from 'openid-client';
 import { logger } from '../telemetry/logging';
 import { csrfForMutating, directoryProxy } from './proxy';
+import {
+  AUTHORIZATION_HEADER,
+  bearerAuthorization,
+  CONTENT_TYPE_HEADER,
+  HopByHopHeaders,
+  HttpMethods,
+} from './http-headers';
+import { COOKIE_HEADER, CSRF_HEADER, CSRF_HEADER_VALUE, MISSING_CSRF_ERROR } from '../shared/bff-contract';
+import { DIRECTORY_API_PREFIX, DirectoryApi } from '../shared/directory-api';
+import { BffSettingKeys, InvalidSettingError } from './settings';
 
 interface SessionLike {
   accessToken?: string;
@@ -30,12 +44,12 @@ function makeReq(overrides: {
   originalUrl?: string;
   body?: Buffer;
 } = {}): Request {
-  const method = overrides.method ?? 'GET';
-  const hasBody = !['GET', 'HEAD'].includes(method);
-  const bodyChunk = overrides.body ?? (hasBody ? Buffer.from('{}') : undefined);
+  const method = overrides.method ?? HttpMethods.get;
+  const hasBody = !([HttpMethods.get, HttpMethods.head] as string[]).includes(method);
+  const bodyChunk = overrides.body ?? (hasBody ? Buffer.from(JSON.stringify({})) : undefined);
 
-  const originalUrl = overrides.originalUrl ?? '/directory/api/churches';
-  const url = originalUrl.replace(/^\/directory\/api/, '') || '/';
+  const originalUrl = overrides.originalUrl ?? DirectoryApi.churches;
+  const url = originalUrl.slice(DIRECTORY_API_PREFIX.length) || '/';
 
   const req: Record<string, unknown> = {
     method,
@@ -72,18 +86,22 @@ const mockNext = vi.fn() as unknown as NextFunction;
 function stubFetch(responses: { status: number; headers?: Headers; body?: ArrayBuffer }[]) {
   const mocks = responses.map(r => ({
     status: r.status,
-    headers: r.headers ?? new Headers({ 'content-type': 'application/json' }),
+    headers: r.headers ?? new Headers(),
     arrayBuffer: vi.fn().mockResolvedValue(r.body ?? new ArrayBuffer(0)),
   }));
   let call = 0;
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(mocks[call++])));
 }
 
+function refreshedTokens(accessToken: string): never {
+  return { access_token: accessToken, refresh_token: newText(), expires_in: newCount() } as never;
+}
+
 describe('csrfForMutating', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('calls next for GET requests without checking X-CSRF', () => {
-    const req = makeReq({ method: 'GET' });
+    const req = makeReq({ method: HttpMethods.get });
     const res = makeRes();
     csrfForMutating(req, res as unknown as Response, mockNext);
     expect(mockNext).toHaveBeenCalledOnce();
@@ -91,16 +109,16 @@ describe('csrfForMutating', () => {
   });
 
   it('rejects POST requests missing the X-CSRF header with 403', () => {
-    const req = makeReq({ method: 'POST' });
+    const req = makeReq({ method: HttpMethods.post });
     const res = makeRes();
     csrfForMutating(req, res as unknown as Response, mockNext);
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Missing X-CSRF header' });
+    expect(res.status).toHaveBeenCalledWith(HttpStatusCode.Forbidden);
+    expect(res.json).toHaveBeenCalledWith({ error: MISSING_CSRF_ERROR });
     expect(mockNext).not.toHaveBeenCalled();
   });
 
   it('calls next for POST requests that include the X-CSRF header', () => {
-    const req = makeReq({ method: 'POST', headers: { 'x-csrf': '1' } });
+    const req = makeReq({ method: HttpMethods.post, headers: { [CSRF_HEADER.toLowerCase()]: CSRF_HEADER_VALUE } });
     const res = makeRes();
     csrfForMutating(req, res as unknown as Response, mockNext);
     expect(mockNext).toHaveBeenCalledOnce();
@@ -112,68 +130,86 @@ describe('directoryProxy', () => {
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
-    savedEnv['DirectoryApiAddress'] = process.env['DirectoryApiAddress'];
-    delete process.env['DirectoryApiAddress'];
+    savedEnv[BffSettingKeys.DirectoryApiAddress] = process.env[BffSettingKeys.DirectoryApiAddress];
+    delete process.env[BffSettingKeys.DirectoryApiAddress];
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    if (savedEnv['DirectoryApiAddress'] === undefined) {
-      delete process.env['DirectoryApiAddress'];
+    if (savedEnv[BffSettingKeys.DirectoryApiAddress] === undefined) {
+      delete process.env[BffSettingKeys.DirectoryApiAddress];
     } else {
-      process.env['DirectoryApiAddress'] = savedEnv['DirectoryApiAddress'];
+      process.env[BffSettingKeys.DirectoryApiAddress] = savedEnv[BffSettingKeys.DirectoryApiAddress];
     }
     vi.unstubAllGlobals();
   });
 
-  it('returns 502 when DirectoryApiAddress is not configured', async () => {
+  it('throws rather than answering when DirectoryApiAddress is not configured', async () => {
     const req = makeReq();
     const res = makeRes();
-    await directoryProxy(req, res as unknown as Response, mockNext);
-    expect(res.status).toHaveBeenCalledWith(502);
-    expect(res.json).toHaveBeenCalledWith({ error: 'DirectoryApiAddress is not configured' });
+
+    await expect(directoryProxy(req, res as unknown as Response, mockNext)).rejects.toThrow(
+      new InvalidSettingError(BffSettingKeys.DirectoryApiAddress),
+    );
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it('fetches anonymously (no Authorization header) when session has no token', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 200 }]);
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Ok }]);
     const req = makeReq({ session: { accessToken: undefined } });
     const res = makeRes();
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
     const [, fetchOptions] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
-    expect((fetchOptions.headers as Record<string, string>)['authorization']).toBeUndefined();
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect((fetchOptions.headers as Record<string, string>)[AUTHORIZATION_HEADER]).toBeUndefined();
+    expect(res.status).toHaveBeenCalledWith(HttpStatusCode.Ok);
   });
 
-  it('attaches Bearer token when session holds an access token', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 200 }]);
-    const req = makeReq({ session: { accessToken: 'valid-token' } });
+  it('withholds the reader session cookie from Directory while still forwarding other headers', async () => {
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Ok }]);
+    const forwardedHeaderName = newText();
+    const forwardedHeaderValue = newText();
+    const req = makeReq({
+      headers: { [COOKIE_HEADER.toLowerCase()]: `${newText()}=${newText()}`, [forwardedHeaderName]: forwardedHeaderValue },
+    });
     const res = makeRes();
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
     const [, fetchOptions] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
-    expect((fetchOptions.headers as Record<string, string>)['authorization']).toBe('Bearer valid-token');
+    const forwarded = fetchOptions.headers as Record<string, string>;
+    expect(forwarded[COOKIE_HEADER.toLowerCase()]).toBeUndefined();
+    expect(forwarded[forwardedHeaderName]).toBe(forwardedHeaderValue);
   });
 
-  it('proactively refreshes token when within 60 s of expiry', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 200 }]);
+  it('attaches Bearer token when session holds an access token', async () => {
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Ok }]);
+    const accessToken = newText();
+    const req = makeReq({ session: { accessToken } });
+    const res = makeRes();
 
-    vi.mocked(refreshTokenGrant).mockResolvedValue({
-      access_token: 'refreshed-token',
-      refresh_token: 'new-refresh',
-      expires_in: 3600,
-    } as never);
+    await directoryProxy(req, res as unknown as Response, mockNext);
+
+    const [, fetchOptions] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect((fetchOptions.headers as Record<string, string>)[AUTHORIZATION_HEADER]).toBe(bearerAuthorization(accessToken));
+  });
+
+  it('proactively refreshes a token that is about to expire', async () => {
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Ok }]);
+    const refreshToken = newText();
+    const refreshedAccessToken = newText();
+    vi.mocked(refreshTokenGrant).mockResolvedValue(refreshedTokens(refreshedAccessToken));
 
     const req = makeReq({
       session: {
-        accessToken: 'old-token',
-        refreshToken: 'refresh-tok',
-        tokenExpiresAt: Date.now() + 30_000,
+        accessToken: newText(),
+        refreshToken,
+        tokenExpiresAt: Date.now() + 1,
         save: vi.fn((cb: (err: unknown) => void) => cb(null)),
       },
     });
@@ -182,26 +218,22 @@ describe('directoryProxy', () => {
     await directoryProxy(req, res as unknown as Response, mockNext);
 
     expect(refreshTokenGrant).toHaveBeenCalledWith(
-      expect.objectContaining({ issuer: 'https://identity.example.com' }),
-      'refresh-tok',
+      expect.objectContaining({ issuer: oidcFakes.issuer }),
+      refreshToken,
     );
-    expect((req.session as unknown as SessionLike).accessToken).toBe('refreshed-token');
+    expect((req.session as unknown as SessionLike).accessToken).toBe(refreshedAccessToken);
   });
 
   it('retries with a refreshed token on a 401 upstream response', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 401 }, { status: 200 }]);
-
-    vi.mocked(refreshTokenGrant).mockResolvedValue({
-      access_token: 'after-retry-token',
-      refresh_token: 'new-refresh',
-      expires_in: 3600,
-    } as never);
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    const upstreamResponses = [{ status: HttpStatusCode.Unauthorized }, { status: HttpStatusCode.Ok }];
+    stubFetch(upstreamResponses);
+    vi.mocked(refreshTokenGrant).mockResolvedValue(refreshedTokens(newText()));
 
     const req = makeReq({
       session: {
-        accessToken: 'expired-token',
-        refreshToken: 'can-refresh',
+        accessToken: newText(),
+        refreshToken: newText(),
         save: vi.fn((cb: (err: unknown) => void) => cb(null)),
       },
     });
@@ -209,70 +241,74 @@ describe('directoryProxy', () => {
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(upstreamResponses.length);
+    expect(res.status).toHaveBeenCalledWith(HttpStatusCode.Ok);
   });
 
   it('forwards the 401 without retry when no refresh token is available', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 401 }]);
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Unauthorized }]);
 
     const req = makeReq({
-      session: { accessToken: 'expired-token', refreshToken: undefined },
+      session: { accessToken: newText(), refreshToken: undefined },
     });
     const res = makeRes();
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
-    expect(res.status).toHaveBeenCalledWith(401);
+    expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+    expect(res.status).toHaveBeenCalledWith(HttpStatusCode.Unauthorized);
     expect(refreshTokenGrant).not.toHaveBeenCalled();
   });
 
   it('forwards non-dropped response headers and strips hop-by-hop headers', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    const contentType = newText();
+    const customHeaderName = newText();
+    const customHeaderValue = newText();
     const responseHeaders = new Headers({
-      'content-type': 'application/json',
-      'connection': 'keep-alive',
-      'x-custom-header': 'custom-value',
+      [CONTENT_TYPE_HEADER]: contentType,
+      [HopByHopHeaders.connection]: HopByHopHeaders.keepAlive,
+      [customHeaderName]: customHeaderValue,
     });
-    stubFetch([{ status: 200, headers: responseHeaders }]);
+    stubFetch([{ status: HttpStatusCode.Ok, headers: responseHeaders }]);
 
     const req = makeReq();
     const res = makeRes();
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
-    expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
-    expect(res.setHeader).toHaveBeenCalledWith('x-custom-header', 'custom-value');
-    expect(res.setHeader).not.toHaveBeenCalledWith('connection', expect.anything());
+    expect(res.setHeader).toHaveBeenCalledWith(CONTENT_TYPE_HEADER.toLowerCase(), contentType);
+    expect(res.setHeader).toHaveBeenCalledWith(customHeaderName, customHeaderValue);
+    expect(res.setHeader).not.toHaveBeenCalledWith(HopByHopHeaders.connection, expect.anything());
   });
 
   it('strips Content-Encoding and Content-Length since fetch() already decompressed the body', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    const contentType = newText();
     const responseHeaders = new Headers({
-      'content-type': 'application/json',
-      'content-encoding': 'gzip',
-      'content-length': '12345',
+      [CONTENT_TYPE_HEADER]: contentType,
+      [HopByHopHeaders.contentEncoding]: newText(),
+      [HopByHopHeaders.contentLength]: String(newCount()),
     });
-    stubFetch([{ status: 200, headers: responseHeaders }]);
+    stubFetch([{ status: HttpStatusCode.Ok, headers: responseHeaders }]);
 
     const req = makeReq();
     const res = makeRes();
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
-    expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
-    expect(res.setHeader).not.toHaveBeenCalledWith('content-encoding', expect.anything());
-    expect(res.setHeader).not.toHaveBeenCalledWith('content-length', expect.anything());
+    expect(res.setHeader).toHaveBeenCalledWith(CONTENT_TYPE_HEADER.toLowerCase(), contentType);
+    expect(res.setHeader).not.toHaveBeenCalledWith(HopByHopHeaders.contentEncoding, expect.anything());
+    expect(res.setHeader).not.toHaveBeenCalledWith(HopByHopHeaders.contentLength, expect.anything());
   });
 
   it('removes stale Authorization from forwarded headers when no session token', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 200 }]);
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Ok }]);
 
     const req = makeReq({
-      headers: { authorization: 'Bearer stale-token' },
+      headers: { [AUTHORIZATION_HEADER]: bearerAuthorization(newText()) },
       session: { accessToken: undefined },
     });
     const res = makeRes();
@@ -280,36 +316,37 @@ describe('directoryProxy', () => {
     await directoryProxy(req, res as unknown as Response, mockNext);
 
     const [, fetchOptions] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
-    expect((fetchOptions.headers as Record<string, string>)['authorization']).toBeUndefined();
+    expect((fetchOptions.headers as Record<string, string>)[AUTHORIZATION_HEADER]).toBeUndefined();
   });
 
   it('joins multi-value request headers into a comma-separated string', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 200 }]);
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Ok }]);
 
+    const multiValueHeaderName = newText();
+    const firstValue = crypto.randomUUID();
+    const secondValue = crypto.randomUUID();
     const req = makeReq({
-      headers: { accept: ['application/json', 'text/plain'] as unknown as string },
+      headers: { [multiValueHeaderName]: [firstValue, secondValue] as unknown as string },
     });
     const res = makeRes();
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
     const [, fetchOptions] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
-    expect((fetchOptions.headers as Record<string, string>)['accept']).toBe(
-      'application/json, text/plain',
-    );
+    expect((fetchOptions.headers as Record<string, string>)[multiValueHeaderName]).toBe(`${firstValue}, ${secondValue}`);
   });
 
   it('forwards the 401 and warns when the token refresh during retry fails', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 401 }]);
-    const refreshError = new Error('refresh failed');
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Unauthorized }]);
+    const refreshError = new Error(newText());
     vi.mocked(refreshTokenGrant).mockRejectedValueOnce(refreshError);
 
     const req = makeReq({
       session: {
-        accessToken: 'expired-token',
-        refreshToken: 'can-refresh',
+        accessToken: newText(),
+        refreshToken: newText(),
         save: vi.fn((cb: (err: unknown) => void) => cb(null)),
       },
     });
@@ -317,34 +354,32 @@ describe('directoryProxy', () => {
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
-    expect(logger.warn).toHaveBeenCalledWith(
-      { err: refreshError },
-      expect.stringContaining('Token refresh on 401 failed'),
-    );
-    expect(res.status).toHaveBeenCalledWith(401);
+    expect(logger.warn).toHaveBeenCalledWith({ err: refreshError }, expect.any(String));
+    expect(res.status).toHaveBeenCalledWith(HttpStatusCode.Unauthorized);
   });
 
   it('buffers a POST body from string chunks and forwards it', async () => {
-    process.env['DirectoryApiAddress'] = 'https://directory.example.com';
-    stubFetch([{ status: 201 }]);
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Created }]);
 
     const req = makeReq({
-      method: 'POST',
-      headers: { 'x-csrf': '1', 'content-type': 'application/json' },
-      session: { accessToken: 'token' },
+      method: HttpMethods.post,
+      headers: { [CSRF_HEADER.toLowerCase()]: CSRF_HEADER_VALUE },
+      session: { accessToken: newText() },
       body: undefined,
     });
 
     const streamingReq = req as unknown as { [Symbol.asyncIterator]: () => AsyncGenerator<string> };
+    const bodyText = JSON.stringify({ [newText()]: newText() });
     streamingReq[Symbol.asyncIterator] = async function* () {
-      yield '{"test":true}';
+      yield bodyText;
     };
 
     const res = makeRes();
 
     await directoryProxy(req, res as unknown as Response, mockNext);
 
-    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.status).toHaveBeenCalledWith(HttpStatusCode.Created);
     const [, fetchOptions] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
     expect(fetchOptions.body).toBeInstanceOf(Uint8Array);
   });

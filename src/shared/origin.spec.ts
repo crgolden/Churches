@@ -3,7 +3,8 @@ import { DOCUMENT } from '@angular/common';
 import { REQUEST } from '@angular/core';
 import { injectOrigin } from './origin';
 
-const BROWSER_ORIGIN = 'https://churches.example.com';
+const BROWSER_ORIGIN = `https://${crypto.randomUUID()}.example.com`;
+const SSR_ORIGIN = `https://${crypto.randomUUID()}.example.com:4000`;
 
 describe('injectOrigin', () => {
   describe('under SSR (REQUEST token provided)', () => {
@@ -12,7 +13,7 @@ describe('injectOrigin', () => {
         providers: [
           {
             provide: REQUEST,
-            useValue: new Request('https://ssr-host.example.com:4000/churches/grace'),
+            useValue: new Request(`${SSR_ORIGIN}/${crypto.randomUUID()}`),
           },
           {
             provide: DOCUMENT,
@@ -24,7 +25,7 @@ describe('injectOrigin', () => {
 
     it('returns the origin from the server-side Request URL', () => {
       const origin = TestBed.runInInjectionContext(() => injectOrigin());
-      expect(origin).toBe('https://ssr-host.example.com:4000');
+      expect(origin).toBe(SSR_ORIGIN);
     });
   });
 

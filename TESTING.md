@@ -36,8 +36,12 @@ No live servers needed. Playwright manages two local servers for the test run, s
 Angular bootstrap hits the mock directly):
 
 1. **Mock Directory API** (`npx tsx e2e/mocks/directory-server.ts`, port 4001) — handles
-   `/directory/api/*` routes and the `/_test/*` control API used by test helpers. Its routes carry no
+   `/directory/api/*` routes and the control API used by test helpers. Its routes carry no
    path prefix, because the SSR server's `directoryProxy` strips `/directory/api` before forwarding.
+   The control routes and the mock's port reach every process through one generated E2E contract
+   (`e2e/mocks/e2e-contract.ts`): `playwright.config.ts` builds it with `newE2eContract()` and stores it
+   as JSON in `E2E_CONTRACT`, which the runner, its workers and the mock inherit. A route generated
+   inside any one process instead would differ from the others' and the control call would 404.
    It is a real HTTP server rather than `page.route` interception because Node makes these calls
    during SSR, and Playwright can only intercept requests the browser makes.
 2. **Node SSR + BFF server** (port 4000) — starts the built `dist/churches.client/server/server.mjs`
@@ -52,7 +56,8 @@ because every spec shares the mock server's in-memory state; concurrent specs wo
 **Authentication is mocked wholesale, and no tier exercises the real OIDC exchange.** `e2e/fixtures.ts`
 fulfils `/bff/user` with a fixed claim array — `authedPage` with user claims, `modPage` with
 `churches.mod=true` — so every moderator test passes regardless of which token really carried the claim,
-and `anonymousPage` fulfils it as 401. The PKCE authorization-code flow, the token exchange, and the
+and `anonymousPage` fulfils it as 200 with a `null` body, which is what the real BFF answers a visitor
+with no session. The PKCE authorization-code flow, the token exchange, and the
 userinfo call are not covered by the E2E tier. **The synthetic walker is the only tier that drives the
 real exchange**, because it signs in through the deployed Identity with a passkey rather than a mock —
 so a break in the PKCE flow surfaces there and nowhere else in this repo. The discriminating test for
@@ -108,7 +113,7 @@ real traffic into observability. Tests skip unless `WalkerBaseUrl` is set.
 **This replaced the post-deploy smoke tier, which was deleted fleet-wide.** Smoke was a stopgap
 until walkers existed; once they did it was duplicate coverage that also needed its own reCAPTCHA
 exemption to log in. The five checks it ran — `/health`, SPA bootstrap, two CSRF cases and one
-unauthenticated 401 — are covered by the E2E tier against mocks, and the walker now exercises the
+unauthenticated session check — are covered by the E2E tier against mocks, and the walker now exercises the
 same paths against production for real.
 
 Environment contract:
@@ -117,7 +122,7 @@ Environment contract:
 |---|---|
 | `WalkerBaseUrl` | Deployed app URL; also disables `webServer` |
 | `SYNTHETIC_SEED` | **Required** decimal uint32; the whole walk derives from it |
-| `SYNTHETIC_STEPS` | Optional step budget override (default 40) |
+| `SYNTHETIC_STEPS` | Optional step budget override; its default and ceiling are `stepBudget` in `e2e/synthetic/walker-settings.json` |
 | `PASSKEY_CREDENTIAL1` | The walker account's passkey, as the five-field JSON Playwright's virtual authenticator returns |
 
 **The walker signs in with a passkey, not a password.** Identity evaluates the passkey branch

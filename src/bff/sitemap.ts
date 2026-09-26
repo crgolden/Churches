@@ -1,14 +1,26 @@
 import type { Request, Response } from 'express';
 import { logger } from '../telemetry/logging';
+import { BffSettingKeys, requiredUrlSetting } from './settings';
+import { CONTENT_TYPE_HEADER, HopByHopHeaders } from './http-headers';
+
+export const SITEMAP_INDEX_CONTENT_TYPE = 'application/xml';
+
+export const SITEMAP_CHUNK_CONTENT_TYPE = 'application/gzip';
+
+export const SitemapFileNames = {
+  index: 'sitemap-index.xml',
+  chunkPrefix: 'sitemap-',
+  chunkSuffix: '.xml.gz',
+} as const;
+
+export function sitemapChunkFileName(index: number): string {
+  return `${SitemapFileNames.chunkPrefix}${index}${SitemapFileNames.chunkSuffix}`;
+}
 
 const CHUNK_FILENAME_PATTERN = /^sitemap-\d+\.xml\.gz$/;
 
-function resolveBlobUrl(path: string): string | undefined {
-  const base = process.env['SitemapBlobBaseUrl'];
-  if (!base) {
-    return undefined;
-  }
-
+function resolveBlobUrl(path: string): string {
+  const base = requiredUrlSetting(BffSettingKeys.SitemapBlobBaseUrl).toString();
   return new URL(path, base.endsWith('/') ? base : `${base}/`).toString();
 }
 
@@ -22,21 +34,16 @@ async function sendBlob(res: Response, blobUrl: string, contentType: string): Pr
 
   const body = Buffer.from(await blobResponse.arrayBuffer());
   res.status(200);
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Content-Length', body.length.toString());
+  res.setHeader(CONTENT_TYPE_HEADER, contentType);
+  res.setHeader(HopByHopHeaders.contentLength, body.length.toString());
   res.end(body);
 }
 
 export async function sitemapIndexHandler(_req: Request, res: Response): Promise<void> {
-  const blobUrl = resolveBlobUrl('sitemap-index.xml');
-  if (!blobUrl) {
-    res.status(502);
-    res.end('SitemapBlobBaseUrl is not configured');
-    return;
-  }
+  const blobUrl = resolveBlobUrl(SitemapFileNames.index);
 
   try {
-    await sendBlob(res, blobUrl, 'application/xml');
+    await sendBlob(res, blobUrl, SITEMAP_INDEX_CONTENT_TYPE);
   } catch (err) {
     logger.error({ err }, 'Failed to fetch sitemap index from blob storage');
     if (!res.headersSent) {
@@ -55,14 +62,9 @@ export async function sitemapChunkHandler(req: Request, res: Response): Promise<
   }
 
   const blobUrl = resolveBlobUrl(`sitemaps/${file}`);
-  if (!blobUrl) {
-    res.status(502);
-    res.end('SitemapBlobBaseUrl is not configured');
-    return;
-  }
 
   try {
-    await sendBlob(res, blobUrl, 'application/gzip');
+    await sendBlob(res, blobUrl, SITEMAP_CHUNK_CONTENT_TYPE);
   } catch (err) {
     logger.error({ err }, 'Failed to fetch sitemap chunk from blob storage');
     if (!res.headersSent) {

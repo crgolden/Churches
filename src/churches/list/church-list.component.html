@@ -1,126 +1,126 @@
 @if (error()) {
-  <div class="page-container page-section">
-    <p class="text-error">{{ error() }}</p>
+  <div crgPageContainer crgPageSection>
+    <p class="m-0 text-meta text-danger">{{ error() }}</p>
   </div>
-} @else if (results()) {
-  <div class="page-container page-section">
-    <div class="list-header">
-      <p id="result-count" class="count">
-        {{ results()!.totalCount | number }}
-        {{ results()!.totalCount === 1 ? 'church' : 'churches' }} found
+} @else if (results(); as currentResults) {
+  <div crgPageContainer crgPageSection>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <p id="result-count" class="m-0 text-body font-medium text-text-muted" [attr.data-total-count]="currentResults.totalCount">
+        {{ currentResults.totalCount | number }}
+        {{ currentResults.totalCount === 1 ? 'church' : 'churches' }} found
         @if (q()) {
-          <span class="searched-term">for "{{ q() }}"</span>
+          <span class="font-normal text-text-muted">for "{{ q() }}"</span>
         }
       </p>
-      <div class="list-actions">
-        <div class="filter-field sort-field">
+      <div class="flex flex-wrap gap-2">
+        <div class="flex items-center">
           <label for="sort-select" class="sr-only">Sort by</label>
-          <select id="sort-select" #sortSelect (change)="changeSort(sortSelect.value)">
-            <option value="relevance" [selected]="sort() === null || sort() === 'relevance'">Relevance</option>
-            <option value="name" [selected]="sort() === 'name'">Name (A&ndash;Z)</option>
+          <select id="sort-select" class="text-note" #sortSelect (change)="changeSort(sortSelect.value)">
+            <option [value]="sorts.relevance" [selected]="sort() === null || sort() === sorts.relevance">Relevance</option>
+            <option [value]="sorts.name" [selected]="sort() === sorts.name">Name (A&ndash;Z)</option>
             @if (hasGeo()) {
-              <option value="distance" [selected]="sort() === 'distance'">Distance</option>
+              <option [value]="sorts.distance" [selected]="sort() === sorts.distance">Distance</option>
             }
           </select>
         </div>
-        <div class="filter-field page-size-field">
+        <div class="flex items-center">
           <label for="page-size-select" class="sr-only">Results per page</label>
-          <select id="page-size-select" #pageSizeSelect (change)="changePageSize(+pageSizeSelect.value)">
-            <option value="10" [selected]="pageSize() === 10">10 per page</option>
-            <option value="20" [selected]="pageSize() === 20">20 per page</option>
-            <option value="50" [selected]="pageSize() === 50">50 per page</option>
+          <select id="page-size-select" class="text-note" #pageSizeSelect (change)="changePageSize(+pageSizeSelect.value)">
+            @for (size of pageSizeOptions; track size) {
+              <option [value]="size" [selected]="servedPageSize() === size">{{ size }} per page</option>
+            }
           </select>
         </div>
-        <div class="view-toggle" role="group" aria-label="Result view">
+        <div class="flex gap-1" [attr.role]="ariaRoles.group" aria-label="Result view">
           <a
             id="btn-view-grid"
-            class="btn-ghost"
-            [class.active]="view() === 'grid'"
+            crgButtonGhost
+            class="aria-[current=true]:bg-accent/8 aria-[current=true]:text-accent aria-[current=true]:hover:not-disabled:bg-accent/8 aria-[current=true]:hover:not-disabled:text-accent"
             [routerLink]="[]"
-            [queryParams]="{ view: 'grid' }"
+            [queryParams]="viewQuery(views.grid)"
             queryParamsHandling="merge"
-            [attr.aria-current]="view() === 'grid' ? 'true' : null">
+            [attr.aria-current]="view() === views.grid ? 'true' : null">
             Grid
           </a>
           <a
             id="btn-view-list"
-            class="btn-ghost"
-            [class.active]="view() === 'list'"
+            crgButtonGhost
+            class="aria-[current=true]:bg-accent/8 aria-[current=true]:text-accent aria-[current=true]:hover:not-disabled:bg-accent/8 aria-[current=true]:hover:not-disabled:text-accent"
             [routerLink]="[]"
-            [queryParams]="{ view: 'list' }"
+            [queryParams]="viewQuery(views.list)"
             queryParamsHandling="merge"
-            [attr.aria-current]="view() === 'list' ? 'true' : null">
+            [attr.aria-current]="view() === views.list ? 'true' : null">
             List
           </a>
           <a
             id="btn-view-map"
-            class="btn-ghost"
-            [class.active]="view() === 'map'"
+            crgButtonGhost
+            class="aria-[current=true]:bg-accent/8 aria-[current=true]:text-accent aria-[current=true]:hover:not-disabled:bg-accent/8 aria-[current=true]:hover:not-disabled:text-accent"
             [routerLink]="[]"
-            [queryParams]="{ view: 'map' }"
+            [queryParams]="viewQuery(views.map)"
             queryParamsHandling="merge"
-            [attr.aria-current]="view() === 'map' ? 'true' : null">
+            [attr.aria-current]="view() === views.map ? 'true' : null">
             Map
           </a>
         </div>
-        <a routerLink="/" class="btn-ghost">&larr; Refine search</a>
+        <a routerLink="/" crgButtonGhost>&larr; Refine search</a>
       </div>
     </div>
-    @if (view() === 'map') {
+    @if (view() === views.map) {
       <app-church-map
-        [items]="results()!.items"
+        [items]="currentResults.items"
         (markerClick)="null">
       </app-church-map>
-    } @else if (view() === 'list') {
-      <div class="church-list">
-        @for (item of results()!.items; track item.church.id) {
-          <article class="church-row" [attr.id]="'church-row-' + $index">
-            <a [attr.id]="'church-name-' + $index" [routerLink]="['/churches', item.church.slug]" class="church-name">
+    } @else if (view() === views.list) {
+      <div id="church-list" class="flex flex-col">
+        @for (item of currentResults.items; track item.church.id) {
+          <article class="flex flex-wrap items-center gap-3 border-b border-line py-3" [attr.id]="'church-row-' + $index">
+            <a [attr.id]="churchNameId($index)" [routerLink]="['/churches', item.church.slug]" class="flex-[0_0_260px] truncate text-body font-medium text-accent hover:underline">
               {{ item.church.canonicalName }}
             </a>
-            <span [attr.id]="'church-location-' + $index" class="church-location">
+            <span [attr.id]="'church-location-' + $index" class="flex-auto text-meta text-text-muted">
               {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
             </span>
-            <div class="row-tags">
+            <div class="flex flex-none flex-wrap gap-[0.4rem]">
               @if (item.distanceMiles !== null) {
-                <span [attr.id]="'church-distance-' + $index" class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
+                <span [attr.id]="churchDistanceId($index)" class="inline-block rounded-full bg-amber/15 px-[0.6rem] py-[0.2rem] text-small text-amber-dark">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
               }
               @if (item.church.worshipStyle) {
-                <span class="tag">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
+                <span class="inline-block rounded-full bg-accent/8 px-[0.6rem] py-[0.2rem] text-small text-accent">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
               }
               @if (item.church.wheelchairAccessible) {
-                <span class="tag tag-muted">Accessible</span>
+                <span class="inline-block rounded-full border border-line bg-canvas px-[0.6rem] py-[0.2rem] text-small text-text-muted">Accessible</span>
               }
             </div>
           </article>
         }
       </div>
     } @else {
-      <div class="church-grid">
-        @for (item of results()!.items; track item.church.id) {
-          <article class="church-card card" [attr.id]="'church-card-' + $index">
-            <div class="card-body">
-              <a [attr.id]="'church-name-' + $index" [routerLink]="['/churches', item.church.slug]" class="church-name">
-                <h2>{{ item.church.canonicalName }}</h2>
+      <div id="church-grid" class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-6">
+        @for (item of currentResults.items; track item.church.id) {
+          <article crgCard class="flex flex-col transition-[translate,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0" [attr.id]="'church-card-' + $index">
+            <div class="flex-1 p-6">
+              <a [attr.id]="churchNameId($index)" [routerLink]="['/churches', item.church.slug]" class="group">
+                <h2 class="mb-[0.35rem] text-lead text-accent group-hover:underline">{{ item.church.canonicalName }}</h2>
               </a>
-              <p [attr.id]="'church-location-' + $index" class="church-location">
+              <p [attr.id]="'church-location-' + $index" class="mb-3 text-meta text-text-muted">
                 {{ item.church.city }}, {{ item.church.state }} {{ item.church.zip }}
               </p>
-              <div class="card-tags">
+              <div class="flex flex-wrap gap-[0.4rem]">
                 @if (item.distanceMiles !== null) {
-                  <span [attr.id]="'church-distance-' + $index" class="tag tag-accent">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
+                  <span [attr.id]="churchDistanceId($index)" class="inline-block rounded-full bg-amber/15 px-[0.6rem] py-[0.2rem] text-small text-amber-dark">{{ item.distanceMiles | number: '1.1-1' }} mi</span>
                 }
                 @if (item.church.worshipStyle) {
-                  <span class="tag">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
+                  <span class="inline-block rounded-full bg-accent/8 px-[0.6rem] py-[0.2rem] text-small text-accent">{{ worshipStyleLabel(item.church.worshipStyle) }}</span>
                 }
                 @if (item.church.wheelchairAccessible) {
-                  <span class="tag tag-muted">Accessible</span>
+                  <span class="inline-block rounded-full border border-line bg-canvas px-[0.6rem] py-[0.2rem] text-small text-text-muted">Accessible</span>
                 }
               </div>
             </div>
             @if (item.church.website) {
-              <div class="card-footer">
-                <a [href]="item.church.website" target="_blank" rel="noopener" class="btn-ghost">
+              <div class="border-t border-line px-6 py-3">
+                <a [href]="item.church.website" target="_blank" rel="noopener" crgButtonGhost>
                   Visit Website &nearr;
                 </a>
               </div>
@@ -129,45 +129,53 @@
         }
       </div>
     }
-    @if (view() !== 'map' && results()!.totalCount > 0) {
-      <nav class="pagination" aria-label="Pagination">
-        <span class="showing-indicator text-muted">
-          Showing {{ showingFrom() }}&ndash;{{ showingTo() }} of {{ results()!.totalCount }}
+    @if (pageIsPastTheEnd()) {
+      <p id="page-past-the-end" class="text-meta text-text-muted">
+        There are no churches on this page.
+        <a id="btn-first-page" [routerLink]="[]" [queryParams]="{ page: 1 }" queryParamsHandling="merge">Back to the first page</a>
+      </p>
+    }
+    @if (currentResults.totalCount > 0) {
+      <nav class="mt-12 flex flex-col items-center justify-center gap-3" aria-label="Pagination">
+        <span id="showing-indicator" class="text-meta text-text-muted">
+          @if (pageIsPastTheEnd()) {
+            Showing 0 of {{ currentResults.totalCount | number }}
+          } @else {
+            Showing {{ showingFrom() | number }}&ndash;{{ showingTo() | number }} of {{ currentResults.totalCount | number }}
+          }
         </span>
         @if (totalPages() > 1) {
-          <div class="page-buttons">
-            @if (page() > 1) {
+          <div class="flex flex-wrap items-center justify-center gap-2">
+            @if (servedPage() > 1) {
               <a
                 id="btn-prev-page"
-                class="btn-ghost"
+                crgButtonGhost
                 [routerLink]="[]"
-                [queryParams]="{ page: page() - 1 }"
+                [queryParams]="{ page: servedPage() - 1 }"
                 queryParamsHandling="merge"
                 rel="prev">&larr; Previous</a>
-            } @else {
-              <button id="btn-prev-page" type="button" class="btn-ghost" disabled>&larr; Previous</button>
             }
             @for (p of pageWindow(); track p) {
               <a
-                class="btn-ghost page-number"
-                [class.active]="p === page()"
+                [attr.id]="pageNumberId($index)"
+                crgButtonGhost
+                class="aria-[current=page]:bg-accent/8 aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=page]:hover:not-disabled:bg-accent/8 aria-[current=page]:hover:not-disabled:text-accent"
                 [routerLink]="[]"
                 [queryParams]="{ page: p }"
                 queryParamsHandling="merge"
-                [attr.aria-current]="p === page() ? 'page' : null">
+                [attr.aria-label]="pageLinkLabel(p)"
+                [attr.aria-current]="p === servedPage() ? 'page' : null">
                 {{ p }}
               </a>
             }
-            @if (page() < totalPages()) {
+            @if (servedPage() < totalPages()) {
               <a
                 id="btn-next-page"
-                class="btn-ghost"
+                crgButtonGhost
                 [routerLink]="[]"
-                [queryParams]="{ page: page() + 1 }"
+                [queryParams]="{ page: servedPage() + 1 }"
                 queryParamsHandling="merge"
                 rel="next">Next &rarr;</a>
-            } @else {
-              <button id="btn-next-page" type="button" class="btn-ghost" disabled>Next &rarr;</button>
             }
           </div>
         }
@@ -175,7 +183,7 @@
     }
   </div>
 } @else {
-  <div class="page-container page-section">
-    <p class="text-muted">Enter a search above to find churches.</p>
+  <div crgPageContainer crgPageSection>
+    <p class="text-meta text-text-muted">Enter a search above to find churches.</p>
   </div>
 }

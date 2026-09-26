@@ -4,6 +4,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { REQUEST } from '@angular/core';
 import { ssrAbsoluteUrlInterceptor } from './ssr-absolute-url.interceptor';
 
+const SSR_ORIGIN = `https://${crypto.randomUUID()}.example.com:4000`;
+const RELATIVE_PATH = `/${crypto.randomUUID()}/${crypto.randomUUID()}`;
+const ABSOLUTE_URL = `https://${crypto.randomUUID()}.example.com${RELATIVE_PATH}`;
+
 function configure(requestProviderValue: Request | null) {
   TestBed.configureTestingModule({
     providers: [
@@ -28,50 +32,50 @@ describe('ssrAbsoluteUrlInterceptor', () => {
     });
 
     it('passes relative URLs through unchanged', () => {
-      http.get('/directory/api/churches').subscribe();
+      http.get(RELATIVE_PATH).subscribe();
 
-      const req = controller.expectOne('/directory/api/churches');
-      expect(req.request.url).toBe('/directory/api/churches');
+      const req = controller.expectOne(RELATIVE_PATH);
+      expect(req.request.url).toBe(RELATIVE_PATH);
       req.flush([]);
     });
 
     it('passes already-absolute URLs through unchanged', () => {
-      http.get('https://directory.example.com/api/churches').subscribe();
+      http.get(ABSOLUTE_URL).subscribe();
 
-      const req = controller.expectOne('https://directory.example.com/api/churches');
-      expect(req.request.url).toBe('https://directory.example.com/api/churches');
+      const req = controller.expectOne(ABSOLUTE_URL);
+      expect(req.request.url).toBe(ABSOLUTE_URL);
       req.flush([]);
     });
   });
 
   describe('under SSR (REQUEST provided)', () => {
     beforeEach(() => {
-      configure(new Request('https://ssr-host.example.com:4000/churches'));
+      configure(new Request(`${SSR_ORIGIN}/${crypto.randomUUID()}`));
       http = TestBed.inject(HttpClient);
       controller = TestBed.inject(HttpTestingController);
     });
 
     it('rewrites a relative path to an absolute URL using the request origin', () => {
-      http.get('/directory/api/churches').subscribe();
+      http.get(RELATIVE_PATH).subscribe();
 
-      const req = controller.expectOne((r) => r.url.startsWith('https://ssr-host'));
-      expect(req.request.url).toBe('https://ssr-host.example.com:4000/directory/api/churches');
+      const req = controller.expectOne((r) => r.url.startsWith(SSR_ORIGIN));
+      expect(req.request.url).toBe(`${SSR_ORIGIN}${RELATIVE_PATH}`);
       req.flush([]);
     });
 
     it('adds a leading slash when the relative URL lacks one', () => {
-      http.get('directory/api/churches').subscribe();
+      http.get(RELATIVE_PATH.substring(1)).subscribe();
 
-      const req = controller.expectOne((r) => r.url.startsWith('https://ssr-host'));
-      expect(req.request.url).toBe('https://ssr-host.example.com:4000/directory/api/churches');
+      const req = controller.expectOne((r) => r.url.startsWith(SSR_ORIGIN));
+      expect(req.request.url).toBe(`${SSR_ORIGIN}${RELATIVE_PATH}`);
       req.flush([]);
     });
 
     it('passes already-absolute URLs through even under SSR', () => {
-      http.get('https://external.example.com/api').subscribe();
+      http.get(ABSOLUTE_URL).subscribe();
 
-      const req = controller.expectOne('https://external.example.com/api');
-      expect(req.request.url).toBe('https://external.example.com/api');
+      const req = controller.expectOne(ABSOLUTE_URL);
+      expect(req.request.url).toBe(ABSOLUTE_URL);
       req.flush([]);
     });
   });

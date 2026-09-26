@@ -1,0 +1,8 @@
+{
+  "scrollRestoreTolerancePx": 40,
+  "ports": {
+    "ssr": 4000,
+    "mockDirectory": 4001,
+    "unusedOidcAuthority": 4002
+  }
+}

@@ -23,10 +23,10 @@ describe('NavComponent', () => {
   });
 
   it('toggleMenu flips menuOpen signal', () => {
-    expect(component['menuOpen']()).toBe(false);
-    component['toggleMenu']();
-    expect(component['menuOpen']()).toBe(true);
-    component['toggleMenu']();
-    expect(component['menuOpen']()).toBe(false);
+    expect(component.menuOpen()).toBe(false);
+    component.toggleMenu();
+    expect(component.menuOpen()).toBe(true);
+    component.toggleMenu();
+    expect(component.menuOpen()).toBe(false);
   });
 });

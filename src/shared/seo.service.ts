@@ -3,8 +3,22 @@ import { Injectable, inject } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
 import { Church, WORSHIP_STYLES } from './models';
 import { injectOrigin } from './origin';
-
-const JSON_LD_ELEMENT_ID = 'app-json-ld';
+import { PageTitles, pageTitle } from './page-title';
+import { CHURCHES_URL, churchUrl } from '../app/app-paths';
+import {
+  CANONICAL_LINK_SELECTOR,
+  CANONICAL_REL,
+  HOME_CRUMB,
+  JSON_LD_ELEMENT_ID,
+  JSON_LD_MIME_TYPE,
+  JsonLdKeys,
+  MetaNames,
+  MetaProperties,
+  OgTypes,
+  SchemaProperties,
+  SchemaTypes,
+  TWITTER_CARD,
+} from './seo-contract';
 
 @Injectable({ providedIn: 'root' })
 export class SeoService {
@@ -13,16 +27,15 @@ export class SeoService {
   private readonly document = inject(DOCUMENT);
   private readonly origin = injectOrigin();
 
-  setPage(pageTitle: string, description: string, canonicalPath: string): void {
+  setPage(ogTitle: string, description: string, canonicalPath: string): void {
     const canonicalUrl = `${this.origin}${canonicalPath}`;
-    this.title.setTitle(pageTitle);
-    this.meta.updateTag({ name: 'description', content: description });
+    this.meta.updateTag({ name: MetaNames.description, content: description });
     this.setCanonical(canonicalUrl);
-    this.meta.updateTag({ property: 'og:title', content: pageTitle });
-    this.meta.updateTag({ property: 'og:description', content: description });
-    this.meta.updateTag({ property: 'og:url', content: canonicalUrl });
-    this.meta.updateTag({ property: 'og:type', content: 'website' });
-    this.meta.updateTag({ name: 'twitter:card', content: 'summary' });
+    this.meta.updateTag({ property: MetaProperties.ogTitle, content: ogTitle });
+    this.meta.updateTag({ property: MetaProperties.ogDescription, content: description });
+    this.meta.updateTag({ property: MetaProperties.ogUrl, content: canonicalUrl });
+    this.meta.updateTag({ property: MetaProperties.ogType, content: OgTypes.website });
+    this.meta.updateTag({ name: MetaNames.twitterCard, content: TWITTER_CARD });
   }
 
   setChurchMeta(church: Church): void {
@@ -31,22 +44,22 @@ export class SeoService {
     const description =
       `${church.canonicalName} — a ${worshipStyleLabel} church in ${church.city}, ${church.state}. ` +
       'Find service times, location, and more.';
-    const canonicalPath = `/churches/${church.slug}`;
+    const canonicalPath = churchUrl(church.slug);
     const canonicalUrl = `${this.origin}${canonicalPath}`;
 
-    this.title.setTitle(`${church.canonicalName} | Churches`);
-    this.meta.updateTag({ name: 'description', content: description });
+    this.title.setTitle(pageTitle(church.canonicalName));
+    this.meta.updateTag({ name: MetaNames.description, content: description });
     this.setCanonical(canonicalUrl);
-    this.meta.updateTag({ property: 'og:title', content: church.canonicalName });
-    this.meta.updateTag({ property: 'og:description', content: description });
-    this.meta.updateTag({ property: 'og:url', content: canonicalUrl });
-    this.meta.updateTag({ property: 'og:type', content: 'place' });
-    this.meta.updateTag({ name: 'twitter:card', content: 'summary' });
+    this.meta.updateTag({ property: MetaProperties.ogTitle, content: church.canonicalName });
+    this.meta.updateTag({ property: MetaProperties.ogDescription, content: description });
+    this.meta.updateTag({ property: MetaProperties.ogUrl, content: canonicalUrl });
+    this.meta.updateTag({ property: MetaProperties.ogType, content: OgTypes.place });
+    this.meta.updateTag({ name: MetaNames.twitterCard, content: TWITTER_CARD });
     this.setJsonLd(this.buildChurchJsonLd(church, canonicalUrl));
   }
 
   setNoIndex(): void {
-    this.meta.updateTag({ name: 'robots', content: 'noindex' });
+    this.meta.updateTag({ name: MetaNames.robots, content: 'noindex' });
   }
 
   removeJsonLd(): void {
@@ -55,10 +68,10 @@ export class SeoService {
   }
 
   private setCanonical(url: string): void {
-    let link = this.document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    let link = this.document.querySelector<HTMLLinkElement>(CANONICAL_LINK_SELECTOR);
     if (!link) {
       link = this.document.createElement('link');
-      link.setAttribute('rel', 'canonical');
+      link.setAttribute('rel', CANONICAL_REL);
       this.document.head.appendChild(link);
     }
     link.setAttribute('href', url);
@@ -68,63 +81,63 @@ export class SeoService {
     this.removeJsonLd();
     const script = this.document.createElement('script');
     script.id = JSON_LD_ELEMENT_ID;
-    script.setAttribute('type', 'application/ld+json');
+    script.setAttribute('type', JSON_LD_MIME_TYPE);
     script.text = JSON.stringify(data);
     this.document.head.appendChild(script);
   }
 
   private buildChurchJsonLd(church: Church, canonicalUrl: string): object {
     const address: Record<string, string> = {
-      '@type': 'PostalAddress',
+      [JsonLdKeys.type]: SchemaTypes.postalAddress,
       addressLocality: church.city,
       addressRegion: church.state,
       postalCode: church.zip,
       addressCountry: 'US',
     };
     if (church.street) {
-      address['streetAddress'] = church.street;
+      address[SchemaProperties.streetAddress] = church.street;
     }
 
     const churchNode: Record<string, unknown> = {
-      '@type': 'Church',
+      [JsonLdKeys.type]: SchemaTypes.church,
       name: church.canonicalName,
       address,
       url: canonicalUrl,
     };
 
     if (church.latitude && church.longitude) {
-      churchNode['geo'] = {
-        '@type': 'GeoCoordinates',
-        latitude: church.latitude,
+      churchNode[SchemaProperties.geo] = {
+        [JsonLdKeys.type]: SchemaTypes.geoCoordinates,
+        [SchemaProperties.latitude]: church.latitude,
         longitude: church.longitude,
       };
     }
 
     if (church.phoneNumber) {
-      churchNode['telephone'] = church.phoneNumber;
+      churchNode[SchemaProperties.telephone] = church.phoneNumber;
     }
 
     if (church.website) {
-      churchNode['sameAs'] = church.website;
+      churchNode[SchemaProperties.sameAs] = church.website;
     }
 
     const breadcrumb = {
-      '@type': 'BreadcrumbList',
+      [JsonLdKeys.type]: SchemaTypes.breadcrumbList,
       itemListElement: [
         {
-          '@type': 'ListItem',
+          [JsonLdKeys.type]: SchemaTypes.listItem,
           position: 1,
-          name: 'Home',
+          name: HOME_CRUMB,
           item: this.origin,
         },
         {
-          '@type': 'ListItem',
+          [JsonLdKeys.type]: SchemaTypes.listItem,
           position: 2,
-          name: 'Browse Churches',
-          item: `${this.origin}/churches`,
+          name: PageTitles.browseChurches,
+          item: `${this.origin}${CHURCHES_URL}`,
         },
         {
-          '@type': 'ListItem',
+          [JsonLdKeys.type]: SchemaTypes.listItem,
           position: 3,
           name: church.canonicalName,
           item: canonicalUrl,
@@ -133,8 +146,8 @@ export class SeoService {
     };
 
     return {
-      '@context': 'https://schema.org',
-      '@graph': [churchNode, breadcrumb],
+      [JsonLdKeys.context]: 'https://schema.org',
+      [JsonLdKeys.graph]: [churchNode, breadcrumb],
     };
   }
 }

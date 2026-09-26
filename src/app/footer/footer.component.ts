@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { PageContainerDirective } from '@crgolden/modules/primitives';
 
 @Component({
   selector: 'app-footer',
+  imports: [PageContainerDirective],
   templateUrl: './footer.component.html',
-  styleUrl: './footer.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FooterComponent {

@@ -1,121 +1,161 @@
 import { test as base, type Page } from '@playwright/test';
-import type { ChurchRecord, CorrectionRecord } from './mocks/directory.js';
+import {
+  LARGEST_PERCENT,
+  newDisplayName,
+  newEmailAddress,
+  newHttpsAddress,
+  newId,
+  newMemberOf,
+  newPathSegment,
+  newPercent,
+  newText,
+  newUtcInstant,
+  randomIntBetween,
+} from '@crgolden/modules/testing';
+import {
+  ControlRoutes,
+  type CampusRecord,
+  type ChurchRecord,
+  type CorrectionRecord,
+  type MinistryRecord,
+  type ScheduleRecord,
+} from './mocks/directory.js';
+import { e2eContract } from './mocks/e2e-contract.js';
+import { abortMapTiles } from './map-tiles.js';
+import { MediaTypes } from './media-type-constants.js';
+import { OidcClaimTypes } from './oidc-constants.js';
+import { CHURCHES_URL } from '../src/app/app-paths';
+import { CONTENT_TYPE_HEADER, HttpMethods } from '../src/bff/http-headers';
+import { DEFAULT_PAGE_SIZE, SearchParamNames } from '../src/shared/directory-api';
+import { DAYS_OF_WEEK, US_STATES, WORSHIP_STYLES } from '../src/shared/models';
+import { BffPaths, ClaimTypes, MODERATOR_CLAIM_VALUE, SID_QUERY_PARAMETER } from '../src/shared/bff-contract';
 
 export type { ChurchRecord, CorrectionRecord };
 
-export const FIRST_BAPTIST_AUSTIN: ChurchRecord = {
-  id: '11111111-1111-1111-1111-111111111111',
-  canonicalName: 'First Baptist Church Austin',
-  slug: 'first-baptist-church-austin-tx',
-  latitude: 30.2672,
-  longitude: -97.7431,
-  street: '901 Trinity St',
-  city: 'Austin',
-  state: 'TX',
-  zip: '78701',
-  phoneNumber: '(512) 476-2625',
-  website: 'https://fbcaustin.org',
-  emailAddress: 'info@fbcaustin.org',
-  denominationId: null,
-  worshipStyle: 1,
-  primaryLanguage: 'English',
-  acceptsLGBTQ: null,
-  wheelchairAccessible: true,
-  hasNursery: true,
-  hasYouthProgram: true,
-  confidenceScore: 0.85,
-  lastVerifiedAt: null,
-  isActive: true,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  schedules: [
-    {
-      id: 'aaaaaaaa-0000-0000-0000-000000000001',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      campusId: null,
-      dayOfWeek: 0,
-      startTime: '10:00:00',
-      description: 'Sunday Worship',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'aaaaaaaa-0000-0000-0000-000000000002',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      campusId: null,
-      dayOfWeek: 3,
-      startTime: '19:00:00',
-      description: 'Bible Study',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ],
-  ministries: [
-    {
-      id: 'bbbbbbbb-0000-0000-0000-000000000001',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      name: 'Youth Group',
-      description: 'For teens',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'bbbbbbbb-0000-0000-0000-000000000002',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      name: 'Food Bank',
-      description: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ],
-  campuses: [
-    {
-      id: 'cccccccc-0000-0000-0000-000000000001',
-      churchId: '11111111-1111-1111-1111-111111111111',
-      name: 'North Campus',
-      street: '1200 N Lamar Blvd',
-      city: 'Austin',
-      state: 'TX',
-      zip: '78703',
-      latitude: 30.29,
-      longitude: -97.75,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ],
-};
+function newLatitude(): number {
+  return randomIntBetween(-89, 90);
+}
 
-export const MOSAIC_AUSTIN: ChurchRecord = {
-  id: '22222222-2222-2222-2222-222222222222',
-  canonicalName: 'Mosaic Church Austin',
-  slug: 'mosaic-church-austin-tx',
-  latitude: 30.27,
-  longitude: -97.75,
-  street: null,
-  city: 'Austin',
-  state: 'TX',
-  zip: '78702',
-  phoneNumber: null,
-  website: null,
-  emailAddress: null,
-  denominationId: null,
-  worshipStyle: 2,
-  primaryLanguage: 'English',
-  acceptsLGBTQ: null,
-  wheelchairAccessible: null,
-  hasNursery: null,
-  hasYouthProgram: null,
-  confidenceScore: 0.2,
-  lastVerifiedAt: null,
-  isActive: true,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  schedules: [],
-  ministries: [],
-  campuses: [],
-};
+function newLongitude(): number {
+  return randomIntBetween(-179, 180);
+}
 
-const MOCK_BASE = 'http://localhost:4001';
+function newStartTime(): string {
+  return `${randomIntBetween(10, 24)}:${randomIntBetween(10, 60)}:${randomIntBetween(10, 60)}`;
+}
+
+function newSchedule(churchId: string): ScheduleRecord {
+  return {
+    id: newId(),
+    churchId,
+    campusId: null,
+    dayOfWeek: newMemberOf(DAYS_OF_WEEK).value,
+    startTime: newStartTime(),
+    description: newDisplayName(),
+    createdAt: newUtcInstant(),
+    updatedAt: newUtcInstant(),
+  };
+}
+
+function newMinistry(churchId: string, description: string | null): MinistryRecord {
+  return {
+    id: newId(),
+    churchId,
+    name: newDisplayName(),
+    description,
+    createdAt: newUtcInstant(),
+    updatedAt: newUtcInstant(),
+  };
+}
+
+function newCampus(churchId: string): CampusRecord {
+  return {
+    id: newId(),
+    churchId,
+    name: newDisplayName(),
+    street: newDisplayName(),
+    city: newText(),
+    state: newMemberOf(US_STATES).code,
+    zip: newText(),
+    latitude: newLatitude(),
+    longitude: newLongitude(),
+    createdAt: newUtcInstant(),
+    updatedAt: newUtcInstant(),
+  };
+}
+
+export function newChurchWithoutDetails(): ChurchRecord {
+  return {
+    id: newId(),
+    canonicalName: newDisplayName(),
+    slug: `${newPathSegment()}-${newPathSegment()}`,
+    latitude: newLatitude(),
+    longitude: newLongitude(),
+    street: null,
+    city: newText(),
+    state: newMemberOf(US_STATES).code,
+    zip: newText(),
+    phoneNumber: null,
+    website: null,
+    emailAddress: null,
+    denominationId: null,
+    worshipStyle: newMemberOf(WORSHIP_STYLES).value,
+    primaryLanguage: newText(),
+    acceptsLGBTQ: null,
+    wheelchairAccessible: null,
+    hasNursery: null,
+    hasYouthProgram: null,
+    confidenceScore: newPercent() / LARGEST_PERCENT,
+    lastVerifiedAt: null,
+    isActive: true,
+    createdAt: newUtcInstant(),
+    updatedAt: newUtcInstant(),
+    schedules: [],
+    ministries: [],
+    campuses: [],
+  };
+}
+
+export function newChurchWithDetails(): ChurchRecord {
+  const church = newChurchWithoutDetails();
+  return {
+    ...church,
+    street: newDisplayName(),
+    phoneNumber: newText(),
+    website: newHttpsAddress(),
+    emailAddress: newEmailAddress(),
+    wheelchairAccessible: true,
+    hasNursery: true,
+    hasYouthProgram: true,
+    schedules: [newSchedule(church.id), newSchedule(church.id)],
+    ministries: [newMinistry(church.id, newDisplayName()), newMinistry(church.id, null)],
+    campuses: [newCampus(church.id)],
+  };
+}
+
+export function churchesUrl(query: Record<string, string>): string {
+  return `${CHURCHES_URL}?${new URLSearchParams(query).toString()}`;
+}
+
+export function firstPageUrl(query: Record<string, string> = {}): string {
+  return churchesUrl({
+    ...query,
+    [SearchParamNames.page]: String(1),
+    [SearchParamNames.pageSize]: String(DEFAULT_PAGE_SIZE),
+  });
+}
+
+export async function seedChurches(store: TestStore, count: number): Promise<void> {
+  for (const church of Array.from({ length: count }, newChurchWithoutDetails)) {
+    await store.seedChurch(church);
+  }
+}
+
+export const CHURCH_WITH_DETAILS = newChurchWithDetails();
+
+export const CHURCH_WITHOUT_DETAILS = newChurchWithoutDetails();
+
+export const USER_SUBJECT = newId();
 
 export interface TestStore {
   reset(): Promise<void>;
@@ -123,10 +163,14 @@ export interface TestStore {
   seedCorrection(correction: Omit<CorrectionRecord, 'createdAt'> & { createdAt?: string }): Promise<void>;
 }
 
+function mockDirectoryAddress(): string {
+  return `http://localhost:${e2eContract().mockDirectoryPort}`;
+}
+
 async function fetchControl(path: string, body?: unknown): Promise<void> {
-  const res = await fetch(`${MOCK_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const res = await fetch(`${mockDirectoryAddress()}${path}`, {
+    method: HttpMethods.post,
+    headers: { [CONTENT_TYPE_HEADER]: MediaTypes.json },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -134,47 +178,33 @@ async function fetchControl(path: string, body?: unknown): Promise<void> {
   }
 }
 
-const USER_CLAIMS = [
-  { type: 'sub', value: 'e2e-user-id' },
-  { type: 'email', value: 'e2e@test.invalid' },
-  { type: 'name', value: 'e2e@test.invalid' },
-  { type: 'bff:logout_url', value: '/bff/logout?sid=e2e' },
-  { type: 'bff:session_expires_in', value: '3600' },
+const USER_EMAIL = newEmailAddress();
+
+interface Claim {
+  type: string;
+  value: string;
+}
+
+const USER_CLAIMS: Claim[] = [
+  { type: ClaimTypes.subject, value: USER_SUBJECT },
+  { type: OidcClaimTypes.email, value: USER_EMAIL },
+  { type: ClaimTypes.name, value: USER_EMAIL },
+  { type: ClaimTypes.logoutUrl, value: `${BffPaths.logout}?${SID_QUERY_PARAMETER}=${newText()}` },
 ];
 
-const MOD_CLAIMS = [
+const MOD_CLAIMS: Claim[] = [
   ...USER_CLAIMS,
-  { type: 'churches.mod', value: 'true' },
+  { type: ClaimTypes.moderator, value: MODERATOR_CLAIM_VALUE },
 ];
 
 async function applyAnonymousRoutes(page: Page): Promise<void> {
-  await page.route('**/bff/user**', route =>
-    route.fulfill({ status: 401 }),
-  );
-  await page.route('**/bff/login**', route =>
-    route.fulfill({
-      status: 200,
-      contentType: 'text/html',
-      body: '<html><body><p>Login page (mock)</p></body></html>',
-    }),
-  );
+  await page.route(`**${BffPaths.user}**`, route => route.fulfill({ json: null }));
+  await page.route(`**${BffPaths.login}**`, route => route.fulfill({ body: newText() }));
 }
 
-async function applyAuthRoutes(page: Page, claims: typeof USER_CLAIMS): Promise<void> {
-  await page.route('**/bff/user**', route =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(claims),
-    }),
-  );
-  await page.route('**/bff/logout**', route =>
-    route.fulfill({
-      status: 200,
-      contentType: 'text/html',
-      body: '<html><body><p>Logged out (mock)</p></body></html>',
-    }),
-  );
+async function applyAuthRoutes(page: Page, claims: Claim[]): Promise<void> {
+  await page.route(`**${BffPaths.user}**`, route => route.fulfill({ json: claims }));
+  await page.route(`**${BffPaths.logout}**`, route => route.fulfill({ body: newText() }));
 }
 
 type ChurchesFixtures = {
@@ -188,13 +218,13 @@ export const test = base.extend<ChurchesFixtures>({
   store: async ({}, use) => {
     const s: TestStore = {
       async reset() {
-        await fetchControl('/_test/reset');
+        await fetchControl(ControlRoutes.reset);
       },
       async seedChurch(church) {
-        await fetchControl('/_test/churches', church);
+        await fetchControl(ControlRoutes.churches, church);
       },
       async seedCorrection(correction) {
-        await fetchControl('/_test/corrections', {
+        await fetchControl(ControlRoutes.corrections, {
           ...correction,
           createdAt: correction.createdAt ?? new Date().toISOString(),
         });
@@ -204,16 +234,19 @@ export const test = base.extend<ChurchesFixtures>({
   },
 
   anonymousPage: async ({ page }, use) => {
+    await abortMapTiles(page);
     await applyAnonymousRoutes(page);
     await use(page);
   },
 
   authedPage: async ({ page }, use) => {
+    await abortMapTiles(page);
     await applyAuthRoutes(page, USER_CLAIMS);
     await use(page);
   },
 
   modPage: async ({ page }, use) => {
+    await abortMapTiles(page);
     await applyAuthRoutes(page, MOD_CLAIMS);
     await use(page);
   },

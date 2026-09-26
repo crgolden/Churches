@@ -15,16 +15,28 @@ import {
 import { isPlatformBrowser } from '@angular/common';
 import type * as LeafletType from 'leaflet';
 import type { SearchResult } from '../../shared/models';
+import { CHURCH_MAP_ID, CHURCH_MAP_TILES_ID, MARKER_CLICK_EVENT } from './map-ids';
+import { environment } from '../../environments/environment';
+import { AriaRoles } from '../../shared/aria-roles';
 
 @Component({
   selector: 'app-church-map',
   standalone: true,
   template: `
-    <div #mapEl id="church-map" class="leaflet-container" style="width:100%;height:480px;isolation:isolate"></div>
+    <div
+      #mapEl
+      [id]="mapId"
+      class="leaflet-container"
+      [attr.role]="ariaRoles.region"
+      [attr.aria-label]="'Map of ' + items().length + ' search results'"
+      style="width:100%;height:480px;isolation:isolate"></div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
+  protected readonly ariaRoles = AriaRoles;
+  protected readonly mapId = CHURCH_MAP_ID;
+
   private readonly platformId = inject(PLATFORM_ID);
 
   readonly items = input<SearchResult[]>([]);
@@ -44,13 +56,13 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     const L = await this.loadLeaflet();
     this.fixDefaultIcon(L);
     this.map = L.map(this.mapElRef.nativeElement).setView([39.5, -98.35], 4);
-    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tiles = L.tileLayer(environment.mapTileUrlTemplate, {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(this.map);
     const tileContainer = tiles.getContainer();
     if (tileContainer) {
-      tileContainer.id = 'church-map-tiles';
+      tileContainer.id = CHURCH_MAP_TILES_ID;
     }
     this.map.invalidateSize();
     this.renderMarkers(L);
@@ -88,7 +100,7 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         .addTo(this.map)
         .bindPopup(item.church.canonicalName);
       marker.getElement()?.setAttribute('id', `church-marker-${item.church.slug}`);
-      marker.on('click', () => this.markerClick.emit(item.church.slug));
+      marker.on(MARKER_CLICK_EVENT, () => this.markerClick.emit(item.church.slug));
       this.markers.push(marker);
     }
     if (this.markers.length > 0) {

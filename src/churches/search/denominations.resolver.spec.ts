@@ -4,7 +4,7 @@ import { denominationsResolver } from './denominations.resolver';
 import { ChurchApiService } from '../../shared/church.service';
 import { Denomination } from '../../shared/models';
 
-const DENOMINATIONS = [{ id: 'd1', name: 'Baptist' }] as unknown as Denomination[];
+const DENOMINATIONS = [{ id: crypto.randomUUID(), name: crypto.randomUUID() }] as unknown as Denomination[];
 
 function run(api: Partial<ChurchApiService>): Promise<Denomination[]> {
   TestBed.resetTestingModule();

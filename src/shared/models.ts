@@ -93,6 +93,9 @@ export interface UserCorrection {
   reviewedAt: string | null;
   createdAt: string;
   churchName: string | null;
+  targetChurchName: string | null;
+  churchSlug: string | null;
+  targetChurchSlug: string | null;
 }
 
 export interface SearchParams {
@@ -116,6 +119,10 @@ export interface Denomination {
   id: string;
   name: string;
 }
+
+export const MERGE_FIELD = 'merge';
+
+export const UNKNOWN_WORSHIP_STYLE_LABEL = 'Unknown';
 
 export const WORSHIP_STYLES: { value: number; label: string }[] = [
   { value: 1, label: 'Traditional' },

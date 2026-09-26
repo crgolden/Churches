@@ -1,23 +1,27 @@
 import type { Request, Response as ExpressResponse, NextFunction } from 'express';
 import { refreshTokenGrant } from 'openid-client';
 import { getOidcConfig } from './oidc';
+import { BffSettingKeys, requiredUrlSetting } from './settings';
 import { logger } from '../telemetry/logging';
+import { COOKIE_HEADER, CSRF_HEADER, MISSING_CSRF_ERROR } from '../shared/bff-contract';
+import { AUTHORIZATION_HEADER, bearerAuthorization, HopByHopHeaders, HttpMethods } from './http-headers';
 
-const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const MUTATING_METHODS = new Set<string>([HttpMethods.post, HttpMethods.put, HttpMethods.patch, HttpMethods.delete]);
 
-const DROP_REQUEST_HEADERS = new Set([
-  'host',
-  'connection',
-  'transfer-encoding',
-  'x-csrf',
+const DROP_REQUEST_HEADERS = new Set<string>([
+  HopByHopHeaders.host,
+  HopByHopHeaders.connection,
+  HopByHopHeaders.transferEncoding,
+  CSRF_HEADER.toLowerCase(),
+  COOKIE_HEADER.toLowerCase(),
 ]);
 
-const DROP_RESPONSE_HEADERS = new Set([
-  'connection',
-  'keep-alive',
-  'transfer-encoding',
-  'content-encoding',
-  'content-length',
+const DROP_RESPONSE_HEADERS = new Set<string>([
+  HopByHopHeaders.connection,
+  HopByHopHeaders.keepAlive,
+  HopByHopHeaders.transferEncoding,
+  HopByHopHeaders.contentEncoding,
+  HopByHopHeaders.contentLength,
 ]);
 
 export function csrfForMutating(
@@ -25,8 +29,8 @@ export function csrfForMutating(
   res: ExpressResponse,
   next: NextFunction,
 ): void {
-  if (MUTATING_METHODS.has(req.method) && !req.headers['x-csrf']) {
-    res.status(403).json({ error: 'Missing X-CSRF header' });
+  if (MUTATING_METHODS.has(req.method) && !req.headers[CSRF_HEADER.toLowerCase()]) {
+    res.status(403).json({ error: MISSING_CSRF_ERROR });
     return;
   }
   next();
@@ -60,14 +64,7 @@ export async function directoryProxy(
   res: ExpressResponse,
   _next: NextFunction,
 ): Promise<void> {
-  const configuredBase = process.env['DirectoryApiAddress'];
-
-  if (configuredBase === undefined || configuredBase.trim().length === 0) {
-    res.status(502).json({ error: 'DirectoryApiAddress is not configured' });
-    return;
-  }
-
-  const base = configuredBase.replace(/\/$/, '');
+  const base = requiredUrlSetting(BffSettingKeys.DirectoryApiAddress).toString().replace(/\/$/, '');
 
   const relativePath = req.url.replace(/^\/+/, '');
   const targetUrl = new URL(relativePath, `${base}/`);
@@ -86,7 +83,7 @@ export async function directoryProxy(
     }
   }
 
-  const hasBody = !['GET', 'HEAD'].includes(req.method);
+  const hasBody = !([HttpMethods.get, HttpMethods.head] as string[]).includes(req.method);
   let bodyBuffer: Uint8Array<ArrayBuffer> | undefined;
 
   if (hasBody) {
@@ -124,9 +121,9 @@ export async function directoryProxy(
 
     const token = req.session.accessToken;
     if (token) {
-      out['authorization'] = `Bearer ${token}`;
+      out[AUTHORIZATION_HEADER] = bearerAuthorization(token);
     } else {
-      delete out['authorization'];
+      delete out[AUTHORIZATION_HEADER];
     }
 
     return out;

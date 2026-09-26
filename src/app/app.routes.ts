@@ -8,44 +8,53 @@ import { ContributeComponent } from '../churches/contribute/contribute.component
 import { ModerationComponent } from '../admin/moderation/moderation.component';
 import { NotFoundComponent } from '../shared/not-found/not-found.component';
 import { denominationsResolver } from '../churches/search/denominations.resolver';
+import { churchCountResolver } from '../churches/search/church-count.resolver';
 import { churchListResolver } from '../churches/list/church-list.resolver';
 import { churchDetailResolver } from '../churches/detail/church-detail.resolver';
 import { moderationResolver } from '../admin/moderation/moderation.resolver';
 import { contributeChurchResolver } from '../churches/contribute/contribute.resolver';
+import { PageTitles } from '../shared/page-title';
+import { AppPaths, RouteDataKeys } from './app-paths';
 
 export const routes: Routes = [
   {
     path: '',
     component: SearchComponent,
-    resolve: { denominations: denominationsResolver },
-    title: 'Find Your Church Home',
+    resolve: {
+      [RouteDataKeys.denominations]: denominationsResolver,
+      [RouteDataKeys.churchCount]: churchCountResolver,
+    },
+    title: PageTitles.home,
   },
   {
-    path: 'churches',
+    path: AppPaths.churches,
     component: ChurchListComponent,
-    resolve: { results: churchListResolver },
+    resolve: { [RouteDataKeys.results]: churchListResolver },
     runGuardsAndResolvers: 'paramsOrQueryParamsChange',
-    title: 'Browse Churches',
+    title: PageTitles.browseChurches,
   },
   {
-    path: 'churches/:slug',
+    path: `${AppPaths.churches}/:slug`,
     component: ChurchDetailComponent,
-    resolve: { church: churchDetailResolver },
-    title: 'Church',
+    resolve: { [RouteDataKeys.church]: churchDetailResolver },
   },
   {
-    path: 'contribute/:slug',
+    path: `${AppPaths.contribute}/:slug`,
     component: ContributeComponent,
     canActivate: [authGuard],
-    resolve: { church: contributeChurchResolver },
-    title: 'Suggest a Correction',
+    resolve: {
+      [RouteDataKeys.church]: contributeChurchResolver,
+      [RouteDataKeys.denominations]: denominationsResolver,
+    },
+    title: PageTitles.suggestACorrection,
   },
   {
-    path: 'admin/moderation',
+    path: AppPaths.adminModeration,
     component: ModerationComponent,
     canActivate: [modGuard],
-    resolve: { corrections: moderationResolver },
-    title: 'Moderation',
+    resolve: { [RouteDataKeys.corrections]: moderationResolver },
+    runGuardsAndResolvers: 'paramsOrQueryParamsChange',
+    title: PageTitles.moderation,
   },
-  { path: '**', component: NotFoundComponent, title: 'Page Not Found' },
+  { path: '**', component: NotFoundComponent, title: PageTitles.pageNotFound },
 ];

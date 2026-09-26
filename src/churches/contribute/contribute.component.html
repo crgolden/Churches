@@ -1,45 +1,79 @@
+<p id="correction-announcement" class="sr-only" [attr.role]="ariaRoles.status">{{ submissionAnnouncement() }}</p>
 @if (submitted()) {
-  <div class="contribute-page">
-    <div id="correction-submitted" class="success-card card">
-      <div class="success-icon">&#10003;</div>
-      <h2>Thank you!</h2>
-      <p>Your correction has been submitted for review.</p>
-      <a [href]="'/churches/' + $safeNavigationMigration(church()?.slug)" class="btn-primary"
+  <div class="mx-auto max-w-lead px-6 pt-8 pb-12">
+    <div id="correction-submitted" crgCard class="px-8 py-12 text-center">
+      <div class="mb-3 text-mark font-bold text-ok" aria-hidden="true">&#10003;</div>
+      <h2 class="mb-2">Thank you!</h2>
+      <p class="mb-6 text-text-muted">Your correction has been submitted for review.</p>
+      <a [href]="'/churches/' + $safeNavigationMigration(church()?.slug)" crgButtonPrimary
         >Back to church</a
       >
     </div>
   </div>
-} @else if (church()) {
-  <div class="contribute-page">
-    <div class="contribute-card card">
-      <h1 id="contribute-title">Suggest a Correction</h1>
-      <p id="correction-church-label" class="church-label">
-        For: <strong>{{ church()!.canonicalName }}</strong>
+} @else if (church(); as current) {
+  <div class="mx-auto max-w-lead px-6 pt-8 pb-12">
+    <div crgCard class="p-8">
+      <h1 id="contribute-title" class="mb-1 text-section">Suggest a Correction</h1>
+      <p id="correction-church-label" class="mb-6 text-detail text-text-muted" [attr.data-church-id]="current.id">
+        For: <strong>{{ current.canonicalName }}</strong>
       </p>
-      <form class="contribute-form" (submit)="$event.preventDefault(); submit()">
-        <div class="field-group">
-          <label for="field-select">Field to correct</label>
-          <select id="field-select" #sel (change)="field.set(sel.value)" [value]="field()">
-            @for (f of fields; track f) {
-              <option [value]="f">{{ f }}</option>
+      <form class="flex flex-col gap-6" (submit)="$event.preventDefault(); submit()">
+        <div class="flex flex-col gap-1">
+          <label for="field-select" class="text-meta font-medium">Field to correct</label>
+          <select id="field-select" #sel (change)="onFieldChange(sel.value)" [value]="field()">
+            @for (f of fields; track f.key) {
+              <option [value]="f.key">{{ f.label }}</option>
             }
           </select>
         </div>
-        <div class="field-group">
-          <label for="new-value">Correct value</label>
-          <input
-            id="new-value"
-            #val
-            type="text"
-            [value]="newValue()"
-            (input)="newValue.set(val.value)"
-            required
-          />
+        <p id="current-value" class="text-meta text-text-muted">
+          @if (currentValue() !== null) {
+            Currently: {{ currentValue() }}
+          } @else {
+            The directory has nothing recorded for this field.
+          }
+        </p>
+        <div class="flex flex-col gap-1">
+          <label for="new-value" class="text-meta font-medium">Correct value</label>
+          @switch (kind()) {
+            @case ('worshipStyle') {
+              <select id="new-value" #styleSel (change)="newValue.set(styleSel.value)">
+                <option value="0">Unknown</option>
+                @for (style of worshipStyles; track style.value) {
+                  <option [value]="style.value">{{ style.label }}</option>
+                }
+              </select>
+            }
+            @case ('denomination') {
+              <select id="new-value" #denomSel (change)="newValue.set(denomSel.value)">
+                @for (d of denominations(); track d.id) {
+                  <option [value]="d.id">{{ d.name }}</option>
+                }
+              </select>
+            }
+            @case ('boolean') {
+              <select id="new-value" #boolSel (change)="newValue.set(boolSel.value)">
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            }
+            @default {
+              <input
+                id="new-value"
+                #val
+                type="text"
+                [value]="newValue()"
+                (input)="newValue.set(val.value)"
+                required
+              />
+            }
+          }
         </div>
-        @if (error()) {
-          <p id="correction-error" class="text-error">{{ error() }}</p>
+        <p id="correction-error-announcement" class="sr-only" [attr.role]="ariaRoles.status">{{ errorMessage() }}</p>
+        @if (error(); as currentError) {
+          <p id="correction-error" class="m-0 text-meta text-danger" [attr.data-error]="currentError">{{ errorMessage() }}</p>
         }
-        <button id="btn-submit-correction" type="submit" class="btn-primary" [disabled]="submitting()">
+        <button id="btn-submit-correction" type="submit" crgButtonPrimary [disabled]="submitting()">
           {{ submitting() ? 'Submitting...' : 'Submit Correction' }}
         </button>
       </form>
