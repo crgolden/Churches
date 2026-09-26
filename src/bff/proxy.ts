@@ -1,10 +1,18 @@
+import { HttpStatusCode } from '@angular/common/http';
 import type { Request, Response as ExpressResponse, NextFunction } from 'express';
 import { refreshTokenGrant } from 'openid-client';
 import { getOidcConfig } from './oidc';
 import { BffSettingKeys, requiredUrlSetting } from './settings';
 import { logger } from '../telemetry/logging';
 import { COOKIE_HEADER, CSRF_HEADER, MISSING_CSRF_ERROR } from '../shared/bff-contract';
-import { AUTHORIZATION_HEADER, bearerAuthorization, HopByHopHeaders, HttpMethods } from './http-headers';
+import {
+  AUTHORIZATION_HEADER,
+  bearerAuthorization,
+  HopByHopHeaders,
+  HttpMethods,
+  WWW_AUTHENTICATE_HEADER,
+} from './http-headers';
+import { statusCodeOf } from '../shared/http-status';
 
 const MUTATING_METHODS = new Set<string>([HttpMethods.post, HttpMethods.put, HttpMethods.patch, HttpMethods.delete]);
 
@@ -138,7 +146,11 @@ export async function directoryProxy(
 
   let apiResponse = await doFetch();
 
-  if (apiResponse.status === 401 && req.session.refreshToken) {
+  if (
+    statusCodeOf(apiResponse) === HttpStatusCode.Unauthorized &&
+    apiResponse.headers.get(WWW_AUTHENTICATE_HEADER) !== null &&
+    req.session.refreshToken
+  ) {
     try {
       await refreshAndSave(req);
       apiResponse = await doFetch();

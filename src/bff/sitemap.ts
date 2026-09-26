@@ -1,7 +1,11 @@
+import { HttpStatusCode } from '@angular/common/http';
 import type { Request, Response } from 'express';
 import { logger } from '../telemetry/logging';
 import { BffSettingKeys, requiredUrlSetting } from './settings';
 import { CONTENT_TYPE_HEADER, HopByHopHeaders } from './http-headers';
+import { statusCodeOf } from '../shared/http-status';
+
+export const SITEMAP_UPSTREAM_FAILED_MESSAGE = 'Sitemap upstream fetch failed';
 
 export const SITEMAP_INDEX_CONTENT_TYPE = 'application/xml';
 
@@ -27,13 +31,13 @@ function resolveBlobUrl(path: string): string {
 async function sendBlob(res: Response, blobUrl: string, contentType: string): Promise<void> {
   const blobResponse = await fetch(blobUrl);
   if (!blobResponse.ok) {
-    res.status(blobResponse.status === 404 ? 404 : 502);
-    res.end('Sitemap upstream fetch failed');
+    res.status(statusCodeOf(blobResponse) === HttpStatusCode.NotFound ? HttpStatusCode.NotFound : HttpStatusCode.BadGateway);
+    res.end(SITEMAP_UPSTREAM_FAILED_MESSAGE);
     return;
   }
 
   const body = Buffer.from(await blobResponse.arrayBuffer());
-  res.status(200);
+  res.status(HttpStatusCode.Ok);
   res.setHeader(CONTENT_TYPE_HEADER, contentType);
   res.setHeader(HopByHopHeaders.contentLength, body.length.toString());
   res.end(body);
@@ -47,8 +51,8 @@ export async function sitemapIndexHandler(_req: Request, res: Response): Promise
   } catch (err) {
     logger.error({ err }, 'Failed to fetch sitemap index from blob storage');
     if (!res.headersSent) {
-      res.status(502);
-      res.end('Sitemap upstream fetch failed');
+      res.status(HttpStatusCode.BadGateway);
+      res.end(SITEMAP_UPSTREAM_FAILED_MESSAGE);
     }
   }
 }
@@ -56,7 +60,7 @@ export async function sitemapIndexHandler(_req: Request, res: Response): Promise
 export async function sitemapChunkHandler(req: Request, res: Response): Promise<void> {
   const file = req.params['file'];
   if (typeof file !== 'string' || !CHUNK_FILENAME_PATTERN.test(file)) {
-    res.status(404);
+    res.status(HttpStatusCode.NotFound);
     res.end();
     return;
   }
@@ -68,8 +72,8 @@ export async function sitemapChunkHandler(req: Request, res: Response): Promise<
   } catch (err) {
     logger.error({ err }, 'Failed to fetch sitemap chunk from blob storage');
     if (!res.headersSent) {
-      res.status(502);
-      res.end('Sitemap upstream fetch failed');
+      res.status(HttpStatusCode.BadGateway);
+      res.end(SITEMAP_UPSTREAM_FAILED_MESSAGE);
     }
   }
 }

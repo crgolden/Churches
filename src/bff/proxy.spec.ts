@@ -21,10 +21,12 @@ import { logger } from '../telemetry/logging';
 import { csrfForMutating, directoryProxy } from './proxy';
 import {
   AUTHORIZATION_HEADER,
+  BEARER_SCHEME,
   bearerAuthorization,
   CONTENT_TYPE_HEADER,
   HopByHopHeaders,
   HttpMethods,
+  WWW_AUTHENTICATE_HEADER,
 } from './http-headers';
 import { COOKIE_HEADER, CSRF_HEADER, CSRF_HEADER_VALUE, MISSING_CSRF_ERROR } from '../shared/bff-contract';
 import { DIRECTORY_API_PREFIX, DirectoryApi } from '../shared/directory-api';
@@ -224,9 +226,12 @@ describe('directoryProxy', () => {
     expect((req.session as unknown as SessionLike).accessToken).toBe(refreshedAccessToken);
   });
 
-  it('retries with a refreshed token on a 401 upstream response', async () => {
+  it('retries with a refreshed token on a bearer-token 401 (WWW-Authenticate present)', async () => {
     process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
-    const upstreamResponses = [{ status: HttpStatusCode.Unauthorized }, { status: HttpStatusCode.Ok }];
+    const upstreamResponses = [
+      { status: HttpStatusCode.Unauthorized, headers: new Headers({ [WWW_AUTHENTICATE_HEADER]: BEARER_SCHEME }) },
+      { status: HttpStatusCode.Ok },
+    ];
     stubFetch(upstreamResponses);
     vi.mocked(refreshTokenGrant).mockResolvedValue(refreshedTokens(newText()));
 
@@ -247,10 +252,28 @@ describe('directoryProxy', () => {
 
   it('forwards the 401 without retry when no refresh token is available', async () => {
     process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
-    stubFetch([{ status: HttpStatusCode.Unauthorized }]);
+    stubFetch([{ status: HttpStatusCode.Unauthorized, headers: new Headers({ [WWW_AUTHENTICATE_HEADER]: BEARER_SCHEME }) }]);
 
     const req = makeReq({
       session: { accessToken: newText(), refreshToken: undefined },
+    });
+    const res = makeRes();
+
+    await directoryProxy(req, res as unknown as Response, mockNext);
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+    expect(res.status).toHaveBeenCalledWith(HttpStatusCode.Unauthorized);
+    expect(refreshTokenGrant).not.toHaveBeenCalled();
+  });
+
+  it('does not retry a domain-level 401 lacking WWW-Authenticate (a moderation route refusing its subject)', async () => {
+    process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
+    stubFetch([{ status: HttpStatusCode.Unauthorized }]);
+
+    const req = makeReq({
+      method: HttpMethods.post,
+      headers: { [CSRF_HEADER]: CSRF_HEADER_VALUE },
+      session: { accessToken: newText(), refreshToken: newText() },
     });
     const res = makeRes();
 
@@ -339,7 +362,7 @@ describe('directoryProxy', () => {
 
   it('forwards the 401 and warns when the token refresh during retry fails', async () => {
     process.env[BffSettingKeys.DirectoryApiAddress] = newHttpsAddress();
-    stubFetch([{ status: HttpStatusCode.Unauthorized }]);
+    stubFetch([{ status: HttpStatusCode.Unauthorized, headers: new Headers({ [WWW_AUTHENTICATE_HEADER]: BEARER_SCHEME }) }]);
     const refreshError = new Error(newText());
     vi.mocked(refreshTokenGrant).mockRejectedValueOnce(refreshError);
 
