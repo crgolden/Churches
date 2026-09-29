@@ -4,6 +4,7 @@ import walkerSettings from './walker-settings.json';
 import { US_STATES } from '../../src/shared/models';
 import { CHURCH_MAP_ID } from '../../src/churches/map/map-ids';
 import { CHURCH_NAME_ID_PREFIX } from '../../src/churches/list/church-list-ids';
+import { LocatorWaitStates } from '../playwright-constants';
 
 const SEARCH_STATES = US_STATES.map(state => state.code);
 
@@ -59,7 +60,7 @@ const unweightedActions: readonly Omit<WalkerAction, 'weight'>[] = [
     available: page => isVisible(page, '#search-worship-style'),
     run: async (page, rng) => {
       const options = page.locator('#search-worship-style option');
-      await options.first().waitFor();
+      await options.first().waitFor({ state: LocatorWaitStates.attached });
       const optionCount = await options.count();
       await page.selectOption('#search-worship-style', { index: rng.int(optionCount) });
       await page.click('#btn-search');

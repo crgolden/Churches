@@ -119,7 +119,7 @@
                 <div id="schedule-add-grid" class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 max-compact:grid-cols-1">
                   <div class="flex min-w-0 flex-col gap-1">
                     <label class="text-small font-medium text-text-muted" for="schedule-day">Day</label>
-                    <select id="schedule-day" formControlName="dayOfWeek" aria-label="Day of week">
+                    <select id="schedule-day" formControlName="dayOfWeek">
                       @for (d of daysOfWeek; track d.value) { <option [ngValue]="d.value">{{ d.label }}</option> }
                     </select>
                   </div>

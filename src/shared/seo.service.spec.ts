@@ -231,7 +231,7 @@ describe('SeoService', () => {
     it('calling setChurchMeta twice replaces the JSON-LD script (no duplicates)', () => {
       service.setChurchMeta(CHURCH);
       const scripts = doc.querySelectorAll(`#${JSON_LD_ELEMENT_ID}`);
-      expect(scripts.length).toBe(1);
+      expect(scripts).toHaveLength(1);
     });
   });
 

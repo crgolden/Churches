@@ -115,11 +115,30 @@ jobs:
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs
+            -Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs,**/*.spec.ts
+            -Dsonar.tests=src
             -Dsonar.coverage.exclusions=e2e/**,scripts/**,**/*.config.*,src/test-setup.ts,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts
             -Dsonar.test.inclusions=**/*.spec.ts
             -Dsonar.qualitygate.wait=true
             -Dsonar.scanner.skipJreProvisioning=true
+
+      - name: Fail on open Sonar issues
+        if: github.actor != 'dependabot[bot]'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.ref_name }}
+        shell: pwsh
+        run: |
+          $scope = if ($env:PULL_REQUEST) { "pullRequest=$env:PULL_REQUEST" } else { "branch=$env:BRANCH" }
+          $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$($env:SONAR_TOKEN):"))
+          $report = Invoke-RestMethod -Headers @{ Authorization = "Basic $auth" } -Uri "https://sonarcloud.io/api/issues/search?componentKeys=$env:SONAR_PROJECT_KEY&$scope&issueStatuses=OPEN,CONFIRMED&ps=500"
+          foreach ($issue in $report.issues) {
+            Write-Output "::error file=$($issue.component -replace '^[^:]*:'),line=$($issue.line)::$($issue.rule) $($issue.message)"
+          }
+          Write-Output "$($report.total) open Sonar issue(s) on $scope"
+          if ($null -eq $report.total -or $report.total -ne 0) { exit 1 }
 
       - name: Build (production)
         run: npm run build

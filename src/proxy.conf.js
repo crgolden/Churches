@@ -1,7 +1,16 @@
-const { env } = require('process');
+const { env } = require('node:process');
 
-const target = env.ASPNETCORE_HTTPS_PORT ? `https://localhost:${env.ASPNETCORE_HTTPS_PORT}` :
-  env.ASPNETCORE_URLS ? env.ASPNETCORE_URLS.split(';')[0] : 'https://localhost:7135';
+function proxyTarget() {
+  if (env.ASPNETCORE_HTTPS_PORT) {
+    return `https://localhost:${env.ASPNETCORE_HTTPS_PORT}`;
+  }
+  if (env.ASPNETCORE_URLS) {
+    return env.ASPNETCORE_URLS.split(';')[0];
+  }
+  return 'https://localhost:7135';
+}
+
+const target = proxyTarget();
 
 const PROXY_CONFIG = [
   {

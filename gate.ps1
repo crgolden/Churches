@@ -13,7 +13,8 @@ $GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:e2e/zz-maxfail-plant.sp
 
 Register-GateSteps @('node_modules install markers', 'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec',
     'npm run lint:css', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Install Playwright browsers', 'Run E2E tests',
-    'Playwright max-failures plant', 'npm run lint:utilities', 'SonarCloud analysis', 'Build (production)')
+    'Playwright max-failures plant', 'npm run lint:utilities', 'SonarCloud analysis', 'Fail on open Sonar issues',
+    'Build (production)')
 $repo = $PSScriptRoot
 $scratch = $gateOutput
 $bailReport = Join-Path $scratch 'churches-bail-plant.json'
@@ -25,6 +26,7 @@ $sonarBranch = "branch-local-$($env:COMPUTERNAME.ToLowerInvariant())"
 $unitStep = 'Run unit tests with coverage (npm run test:coverage)'
 $e2eStep = 'Run E2E tests (npm run e2e, CI=true)'
 $sonarStep = "SonarCloud analysis (sonar-scanner, branch $sonarBranch, quality gate waited)"
+$sonarIssues = 'Fail on open Sonar issues'
 $env:TZ = 'UTC'
 $env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
@@ -136,11 +138,16 @@ if (-not (Test-StepCarried 'npm run lint:utilities')) {
     $null = Test-Exit 'npm run lint:utilities'
 }
 
-if (-not (Test-StepCarried $sonarStep)) {
+if (Test-StepCarried $sonarIssues) {
+    $null = Test-StepCarried $sonarStep
+}
+else {
+    $sonarStartedAt = [DateTimeOffset]::UtcNow
     $env:JAVA_HOME = "$env:SystemDrive\sonar-scanner-8.0.1.6346-windows-x64\jre"
     $global:LASTEXITCODE = $null
-    sonar-scanner -D"sonar.projectKey=crgolden_Churches" -D"sonar.organization=crgolden" -D"sonar.host.url=https://sonarcloud.io" -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" -D"sonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs" -D"sonar.coverage.exclusions=e2e/**,scripts/**,**/*.config.*,src/test-setup.ts,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" -D"sonar.test.inclusions=**/*.spec.ts" -D"sonar.scanner.skipJreProvisioning=true" -D"sonar.qualitygate.wait=true" -D"sonar.branch.name=$sonarBranch"
+    sonar-scanner -D"sonar.projectKey=crgolden_Churches" -D"sonar.organization=crgolden" -D"sonar.host.url=https://sonarcloud.io" -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" -D"sonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs,**/*.spec.ts" -D"sonar.tests=src" -D"sonar.coverage.exclusions=e2e/**,scripts/**,**/*.config.*,src/test-setup.ts,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" -D"sonar.test.inclusions=**/*.spec.ts" -D"sonar.scanner.skipJreProvisioning=true" -D"sonar.qualitygate.wait=true" -D"sonar.branch.name=$sonarBranch"
     $null = Test-Exit $sonarStep
+    Test-SonarIssues $sonarIssues 'crgolden_Churches' $sonarBranch $sonarStartedAt
 }
 
 if (-not (Test-StepCarried 'Build (production)')) {

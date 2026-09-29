@@ -1,3 +1,1 @@
-import { designStylelintConfig } from '@crgolden/modules/design-gates';
-
-export default designStylelintConfig;
+export { designStylelintConfig as default } from '@crgolden/modules/design-gates';

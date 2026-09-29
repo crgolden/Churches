@@ -45,7 +45,7 @@ export class LocationMapComponent implements AfterViewInit, OnChanges, OnDestroy
 
   readonly points = input<MapPoint[]>([]);
 
-  @ViewChild('mapEl') private mapElRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('mapEl') private readonly mapElRef?: ElementRef<HTMLDivElement>;
   private map: LeafletType.Map | null = null;
   private markers: LeafletType.Marker[] = [];
 

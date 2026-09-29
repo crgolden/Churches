@@ -1,16 +1,18 @@
 // @ts-check
+const { defineConfig } = require('eslint/config');
 const eslint = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const angular = require('angular-eslint');
 const prettierConfig = require('eslint-config-prettier');
 const crgoldenAngular = require('@crgolden/modules/eslint-angular');
+const sonar = require('./eslint-sonar.config.cjs');
 
-module.exports = tseslint.config(
+module.exports = defineConfig(
   {
     ignores: ['.angular/', 'coverage/', 'dist/', 'out-tsc/'],
   },
   {
-    files: ['**/*.ts'],
+    files: ['src/**/*.ts'],
     extends: [
       eslint.configs.recommended,
       ...tseslint.configs.recommendedTypeChecked,
@@ -68,4 +70,5 @@ module.exports = tseslint.config(
     files: ['**/*.ts'],
     plugins: { crgolden: crgoldenAngular },
   },
+  ...sonar,
 );

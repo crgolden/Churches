@@ -64,7 +64,7 @@ export class SeoService {
 
   removeJsonLd(): void {
     const existing = this.document.getElementById(JSON_LD_ELEMENT_ID);
-    existing?.parentNode?.removeChild(existing);
+    existing?.remove();
   }
 
   private setCanonical(url: string): void {

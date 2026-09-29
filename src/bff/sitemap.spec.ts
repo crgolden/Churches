@@ -151,7 +151,7 @@ describe('sitemapChunkHandler', () => {
     const bytes = body();
     expect(bytes[0]).toBe(0x1f);
     expect(bytes[1]).toBe(0x8b);
-    expect(bytes.length).toBe(GZIP_MAGIC.length);
+    expect(bytes).toHaveLength(GZIP_MAGIC.length);
   });
 
   it.each([

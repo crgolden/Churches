@@ -174,7 +174,7 @@ describe('ChurchDetailComponent', () => {
       longitude: 0,
       campuses: [],
     } as never);
-    expect(component.mapPoints().length).toBe(0);
+    expect(component.mapPoints()).toHaveLength(0);
   });
 
   it('addSchedule POSTs the form to the church schedules endpoint', () => {
@@ -196,12 +196,14 @@ describe('ChurchDetailComponent', () => {
   });
 
   it('addSchedule does nothing without a start time', () => {
+    const typed = { dayOfWeek: newMemberOf(DAYS_OF_WEEK).value, startTime: '', description: newDisplayName() };
     component.church.set({ id: CHURCH_ID } as never);
-    component.scheduleForm.setValue({ dayOfWeek: newMemberOf(DAYS_OF_WEEK).value, startTime: '', description: '' });
+    component.scheduleForm.setValue(typed);
 
     component.addSchedule();
 
     controller.expectNone(DirectoryApi.churchSchedules(CHURCH_ID));
+    expect(component.scheduleForm.getRawValue()).toEqual(typed);
   });
 
   it('asking to delete a ministry sends nothing until the delete is confirmed', () => {

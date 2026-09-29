@@ -5,7 +5,7 @@ import {
   provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideRouter, TitleStrategy, withInMemoryScrolling } from '@angular/router';
-import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   provideClientHydration,
   withEventReplay,
@@ -27,7 +27,7 @@ export const appConfig: ApplicationConfig = {
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
     ),
     provideBrowserScrollRestorationWhenLeavingTheDocument(),
-    provideHttpClient(withFetch(), withInterceptors([ssrAbsoluteUrlInterceptor, appInterceptor])),
+    provideHttpClient(withInterceptors([ssrAbsoluteUrlInterceptor, appInterceptor])),
     provideAppInitializer(() => inject(AuthService).initialize()),
     { provide: TitleStrategy, useClass: AppTitleStrategy },
   ],

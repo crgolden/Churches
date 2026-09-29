@@ -1,6 +1,5 @@
-import { inject } from '@angular/core';
+import { inject, REQUEST } from '@angular/core';
 import { HttpInterceptorFn } from '@angular/common/http';
-import { REQUEST } from '@angular/core';
 
 export const ssrAbsoluteUrlInterceptor: HttpInterceptorFn = (req, next) => {
   const request = inject(REQUEST, { optional: true });

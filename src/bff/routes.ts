@@ -80,10 +80,17 @@ function getOrigin(req: Request): string {
   return `${proto}://${host}`;
 }
 
+function sessionError(err: unknown, message: string): Error {
+  if (err instanceof Error) {
+    return err;
+  }
+  return new Error(message, { cause: err });
+}
+
 function saveSession(req: Request): Promise<void> {
   return new Promise((resolve, reject) =>
     req.session.save((err) =>
-      err ? reject(err instanceof Error ? err : new Error('Session save failed', { cause: err })) : resolve(),
+      err ? reject(sessionError(err, 'Session save failed')) : resolve(),
     ),
   );
 }
@@ -91,7 +98,7 @@ function saveSession(req: Request): Promise<void> {
 function destroySession(req: Request): Promise<void> {
   return new Promise((resolve, reject) =>
     req.session.destroy((err) =>
-      err ? reject(err instanceof Error ? err : new Error('Session destroy failed', { cause: err })) : resolve(),
+      err ? reject(sessionError(err, 'Session destroy failed')) : resolve(),
     ),
   );
 }
@@ -178,7 +185,7 @@ export function buildBffRouter(): Router {
       const userInfo = await fetchUserInfo(config, tokens.access_token, sub);
 
       const merged: Record<string, unknown> = {
-        ...(idClaims ?? {}),
+        ...idClaims,
         ...userInfo,
         ...accessTokenClaims(tokens.access_token),
       };

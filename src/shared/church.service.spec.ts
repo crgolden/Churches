@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { newCount, randomIntBetween } from '@crgolden/modules/testing';
+import { newCount, newText, randomIntBetween } from '@crgolden/modules/testing';
+import { firstValueFrom } from 'rxjs';
 import { ChurchApiService } from './church.service';
 import { DEFAULT_PAGE_SIZE, DirectoryApi, SearchParamNames } from './directory-api';
-import { DAYS_OF_WEEK, WORSHIP_STYLES } from './models';
+import { DAYS_OF_WEEK, WORSHIP_STYLES, type Denomination } from './models';
 import { HttpMethods } from '../bff/http-headers';
 
 const OPTIONAL_SEARCH_PARAMS = [
@@ -35,9 +36,11 @@ describe('ChurchApiService', () => {
 
   afterEach(() => controller.verify());
 
-  it('getDenominations hits the denominations route', () => {
-    service.getDenominations().subscribe();
-    controller.expectOne(DirectoryApi.denominations).flush([]);
+  it('getDenominations hits the denominations route and emits its response', async () => {
+    const denominations: Denomination[] = [{ id: crypto.randomUUID(), name: newText() }];
+    const emitted = firstValueFrom(service.getDenominations());
+    controller.expectOne(DirectoryApi.denominations).flush(denominations);
+    expect(await emitted).toEqual(denominations);
   });
 
   it('getChurches hits the churches route with page params', () => {
@@ -49,10 +52,12 @@ describe('ChurchApiService', () => {
     req.flush({ items: [], totalCount: 0, page, pageSize });
   });
 
-  it('getChurchBySlug hits the church route for that slug', () => {
+  it('getChurchBySlug hits the church route for that slug and emits its response', async () => {
     const slug = crypto.randomUUID();
-    service.getChurchBySlug(slug).subscribe();
-    controller.expectOne(DirectoryApi.church(slug)).flush({});
+    const church = { id: crypto.randomUUID(), slug };
+    const emitted = firstValueFrom(service.getChurchBySlug(slug));
+    controller.expectOne(DirectoryApi.church(slug)).flush(church);
+    expect(await emitted).toEqual(church);
   });
 
   it.each(OPTIONAL_SEARCH_PARAMS)('search with no optional params omits %s', name => {

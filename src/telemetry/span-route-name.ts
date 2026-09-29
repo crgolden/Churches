@@ -19,7 +19,7 @@ export function routeTemplateFor(req: Request): string {
     return `${req.baseUrl}${UNMATCHED_SUFFIX}`;
   }
 
-  const [firstSegment] = (req.path ?? ROOT_ROUTE).split('/').filter(Boolean);
+  const firstSegment = (req.path ?? ROOT_ROUTE).split('/').find(Boolean);
 
   return firstSegment ? `/${firstSegment}${UNMATCHED_SUFFIX}` : ROOT_ROUTE;
 }

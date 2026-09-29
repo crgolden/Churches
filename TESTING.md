@@ -207,12 +207,13 @@ npx vitest run --coverage
 # Run the scanner (uses global sonar-scanner.properties; override token via env)
 $env:SONAR_TOKEN = '<token>'
 sonar-scanner `
-  -Dsonar.projectKey=crgolden_Churches `
-  -Dsonar.organization=crgolden `
-  -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info `
-  -Dsonar.exclusions="**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs" `
-  -Dsonar.coverage.exclusions="e2e/**,src/test-setup.ts" `
-  -Dsonar.test.inclusions="**/*.spec.ts"
+  "-Dsonar.projectKey=crgolden_Churches" `
+  "-Dsonar.organization=crgolden" `
+  "-Dsonar.javascript.lcov.reportPaths=coverage/lcov.info" `
+  "-Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs,**/*.spec.ts" `
+  "-Dsonar.tests=src" `
+  "-Dsonar.coverage.exclusions=e2e/**,scripts/**,**/*.config.*,src/test-setup.ts,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" `
+  "-Dsonar.test.inclusions=**/*.spec.ts"
 ```
 
 ### When to build a truth table

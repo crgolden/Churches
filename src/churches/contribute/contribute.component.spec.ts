@@ -104,6 +104,8 @@ describe('ContributeComponent', () => {
     component.church.set(null);
     component.submit();
     controller.expectNone(() => true);
+    expect(component.submitted()).toBe(false);
+    expect(component.error()).toBeNull();
   });
 
   it('submit does nothing when newValue is empty', () => {
@@ -111,6 +113,8 @@ describe('ContributeComponent', () => {
     component.newValue.set('');
     component.submit();
     controller.expectNone(() => true);
+    expect(component.submitted()).toBe(false);
+    expect(component.error()).toBeNull();
   });
 
   it('submit sets error when value is unchanged', () => {
