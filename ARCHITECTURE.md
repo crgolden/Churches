@@ -352,7 +352,7 @@ The extractor branch is the cost gate: pages the deterministic extractor can rea
 
 Every church row written by the pipeline goes through `ChurchWriter.UpsertAsync`, whose only caller is `GeocoderWorker`. One transaction covers:
 
-1. Look up `CrawlSources.ChurchId` to decide insert vs. update.
+1. Take an exclusive application lock on the crawl source (`sp_getapplock`, owned by the transaction) and, in the same batch, look up `CrawlSources.ChurchId` to decide insert vs. update. Two deliveries for one crawl source therefore write one after the other, and the second becomes an update rather than a second church.
 2. Duplicate guard on new inserts (name + city + state + lat + lng already present → link instead of insert).
 3. Validate through `Shared.Domain.ChurchBuilder` — an invalid church cannot reach SQL; a bad value throws a specific `ArgumentException` here instead of a constraint violation deep in the write.
 4. Upsert `Churches` (slug `name-city-state`, `-N` suffix on collision; denomination resolved by name), link the `CrawlSource`, delete-then-insert all children (`ChurchAttributes`, `ServiceSchedules`, `Ministries`, `Campuses`), and register the church's own website as a crawl source on first insert.
