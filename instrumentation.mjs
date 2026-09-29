@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { diag, DiagConsoleLogger, DiagLogLevel, metrics } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
+  ATTR_SERVICE_INSTANCE_ID,
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions';
@@ -32,6 +34,7 @@ diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 const resource = resourceFromAttributes({
   [ATTR_SERVICE_NAME]: serviceName,
   [ATTR_SERVICE_VERSION]: serviceVersion,
+  [ATTR_SERVICE_INSTANCE_ID]: randomUUID(),
   'deployment.environment': deploymentEnvironment,
 });
 
