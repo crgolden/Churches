@@ -94,9 +94,7 @@ if (-not (Test-StepCarried 'Fix LCOV paths for SonarQube')) {
     Write-Row 'Fix LCOV paths for SonarQube' 'PASS' ''
 }
 
-$global:LASTEXITCODE = $null
-npm run playwright:install
-$null = Test-Exit 'Install Playwright browsers (npm run playwright:install)'
+Install-PlaywrightBrowsers 'Install Playwright browsers (npm run playwright:install)' { npx playwright install --dry-run chromium } { npm run playwright:install }
 
 if (-not (Test-StepCarried $e2eStep)) {
     $global:LASTEXITCODE = $null
