@@ -9,7 +9,7 @@ const { blocks } = require('./eslint-sonar.rules.json');
 
 const javascriptPlugins = { sonarjs, unicorn, 'import-x': importX, '@typescript-eslint': tseslint.plugin };
 const typescriptPlugins = { ...javascriptPlugins, '@angular-eslint': angular };
-const typescriptParserOptions = { projectService: { allowDefaultProject: ['*.ts'] }, tsconfigRootDir: __dirname };
+const typescriptParserOptions = { projectService: { allowDefaultProject: ['*.ts', '*.mts', '*.cts'] }, tsconfigRootDir: __dirname };
 
 module.exports = blocks.map((block) => ({
   files: block.files,

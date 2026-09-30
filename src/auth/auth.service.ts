@@ -38,7 +38,7 @@ export class AuthService {
   }
 
   private fetchSession(): Observable<Session> {
-    return this.http.get<Claim[] | null>(BFF_USER_RELATIVE_PATH).pipe(
+    return this.http.get<Claim[] | null>(BFF_USER_RELATIVE_PATH, { transferCache: false }).pipe(
       catchError(() => of(null)),
       tap(claims => this._session.set(claims)),
       map(claims => claims ?? []),

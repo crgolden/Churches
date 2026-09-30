@@ -117,7 +117,7 @@
         "lint": {
           "builder": "@angular-eslint/builder:lint",
           "options": {
-            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html", "src/**/*.js", "scripts/**/*.mjs", "*.ts", "*.js", "*.mjs", "*.cjs"]
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html", "src/**/*.js", "scripts/**/*.mjs", "*.ts", "*.mts", "*.js", "*.mjs", "*.cjs"]
           }
         },
         "test": {

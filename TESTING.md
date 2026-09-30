@@ -87,7 +87,8 @@ npm run e2e   # self-builds the ci configuration (allowedHosts=localhost), then 
 Failure artifacts (screenshot, trace, video) are written to `playwright-artifacts/`.
 
 **E2E coverage (`e2e/`):** `anonymous.spec.ts` (public search/landing), `church-detail.spec.ts`,
-`auth-flow.spec.ts` (BFF session/claims), `contribute.spec.ts`, `moderation.spec.ts`, `edge-case.spec.ts`.
+`auth-flow.spec.ts` (BFF session/claims), `contribute.spec.ts`, `moderation.spec.ts`, `edge-case.spec.ts`,
+`transfer-cache.spec.ts` (hydration reuses the server-rendered directory responses).
 
 **Map view:** `anonymous.spec.ts` seeds a church with coordinates, toggles "Map view" on `/churches`,
 and asserts `div.leaflet-container` is visible, at least one `.leaflet-marker-icon` renders, **and that

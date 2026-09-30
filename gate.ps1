@@ -9,11 +9,11 @@ if (-not (Test-Path -LiteralPath $gateCommon)) {
 . $gateCommon
 $gateOutput = Join-Path ([IO.Path]::GetTempPath()) "crgolden-gates\$(Split-Path -Leaf $PSScriptRoot)"
 New-Item -ItemType Directory -Force -Path $gateOutput | Out-Null
-$GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:e2e/zz-maxfail-plant.spec.ts')
+$GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:e2e/zz-maxfail-plant.spec.ts', 'plant:src/app/app.config.ts')
 
 Register-GateSteps @('node_modules install markers', 'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec',
     'npm run lint:css', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Install Playwright browsers', 'Run E2E tests',
-    'Playwright max-failures plant', 'npm run lint:utilities', 'SonarCloud analysis', 'Fail on open Sonar issues',
+    'Playwright max-failures plant', 'Transfer-cache plant', 'npm run lint:utilities', 'SonarCloud analysis', 'Fail on open Sonar issues',
     'Build (production)')
 $repo = $PSScriptRoot
 $scratch = $gateOutput
@@ -128,6 +128,44 @@ if (-not (Test-StepCarried $maxFailStep)) {
     if ($plantExit -eq 0 -or $stats.unexpected -lt 1) { Stop-Gate $maxFailStep "the planted failures did not fail the run: $detail" }
     if ($stats.unexpected -ge $plantedFailures) { Stop-Gate $maxFailStep "max-failures did not stop the run: $detail" }
     Write-Row $maxFailStep 'PASS' $detail
+}
+
+$transferCacheStep = 'Transfer-cache plant (transfer cache switched off, e2e/transfer-cache.spec.ts must fail its hydration test and pass its navigation control)'
+if (-not (Test-StepCarried $transferCacheStep)) {
+    $appConfig = Join-Path $repo 'src\app\app.config.ts'
+    $transferCacheReport = Join-Path $scratch 'churches-transfer-cache-plant.json'
+    $original = [IO.File]::ReadAllText($appConfig)
+    $cacheOptions = 'withHttpTransferCacheOptions({ includeRequestsWithCredentials: true, includeRequestsWithAuthHeaders: true })'
+    $planted = $original.Replace($cacheOptions, 'withNoHttpTransferCache()').Replace('withHttpTransferCacheOptions,', 'withNoHttpTransferCache,')
+    if ($planted.Contains('withHttpTransferCacheOptions') -or -not $planted.Contains('withNoHttpTransferCache()')) {
+        Stop-Gate $transferCacheStep 'the plant did not apply: app.config.ts no longer carries the transfer-cache options this step replaces'
+    }
+    [IO.File]::WriteAllText($appConfig, $planted)
+    if (Test-Path $transferCacheReport) { Remove-Item $transferCacheReport -Force }
+    $env:PLAYWRIGHT_JSON_OUTPUT_NAME = $transferCacheReport
+    try {
+        $global:LASTEXITCODE = $null
+        npm run build:ci
+        $plantBuildExit = $global:LASTEXITCODE
+        $global:LASTEXITCODE = $null
+        npx playwright test e2e/transfer-cache.spec.ts --project=e2e --no-deps --reporter=json
+        $plantExit = $global:LASTEXITCODE
+    }
+    finally {
+        [IO.File]::WriteAllText($appConfig, $original)
+        Remove-Item Env:PLAYWRIGHT_JSON_OUTPUT_NAME -ErrorAction SilentlyContinue
+    }
+    if ([IO.File]::ReadAllText($appConfig) -ne $original) { Stop-Gate $transferCacheStep 'app.config.ts was not restored' }
+    $global:LASTEXITCODE = $null
+    npm run build:ci
+    if ($global:LASTEXITCODE -ne 0) { Stop-Gate $transferCacheStep "the rebuild after restoring app.config.ts exited $global:LASTEXITCODE" }
+    if ($plantBuildExit -ne 0) { Stop-Gate $transferCacheStep "the planted build exited $plantBuildExit, so the spec never ran against the plant" }
+    if (-not (Test-Path $transferCacheReport)) { Stop-Gate $transferCacheStep "no JSON report (exit $plantExit): the plant did not run" }
+    $stats = (Get-Content $transferCacheReport -Raw | ConvertFrom-Json).stats
+    $detail = "exit $plantExit, passed $($stats.expected), failed $($stats.unexpected), not run $($stats.skipped)"
+    if ($plantExit -eq 0 -or $stats.unexpected -ne 1) { Stop-Gate $transferCacheStep "the hydration test did not go red alone: $detail" }
+    if ($stats.expected -ne 1) { Stop-Gate $transferCacheStep "the navigation control did not pass under the plant: $detail" }
+    Write-Row $transferCacheStep 'PASS' $detail
 }
 
 if (-not (Test-StepCarried 'npm run lint:utilities')) {

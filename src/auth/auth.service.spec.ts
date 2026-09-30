@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpStatusCode, provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TransferState } from '@angular/core';
 import { AuthService } from './auth.service';
 import type { Claim } from './claim';
 import { FETCHES_SESSION_ON_STARTUP } from './session-fetch';
@@ -83,17 +82,16 @@ describe('AuthService', () => {
     expect(service.username()).toBe(BOB);
   });
 
-  it('asks bff/user for the session and never carries it through TransferState', () => {
+  it('asks bff/user for the session with the transfer cache off, so a server-rendered session never reaches the browser', () => {
     const claims: Claim[] = [{ type: ClaimTypes.name, value: ALICE }];
 
     service.initialize().subscribe();
-    controller.expectOne(BFF_USER_RELATIVE_PATH).flush(claims);
+    const sessionRequest = controller.expectOne(BFF_USER_RELATIVE_PATH);
+    expect(sessionRequest.request.transferCache).toBe(false);
+    sessionRequest.flush(claims);
 
     expect(service.isAuthenticated()).toBe(true);
     expect(service.username()).toBe(ALICE);
-
-    const transferred = TestBed.inject(TransferState).toJson();
-    expect(transferred).not.toContain(ALICE);
   });
 
   it('treats the null body bff/user answers an anonymous visitor with as signed out', () => {
