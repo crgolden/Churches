@@ -1,7 +1,6 @@
-import { expect } from './fixtures.js';
+import { expect, type Page } from '@playwright/test';
 import { computedStyleOf } from './computed-style.js';
 import { CssValues } from './css-constants.js';
-import type { Page } from '@playwright/test';
 
 export async function expectTileLayerMounted(page: Page, tilesId: string): Promise<void> {
   await expect(page.locator(`#${tilesId}`)).toBeAttached();

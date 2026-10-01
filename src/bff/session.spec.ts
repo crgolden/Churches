@@ -337,10 +337,10 @@ describe('applySession', () => {
   it('logs a connection error when Redis emits an "error" event', async () => {
     useRedis(randomUUID(), newRedisPort());
 
-    let errorListener: ((err: unknown) => void) | undefined;
+    const listeners = new Map<string, (err: unknown) => void>();
     vi.mocked(createClient).mockReturnValue({
       on: vi.fn().mockImplementation((event: string, listener: (err: unknown) => void) => {
-        if (event === RedisClientEvents.error) errorListener = listener;
+        listeners.set(event, listener);
         return { on: vi.fn(), connect: vi.fn().mockResolvedValue(undefined) };
       }),
       connect: vi.fn().mockResolvedValue(undefined),
@@ -349,7 +349,7 @@ describe('applySession', () => {
     await applySession(makeApp() as unknown as Express);
 
     const connectionError = new Error(randomUUID());
-    errorListener?.(connectionError);
+    listeners.get(RedisClientEvents.error)?.(connectionError);
 
     expect(logger.error).toHaveBeenCalledWith({ err: connectionError }, REDIS_CONNECTION_ERROR_LOG);
   });

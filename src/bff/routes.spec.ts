@@ -281,7 +281,7 @@ describe(BffPaths.callback, () => {
     await handler()(req, res as unknown as Response);
 
     const session = req.session as unknown as Session;
-    const flattened = (session.claims ?? []).filter(c => c.type === arrayClaimType);
+    const flattened = session.claims?.filter(c => c.type === arrayClaimType);
     expect(flattened).toEqual(arrayClaimValues.map(value => ({ type: arrayClaimType, value })));
   });
 
@@ -319,7 +319,8 @@ describe(BffPaths.callback, () => {
 
     await handler()(req, res as unknown as Response);
 
-    const types = ((req.session as unknown as Session).claims ?? []).map(c => c.type);
+    const types = (req.session as unknown as Session).claims?.map(c => c.type);
+    expect(types).toBeDefined();
     expect(types).not.toContain(unlistedClaimType);
   });
 

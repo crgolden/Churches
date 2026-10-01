@@ -17,6 +17,8 @@ import { LOCATION_MAP_ID, LOCATION_MAP_TILES_ID } from './map-ids';
 import { environment } from '../../environments/environment';
 import { AriaRoles } from '../../shared/aria-roles';
 
+export const LOCATION_MAP_SELECTOR = 'app-location-map';
+
 export interface MapPoint {
   lat: number;
   lng: number;
@@ -24,7 +26,7 @@ export interface MapPoint {
 }
 
 @Component({
-  selector: 'app-location-map',
+  selector: LOCATION_MAP_SELECTOR,
   standalone: true,
   template: `
     <div

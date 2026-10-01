@@ -1,5 +1,10 @@
 {
   "scrollRestoreTolerancePx": 40,
+  "executedTestFloor": 43,
+  "bddFeatures": "e2e/features/**/*.feature",
+  "bddSteps": "e2e/steps/**/*.ts",
+  "cucumberMessagesFile": "cucumber-report/messages.ndjson",
+  "cucumberHtmlFile": "cucumber-report/index.html",
   "ports": {
     "ssr": 4000,
     "mockDirectory": 4001,

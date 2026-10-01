@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 import { newId, newText } from '@crgolden/modules/testing';
+import { cucumberReporter, defineBddProject } from 'playwright-bdd';
 import { MEMORY_SESSION_STORE } from './src/bff/settings';
+import { CucumberReporterTypes } from './e2e/cucumber-constants';
 import { E2E_CONTRACT_VARIABLE, newE2eContract } from './e2e/mocks/e2e-contract';
 import e2eSettings from './e2e/e2e-settings.json';
 
@@ -16,10 +18,14 @@ export default defineConfig({
 
   outputDir: './playwright-artifacts',
 
+  workers: 1,
+
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['list'],
     ['junit', { outputFile: 'playwright-results.xml' }],
+    cucumberReporter(CucumberReporterTypes.message, { outputFile: e2eSettings.cucumberMessagesFile }),
+    cucumberReporter(CucumberReporterTypes.html, { outputFile: e2eSettings.cucumberHtmlFile }),
   ],
 
   use: {
@@ -32,8 +38,13 @@ export default defineConfig({
 
   projects: [
     {
-      name: 'e2e',
-      testMatch: /\/e2e\/(?!synthetic\/)(?:[^/]*\/)*[^/]*\.spec\.ts$/,
+      name: 'integration',
+      testDir: './integration',
+      fullyParallel: false,
+      workers: 1,
+    },
+    {
+      ...defineBddProject({ name: 'e2e', features: e2eSettings.bddFeatures, steps: e2eSettings.bddSteps }),
       use: { ...devices['Desktop Chrome'] },
       fullyParallel: false,
       workers: 1,

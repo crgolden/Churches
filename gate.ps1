@@ -9,18 +9,18 @@ if (-not (Test-Path -LiteralPath $gateCommon)) {
 . $gateCommon
 $gateOutput = Join-Path ([IO.Path]::GetTempPath()) "crgolden-gates\$(Split-Path -Leaf $PSScriptRoot)"
 New-Item -ItemType Directory -Force -Path $gateOutput | Out-Null
-$GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:e2e/zz-maxfail-plant.spec.ts', 'plant:src/app/app.config.ts')
+$GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:integration/zz-maxfail-plant.spec.ts', 'plant:src/app/app.config.ts')
 
 Register-GateSteps @('node_modules install markers', 'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec',
-    'npm run lint:css', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Install Playwright browsers', 'Run E2E tests',
-    'Playwright max-failures plant', 'Transfer-cache plant', 'npm run lint:utilities', 'SonarCloud analysis', 'Fail on open Sonar issues',
-    'Build (production)')
+    'npm run lint:css', 'Install Playwright browsers', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Run E2E tests',
+    'Assert E2E executed at least its floor', 'Playwright max-failures plant', 'Transfer-cache plant', 'npm run lint:utilities',
+    'SonarCloud analysis', 'Fail on open Sonar issues', 'Build (production)')
 $repo = $PSScriptRoot
 $scratch = $gateOutput
 $bailReport = Join-Path $scratch 'churches-bail-plant.json'
 $maxFailReport = Join-Path $scratch 'churches-maxfail-plant.json'
 $bailPlant = Join-Path $repo 'src\zz-bail-plant.spec.ts'
-$maxFailPlant = Join-Path $repo 'e2e\zz-maxfail-plant.spec.ts'
+$maxFailPlant = Join-Path $repo 'integration\zz-maxfail-plant.spec.ts'
 $plantedFailures = 3
 $sonarBranch = "branch-local-$($env:COMPUTERNAME.ToLowerInvariant())"
 $unitStep = 'Run unit tests with coverage (npm run test:coverage)'
@@ -60,6 +60,8 @@ if (-not (Test-StepCarried 'npm run lint:css')) {
     $null = Test-Exit 'npm run lint:css'
 }
 
+Install-PlaywrightBrowsers 'Install Playwright browsers (npm run playwright:install)' { npx playwright install --dry-run chromium } { npm run playwright:install }
+
 if (-not (Test-StepCarried $unitStep)) {
     $global:LASTEXITCODE = $null
     npm run test:coverage
@@ -94,12 +96,21 @@ if (-not (Test-StepCarried 'Fix LCOV paths for SonarQube')) {
     Write-Row 'Fix LCOV paths for SonarQube' 'PASS' ''
 }
 
-Install-PlaywrightBrowsers 'Install Playwright browsers (npm run playwright:install)' { npx playwright install --dry-run chromium } { npm run playwright:install }
-
 if (-not (Test-StepCarried $e2eStep)) {
+    $results = Join-Path $repo 'playwright-results.xml'
+    if (Test-Path $results) { Remove-Item $results -Force }
     $global:LASTEXITCODE = $null
     npm run e2e
     $null = Test-Exit $e2eStep
+    $floorStep = 'Assert E2E executed at least its floor'
+    if (-not (Test-Path $results)) { Stop-Gate $floorStep 'playwright-results.xml missing' }
+    $floor = [int](Get-Content (Join-Path $repo 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).executedTestFloor
+    $xml = [xml](Get-Content $results -Raw)
+    $tests = [int]$xml.testsuites.tests
+    $skipped = [int]$xml.testsuites.skipped
+    $executed = $tests - $skipped
+    if ($floor -le 0 -or $executed -lt $floor) { Stop-Gate $floorStep "executed $executed (tests $tests, skipped $skipped), floor $floor" }
+    Write-Row $floorStep 'PASS' "executed $executed (tests $tests, skipped $skipped), floor $floor"
 }
 
 $maxFailStep = "Playwright max-failures plant ($plantedFailures failing tests planted, --max-failures=1 must stop the run)"
@@ -112,7 +123,7 @@ if (-not (Test-StepCarried $maxFailStep)) {
     $env:PLAYWRIGHT_JSON_OUTPUT_NAME = $maxFailReport
     try {
         $global:LASTEXITCODE = $null
-        npx playwright test e2e/zz-maxfail-plant.spec.ts --project=e2e --max-failures=1 --reporter=json
+        npx playwright test integration/zz-maxfail-plant.spec.ts --project=integration --max-failures=1 --reporter=json
         $plantExit = $global:LASTEXITCODE
     }
     finally {
@@ -130,7 +141,7 @@ if (-not (Test-StepCarried $maxFailStep)) {
     Write-Row $maxFailStep 'PASS' $detail
 }
 
-$transferCacheStep = 'Transfer-cache plant (transfer cache switched off, e2e/transfer-cache.spec.ts must fail its hydration test and pass its navigation control)'
+$transferCacheStep = 'Transfer-cache plant (transfer cache switched off, the "Server-rendered pages" feature must fail its hydration scenario and pass its navigation control)'
 if (-not (Test-StepCarried $transferCacheStep)) {
     $appConfig = Join-Path $repo 'src\app\app.config.ts'
     $transferCacheReport = Join-Path $scratch 'churches-transfer-cache-plant.json'
@@ -148,7 +159,7 @@ if (-not (Test-StepCarried $transferCacheStep)) {
         npm run build:ci
         $plantBuildExit = $global:LASTEXITCODE
         $global:LASTEXITCODE = $null
-        npx playwright test e2e/transfer-cache.spec.ts --project=e2e --no-deps --reporter=json
+        npx playwright test --project=e2e --no-deps --reporter=json --grep "Server-rendered pages"
         $plantExit = $global:LASTEXITCODE
     }
     finally {
@@ -181,7 +192,7 @@ else {
     $sonarStartedAt = [DateTimeOffset]::UtcNow
     $env:JAVA_HOME = "$env:SystemDrive\sonar-scanner-8.0.1.6346-windows-x64\jre"
     $global:LASTEXITCODE = $null
-    sonar-scanner -D"sonar.projectKey=crgolden_Churches" -D"sonar.organization=crgolden" -D"sonar.host.url=https://sonarcloud.io" -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" -D"sonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs,**/*.spec.ts" -D"sonar.tests=src" -D"sonar.coverage.exclusions=e2e/**,scripts/**,**/*.config.*,src/test-setup.ts,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" -D"sonar.test.inclusions=**/*.spec.ts" -D"sonar.scanner.skipJreProvisioning=true" -D"sonar.qualitygate.wait=true" -D"sonar.branch.name=$sonarBranch"
+    sonar-scanner -D"sonar.projectKey=crgolden_Churches" -D"sonar.organization=crgolden" -D"sonar.host.url=https://sonarcloud.io" -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" -D"sonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,integration/**,.features-gen/**,instrumentation.mjs,**/*.spec.ts" -D"sonar.tests=src" -D"sonar.coverage.exclusions=e2e/**,integration/**,scripts/**,**/*.config.*,src/test-setup*.ts,gate.ps1,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" -D"sonar.test.inclusions=**/*.spec.ts" -D"sonar.scanner.skipJreProvisioning=true" -D"sonar.qualitygate.wait=true" -D"sonar.branch.name=$sonarBranch"
     $null = Test-Exit $sonarStep
     Test-SonarIssues $sonarIssues 'crgolden_Churches' $sonarBranch $sonarStartedAt
 }
@@ -192,5 +203,5 @@ if (-not (Test-StepCarried 'Build (production)')) {
     $null = Test-Exit 'Build (production)'
 }
 
-Write-Row 'Prune devDependencies / assemble / upload / deploy' 'NOT RUN' 'delivery steps, not checks'
+Write-Row 'Publish E2E scenario results / upload / prune devDependencies / assemble / deploy' 'NOT RUN' 'delivery steps, not checks'
 Complete-Gate

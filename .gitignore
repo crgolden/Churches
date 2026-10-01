@@ -45,6 +45,10 @@ __screenshots__/
 /test-results
 playwright-results.xml
 /.playwright
+**/.features-gen/**/*.spec.js
+**/.features-gen/**/*.spec.js.map
+/cucumber-report
+/.vitest
 
 # SonarQube scanner work directories
 .sonarqube/

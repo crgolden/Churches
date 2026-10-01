@@ -12,9 +12,10 @@ function buildResourceMap(dir: string, map = new Map<string, string>()): Map<str
     if (entry.isDirectory()) {
       buildResourceMap(fullPath, map);
     } else if (entry.name.endsWith('.html') || entry.name.endsWith('.css')) {
-      if (!map.has(entry.name)) {
-        map.set(entry.name, readFileSync(fullPath, { encoding: 'utf-8' }));
+      if (map.has(entry.name)) {
+        throw new Error(`Two component resources are named '${entry.name}', so a templateUrl cannot say which one it means.`);
       }
+      map.set(entry.name, readFileSync(fullPath, { encoding: 'utf-8' }));
     }
   }
   return map;

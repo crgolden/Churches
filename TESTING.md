@@ -1,7 +1,8 @@
 # Testing
 
-The Churches test suite covers **frontend unit tests** (Vitest) and **browser E2E + synthetic-walker
-tests** (TypeScript Playwright). This repo tests the Angular SSR + Node BFF
+The Churches test suite covers **frontend unit tests** (Vitest, in jsdom and in a real browser),
+**integration tests** of the server-rendered HTML (Playwright's `request` fixture), **browser E2E tests**
+written as Gherkin features (`playwright-bdd`), and the **synthetic walker**. This repo tests the Angular SSR + Node BFF
 stack. The Directory API has its own suite in the [Directory](https://github.com/crgolden/Directory) repo.
 
 Unit test coding standards (no control-flow in tests, etc.) are in the workspace-level
@@ -11,8 +12,10 @@ Unit test coding standards (no control-flow in tests, etc.) are in the workspace
 
 | Tier | Tool | Location | Requires live servers? | Runs in CI |
 |------|------|----------|------------------------|------------|
-| Frontend unit | Vitest | `src/**/*.spec.ts` | No | Every push/PR |
-| E2E (regression) | Playwright (`--project=e2e`) | `e2e/` | No — Playwright manages the Node SSR server + mock Directory API | Every push/PR |
+| Frontend unit | Vitest project `unit` (jsdom) | `src/**/*.spec.ts` | No | Every push/PR |
+| Frontend unit in a real browser | Vitest project `browser` (Chromium, `@vitest/browser-playwright`) | `src/**/*.browser.spec.ts` | No | Every push/PR |
+| Integration | Playwright (`--project=integration`, `request` fixture only) | `integration/` | No: the same SSR server and mock Directory API as E2E | Every push/PR |
+| E2E (regression) | Gherkin features, `playwright-bdd` (`--project=e2e`) | `e2e/features/`, steps in `e2e/steps/` | No: Playwright manages the Node SSR server and the mock Directory API | Every push/PR |
 | Synthetic walker | Playwright (`--project=synthetic`) | `e2e/synthetic/` | Yes — targets the deployed stack | Scheduled (`synthetic.yml`), never a merge gate |
 
 ---
@@ -53,11 +56,13 @@ Playwright route mocks — no real Identity or Directory is contacted.
 The `e2e` project (`playwright.config.ts`) runs serialized — `fullyParallel: false`, single worker —
 because every spec shares the mock server's in-memory state; concurrent specs would race on it.
 
-**Authentication is mocked wholesale, and no tier exercises the real OIDC exchange.** `e2e/fixtures.ts`
-fulfils `/bff/user` with a fixed claim array — `authedPage` with user claims, `modPage` with
-`churches.mod=true` — so every moderator test passes regardless of which token really carried the claim,
-and `anonymousPage` fulfils it as 200 with a `null` body, which is what the real BFF answers a visitor
-with no session. The PKCE authorization-code flow, the token exchange, and the
+**Authentication is mocked wholesale, and no tier exercises the real OIDC exchange.** `e2e/test-data.ts`
+fulfils `/bff/user` with a fixed claim array (`signInAsMember` with user claims, `signInAsModerator` with
+`churches.mod=true`), so every moderator scenario passes regardless of which token really carried the claim,
+and `signInAsVisitor` fulfils it as 200 with a `null` body, which is what the real BFF answers a visitor
+with no session. The persona steps (`Given I am a visitor`, `a signed-in member`, `a moderator`) call them.
+**Reading `/bff/user` back in a browser test therefore asserts the fixture, not the BFF**, so no E2E
+scenario reads it. The PKCE authorization-code flow, the token exchange, and the
 userinfo call are not covered by the E2E tier. **The synthetic walker is the only tier that drives the
 real exchange**, because it signs in through the deployed Identity with a passkey rather than a mock —
 so a break in the PKCE flow surfaces there and nowhere else in this repo. The discriminating test for
@@ -86,19 +91,48 @@ npm run e2e   # self-builds the ci configuration (allowedHosts=localhost), then 
 
 Failure artifacts (screenshot, trace, video) are written to `playwright-artifacts/`.
 
-**E2E coverage (`e2e/`):** `anonymous.spec.ts` (public search/landing), `church-detail.spec.ts`,
-`auth-flow.spec.ts` (BFF session/claims), `contribute.spec.ts`, `moderation.spec.ts`, `edge-case.spec.ts`,
-`transfer-cache.spec.ts` (hydration reuses the server-rendered directory responses).
+**E2E features (`e2e/features/`)**, each scenario written as the user sees it
+([AGENTS/TESTING.md](../AGENTS/TESTING.md#writing-e2e-scenarios)):
 
-**Map view:** `anonymous.spec.ts` seeds a church with coordinates, toggles "Map view" on `/churches`,
-and asserts `div.leaflet-container` is visible, at least one `.leaflet-marker-icon` renders, **and that
-`leaflet.css` actually applied** — it reads computed styles that only the stylesheet supplies (position /
-overflow). This guards against a map that renders DOM but has a broken stylesheet.
+| Feature | Covers |
+|---|---|
+| `searching.feature` | Search by name, state, worship style, wheelchair access, no match, Enter, Near me |
+| `search-results.feature` | Result count, result links and location, no distances without a location, map view, opening a church, paging to the top, Back restoring the reader's place in-app and after a full page load, inactive churches hidden |
+| `church-details.feature` | Full and sparse details, missing and inactive churches, low confidence, the correction link by persona, a moderator adding and removing a service time and adding a ministry |
+| `suggesting-corrections.feature` | The form, a submission, a value for an empty field, an unchanged value, sign-in with the return address, an unknown church |
+| `moderation.feature` | Non-moderators turned away, a waiting correction, approve (value applied), reject, an empty queue |
+| `browsing-without-errors.feature` | No script errors moving between pages, signed out and signed in |
+| `server-rendered-pages.feature` | Hydration reuses the server's responses; a later navigation still asks the directory |
 
-**SSR assertions:** `church-detail.spec.ts` fetches raw HTML (`javaScriptEnabled: false`) and asserts
-the server-rendered `<h1>`, `<title>`, `<meta name="description">`, `<link rel="canonical">`, `og:*`
-Open Graph tags, and `<script type="application/ld+json">` on `/churches/:slug`. These prove the SEO
-gap is closed.
+- `npm run e2e` runs `bddgen` first, compiling the features into `.features-gen/e2e/` (git-ignored), and
+  `typecheck:e2e` runs it too. Steps live in `e2e/steps/`, one file per area, built with `createBdd` over the
+  `test` in `e2e/steps/fixtures.ts`. That fixture resets the mock Directory before every scenario, answers map
+  tiles with 204, and records script errors and directory requests into the scenario's `ctx`.
+- **The gate's transfer-cache plant selects the "Server-rendered pages" feature by name from `.features-gen/`**,
+  which the E2E step's `bddgen` writes. A gate that carries the E2E step after `.features-gen/` was deleted
+  finds nothing to select, and the plant then fails for that reason rather than for the transfer cache.
+- **Map view:** "Viewing the results on a map" asserts the Leaflet container, the church's marker, **and that
+  `leaflet.css` actually applied**, through computed styles only that stylesheet supplies (position /
+  overflow). This guards against a map that renders DOM but has a broken stylesheet.
+- **Reports:** besides the Playwright HTML report, the run writes `cucumber-report/messages.ndjson` and
+  `cucumber-report/index.html`, paths from `e2e/e2e-settings.json`. CI uploads `cucumber-report/` as
+  `churches-cucumber-report` and publishes the NDJSON to the `test_results` database with
+  `publish-bdd-results` from `@crgolden/modules`, only when the E2E step ran.
+
+**Integration (`integration/seo.spec.ts`)** fetches raw HTML through the `request` fixture and asserts the
+server-rendered `<title>`, `<meta name="description">`, `<link rel="canonical">`, `og:*` Open Graph tags and
+`<script type="application/ld+json">` on `/churches` and `/churches/:slug`. It drives HTTP rather than a
+browser, so it is an integration test, and it runs as its own Playwright project against the same servers.
+
+**Checked below the E2E layer rather than in a scenario:**
+
+| Behavior | Where |
+|---|---|
+| A Next control only when another page exists, and a Previous only after the first | `church-list.component.spec.ts` (first, last and exactly-one-page cases) |
+| The correction form starts on the church name | `contribute.component.spec.ts` |
+| An empty correction is not submitted | `contribute.component.spec.ts` "submit does nothing when newValue is empty" |
+| Where `churches.mod` comes from, and what `/bff/user` answers | `src/bff/routes.spec.ts` |
+| The Location heading lines up with Contact; the moderator's service-time form is a labelled grid with a row gap | `church-detail.layout.browser.spec.ts`, in the `browser` Vitest project |
 
 ---
 
@@ -167,9 +201,8 @@ which is what makes a failure reproducible in practice.
   navigation assertions route through `expectRendered`, which carries no timeout of its own
   ([CODE-STYLE.md](../AGENTS/CODE-STYLE.md) rule 17): a page that needs more than Playwright's
   default to render is the finding, not a reason for headroom.
-- Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`; the secret
-  marker header goes to Identity-origin requests and, via redirect propagation, this app's own
-  origin — never to third-party hosts (verified from a trace network log).
+- Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`; it sends no marker
+  header.
 - **GitHub disables scheduled workflows after 60 days without repo activity in public repos**;
   a push, a `workflow_dispatch`, or the Actions UI re-enables it. Schedules fire from `main` only.
 
@@ -179,14 +212,18 @@ which is what makes a failure reproducible in practice.
 
 The GitHub Actions workflow (`.github/workflows/main_crgolden-churches.yml`) runs on every push and PR:
 
-1. `npm ci` → lint
-2. `npx vitest run --coverage` (LCOV → `coverage/lcov.info`)
-3. `npm run e2e` (self-builds the `ci` configuration, then runs Playwright E2E; Chromium cached by version)
-4. SonarCloud analysis via `sonarsource/sonarqube-scan-action` (JS LCOV only; no C# paths). That action, not
+1. `npm ci` → lint → type-checks → `lint:css`
+2. Playwright Chromium (cached by version), which the `browser` Vitest project needs as well as E2E
+3. `npm run test:coverage` (both Vitest projects; LCOV → `coverage/lcov.info`)
+4. `npm run e2e` (self-builds the `ci` configuration, runs `bddgen`, then the `integration` and `e2e` projects),
+   then an assertion that it executed at least `executedTestFloor` tests (`e2e/e2e-settings.json`: the 41
+   scenarios plus the 2 integration tests), then `publish-bdd-results`. Adding or removing a scenario or an
+   integration test changes that floor in the same change.
+5. SonarCloud analysis via `sonarsource/sonarqube-scan-action` (JS LCOV only; no C# paths). That action, not
    `sonarcloud-github-action`: the latter is deprecated and its pinned scanner-cli bundles a JRE 17 that
    SonarQube Cloud no longer accepts, so "modernising" back to it breaks the step. It also needs no JDK or
    scanner setup step of its own.
-5. `npm run build` (production configuration) → `npm prune --omit=dev` → deploy to `crgolden-churches` (Linux)
+6. `npm run build` (production configuration) → `npm prune --omit=dev` → deploy to `crgolden-churches` (Linux)
 
 There is no post-deploy step. The scheduled synthetic walker (`synthetic.yml`) is what exercises the
 deployed app; see [Synthetic walker](#synthetic-walker).
@@ -211,9 +248,9 @@ sonar-scanner `
   "-Dsonar.projectKey=crgolden_Churches" `
   "-Dsonar.organization=crgolden" `
   "-Dsonar.javascript.lcov.reportPaths=coverage/lcov.info" `
-  "-Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs,**/*.spec.ts" `
+  "-Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,integration/**,.features-gen/**,instrumentation.mjs,**/*.spec.ts" `
   "-Dsonar.tests=src" `
-  "-Dsonar.coverage.exclusions=e2e/**,scripts/**,**/*.config.*,src/test-setup.ts,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" `
+  "-Dsonar.coverage.exclusions=e2e/**,integration/**,scripts/**,**/*.config.*,src/test-setup*.ts,gate.ps1,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" `
   "-Dsonar.test.inclusions=**/*.spec.ts"
 ```
 

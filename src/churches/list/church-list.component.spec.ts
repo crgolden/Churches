@@ -176,6 +176,15 @@ describe('ChurchListComponent', () => {
     expect(fixture.nativeElement.querySelector('#btn-prev-page')).not.toBeNull();
   });
 
+  it('renders no Next control when the results fill exactly one page', () => {
+    const pageSize = newPageSize();
+    component.results.set(servedPage(pageSize, pageSize, 1, pageSize));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('#btn-next-page')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#btn-prev-page')).toBeNull();
+  });
+
   it('names each page-number link as a page, so a screen reader does not read a bare number', () => {
     const pageSize = newPageSize();
     const pageCount = randomIntBetween(2, PAGE_WINDOW + 1);

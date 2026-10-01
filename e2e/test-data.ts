@@ -1,4 +1,4 @@
-import { test as base, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   LARGEST_PERCENT,
   newDisplayName,
@@ -21,7 +21,6 @@ import {
   type ScheduleRecord,
 } from './mocks/directory.js';
 import { e2eContract } from './mocks/e2e-contract.js';
-import { answerMapTilesWithNoContent } from './map-tiles.js';
 import { MediaTypes } from './media-type-constants.js';
 import { OidcClaimTypes } from './oidc-constants.js';
 import { CHURCHES_URL } from '../src/app/app-paths';
@@ -155,7 +154,7 @@ export const CHURCH_WITH_DETAILS = newChurchWithDetails();
 
 export const CHURCH_WITHOUT_DETAILS = newChurchWithoutDetails();
 
-export const USER_SUBJECT = newId();
+const USER_SUBJECT = newId();
 
 export interface TestStore {
   reset(): Promise<void>;
@@ -197,59 +196,37 @@ const MOD_CLAIMS: Claim[] = [
   { type: ClaimTypes.moderator, value: MODERATOR_CLAIM_VALUE },
 ];
 
-async function applyAnonymousRoutes(page: Page): Promise<void> {
+export async function signInAsVisitor(page: Page): Promise<void> {
   await page.route(`**${BffPaths.user}**`, route => route.fulfill({ json: null }));
   await page.route(`**${BffPaths.login}**`, route => route.fulfill({ body: newText() }));
 }
 
-async function applyAuthRoutes(page: Page, claims: Claim[]): Promise<void> {
+async function signInWith(page: Page, claims: Claim[]): Promise<void> {
   await page.route(`**${BffPaths.user}**`, route => route.fulfill({ json: claims }));
   await page.route(`**${BffPaths.logout}**`, route => route.fulfill({ body: newText() }));
 }
 
-type ChurchesFixtures = {
-  store: TestStore;
-  anonymousPage: Page;
-  authedPage: Page;
-  modPage: Page;
-};
+export async function signInAsMember(page: Page): Promise<void> {
+  await signInWith(page, USER_CLAIMS);
+}
 
-export const test = base.extend<ChurchesFixtures>({
-  store: async ({}, use) => {
-    const s: TestStore = {
-      async reset() {
-        await fetchControl(ControlRoutes.reset);
-      },
-      async seedChurch(church) {
-        await fetchControl(ControlRoutes.churches, church);
-      },
-      async seedCorrection(correction) {
-        await fetchControl(ControlRoutes.corrections, {
-          ...correction,
-          createdAt: correction.createdAt ?? new Date().toISOString(),
-        });
-      },
-    };
-    await use(s);
-  },
+export async function signInAsModerator(page: Page): Promise<void> {
+  await signInWith(page, MOD_CLAIMS);
+}
 
-  anonymousPage: async ({ page }, use) => {
-    await answerMapTilesWithNoContent(page);
-    await applyAnonymousRoutes(page);
-    await use(page);
-  },
-
-  authedPage: async ({ page }, use) => {
-    await answerMapTilesWithNoContent(page);
-    await applyAuthRoutes(page, USER_CLAIMS);
-    await use(page);
-  },
-
-  modPage: async ({ page }, use) => {
-    await answerMapTilesWithNoContent(page);
-    await applyAuthRoutes(page, MOD_CLAIMS);
-    await use(page);
-  },
-});
-
-export { expect } from '@playwright/test';
+export function createTestStore(): TestStore {
+  return {
+    async reset() {
+      await fetchControl(ControlRoutes.reset);
+    },
+    async seedChurch(church) {
+      await fetchControl(ControlRoutes.churches, church);
+    },
+    async seedCorrection(correction) {
+      await fetchControl(ControlRoutes.corrections, {
+        ...correction,
+        createdAt: correction.createdAt ?? new Date().toISOString(),
+      });
+    },
+  };
+}

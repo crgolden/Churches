@@ -53,12 +53,6 @@ jobs:
       - name: Lint stylesheets
         run: npm run lint:css
 
-      - name: Run unit tests with coverage
-        run: npm run test:coverage
-
-      - name: Fix LCOV paths for SonarQube
-        run: sed -i 's|\\|/|g' coverage/lcov.info
-
       - name: Get Playwright version
         id: playwright-version
         run: |
@@ -82,8 +76,50 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Fix LCOV paths for SonarQube
+        run: sed -i 's|\\|/|g' coverage/lcov.info
+
       - name: Run E2E tests
+        id: e2e
         run: npm run e2e
+
+      - name: Assert E2E executed at least its floor
+        if: always()
+        run: |
+          if [ ! -f playwright-results.xml ]; then
+            echo "::error::playwright-results.xml is missing - the E2E suite never reported."
+            exit 1
+          fi
+          floor=$(node -p "require('./e2e/e2e-settings.json').executedTestFloor")
+          tests=$(grep -o 'tests="[0-9]*"' playwright-results.xml | head -1 | grep -o '[0-9]*')
+          skipped=$(grep -o 'skipped="[0-9]*"' playwright-results.xml | head -1 | grep -o '[0-9]*')
+          executed=$(( ${tests:-0} - ${skipped:-0} ))
+          echo "E2E executed ${executed} (tests ${tests:-0}, skipped ${skipped:-0}), floor ${floor}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${floor}" -le 0 ] || [ "${executed}" -lt "${floor}" ]; then
+            echo "::error::E2E executed ${executed} tests, below its floor of ${floor}."
+            exit 1
+          fi
+
+      - name: Publish E2E scenario results
+        if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') && github.actor != 'dependabot[bot]' }}
+        env:
+          PGHOST: ${{ vars.TEST_RESULTS_PGHOST }}
+          PGDATABASE: ${{ vars.TEST_RESULTS_PGDATABASE }}
+          PGUSER: ${{ vars.TEST_RESULTS_PGUSER }}
+          PGSSLMODE: ${{ vars.TEST_RESULTS_PGSSLMODE }}
+          PGPASSWORD: ${{ secrets.TEST_RESULTS_PGPASSWORD }}
+        run: npx --no publish-bdd-results --app ${{ vars.TEST_RESULTS_APP }} "$(node -p "require('./e2e/e2e-settings.json').cucumberMessagesFile")"
+
+      - name: Upload Cucumber report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: churches-cucumber-report
+          path: cucumber-report/
+          if-no-files-found: ignore
 
       - name: Upload Playwright HTML report
         uses: actions/upload-artifact@v7
@@ -115,9 +151,9 @@ jobs:
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,instrumentation.mjs,**/*.spec.ts
+            -Dsonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,integration/**,.features-gen/**,instrumentation.mjs,**/*.spec.ts
             -Dsonar.tests=src
-            -Dsonar.coverage.exclusions=e2e/**,scripts/**,**/*.config.*,src/test-setup.ts,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts
+            -Dsonar.coverage.exclusions=e2e/**,integration/**,scripts/**,**/*.config.*,src/test-setup*.ts,gate.ps1,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts
             -Dsonar.test.inclusions=**/*.spec.ts
             -Dsonar.qualitygate.wait=true
             -Dsonar.scanner.skipJreProvisioning=true

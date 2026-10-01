@@ -53,6 +53,12 @@ describe('ContributeComponent', () => {
     controller.expectNone(() => true);
   });
 
+  it('starts on the church name, so a reader correcting it chooses nothing first', () => {
+    const fieldSelect = fixture.nativeElement.querySelector('#field-select') as HTMLSelectElement;
+
+    expect(fieldSelect.value).toBe(CorrectableFieldKeys.canonicalName);
+  });
+
   it('offers the fields the IRS import gets wrong, not just the text ones', () => {
     const offered = Array.from(
       fixture.nativeElement.querySelectorAll('#field-select option') as NodeListOf<HTMLOptionElement>,
