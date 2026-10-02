@@ -111,7 +111,7 @@ jobs:
           PGUSER: ${{ vars.TEST_RESULTS_PGUSER }}
           PGSSLMODE: ${{ vars.TEST_RESULTS_PGSSLMODE }}
           PGPASSWORD: ${{ secrets.TEST_RESULTS_PGPASSWORD }}
-        run: npx --no publish-bdd-results --app ${{ vars.TEST_RESULTS_APP }} "$(node -p "require('./e2e/e2e-settings.json').cucumberMessagesFile")"
+        run: npx --no -- publish-bdd-results --app ${{ vars.TEST_RESULTS_APP }} "$(node -p "require('./e2e/e2e-settings.json').cucumberMessagesFile")"
 
       - name: Upload Cucumber report
         uses: actions/upload-artifact@v7
