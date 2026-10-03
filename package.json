@@ -70,7 +70,7 @@
     "@angular/build": "^22.2.0",
     "@angular/cli": "^22.2.0",
     "@angular/compiler-cli": "^22.2.0",
-    "@crgolden/modules": "0.15.0",
+    "@crgolden/modules": "0.16.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@types/express": "^5.0.6",

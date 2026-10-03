@@ -13,7 +13,7 @@ $GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:integration/zz-maxfail-
 
 Register-GateSteps @('node_modules install markers', 'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec',
     'npm run lint:css', 'Install Playwright browsers', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Run E2E tests',
-    'Assert E2E executed at least its floor', 'Playwright max-failures plant', 'Transfer-cache plant', 'npm run lint:utilities',
+    'Assert E2E executed at least its floor', 'Publish command reaches the CLI', 'Playwright max-failures plant', 'Transfer-cache plant', 'npm run lint:utilities',
     'SonarCloud analysis', 'Fail on open Sonar issues', 'Build (production)')
 $repo = $PSScriptRoot
 $scratch = $gateOutput
@@ -111,6 +111,12 @@ if (-not (Test-StepCarried $e2eStep)) {
     $executed = $tests - $skipped
     if ($floor -le 0 -or $executed -lt $floor) { Stop-Gate $floorStep "executed $executed (tests $tests, skipped $skipped), floor $floor" }
     Write-Row $floorStep 'PASS' "executed $executed (tests $tests, skipped $skipped), floor $floor"
+}
+
+$publishStep = 'Publish command reaches the CLI (the workflow line run without GITHUB_RUN_ID must fail on the run identity, not on usage)'
+if (-not (Test-StepCarried $publishStep)) {
+    Test-PublishCommandLine $publishStep (Join-Path $repo '.github\workflows\main_crgolden-churches.yml') 'Churches' $repo `
+        (Get-Content (Join-Path $repo 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).cucumberMessagesFile
 }
 
 $maxFailStep = "Playwright max-failures plant ($plantedFailures failing tests planted, --max-failures=1 must stop the run)"
