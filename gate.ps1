@@ -22,7 +22,7 @@ $maxFailReport = Join-Path $scratch 'churches-maxfail-plant.json'
 $bailPlant = Join-Path $repo 'src\zz-bail-plant.spec.ts'
 $maxFailPlant = Join-Path $repo 'integration\zz-maxfail-plant.spec.ts'
 $plantedFailures = 3
-$sonarBranch = "branch-local-$($env:COMPUTERNAME.ToLowerInvariant())"
+$sonarBranch = Get-SonarBranchName
 $unitStep = 'Run unit tests with coverage (npm run test:coverage)'
 $e2eStep = 'Run E2E tests (npm run e2e, CI=true)'
 $sonarStep = "SonarCloud analysis (sonar-scanner, branch $sonarBranch, quality gate waited)"
