@@ -1,4 +1,4 @@
-param([string]$Goal)
+param([string]$Goal, [string[]]$Steps)
 
 $ErrorActionPreference = 'Continue'
 $gateCommon = Join-Path $PSScriptRoot '..\Tools\Gates\GateCommon.ps1'
@@ -15,6 +15,26 @@ Register-GateSteps @('node_modules install markers', 'npm run lint', 'npm run ty
     'npm run lint:css', 'Install Playwright browsers', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Run E2E tests',
     'Assert E2E executed at least its floor', 'Publish command reaches the CLI', 'Playwright max-failures plant', 'Transfer-cache plant', 'npm run lint:utilities',
     'SonarCloud analysis', 'Fail on open Sonar issues', 'Build (production)')
+Register-StepInputs @{
+    'node_modules install markers'           = @('*')
+    'npm run lint'                           = @('src/*', '*.ts', '*.mts', '*.js', '*.mjs', '*.cjs', 'eslint-sonar.rules.json', 'angular.json', 'tsconfig*.json', 'package.json', 'package-lock.json')
+    'npm run typecheck:e2e'                  = @('src/*', 'e2e/*', 'integration/*', 'playwright.config.ts', 'tsconfig*.json', 'package.json', 'package-lock.json')
+    'npm run typecheck:spec'                 = @('src/*', 'tsconfig*.json', 'package.json', 'package-lock.json')
+    'npm run lint:css'                       = @('src/*', 'stylelint.config.mjs', 'package.json', 'package-lock.json')
+    'Install Playwright browsers'            = @('*')
+    'Run unit tests with coverage'           = @('*')
+    'Vitest bail plant'                      = @('*')
+    'Fix LCOV paths'                         = @('*')
+    'Run E2E tests'                          = @('*')
+    'Assert E2E executed at least its floor' = @('*')
+    'Publish command reaches the CLI'        = @('*')
+    'Playwright max-failures plant'          = @('*')
+    'Transfer-cache plant'                   = @('*')
+    'npm run lint:utilities'                 = @('*')
+    'SonarCloud analysis'                    = @('*')
+    'Fail on open Sonar issues'              = @('*')
+    'Build (production)'                     = @('*')
+}
 $repo = $PSScriptRoot
 $scratch = $gateOutput
 $bailReport = Join-Path $scratch 'churches-bail-plant.json'
@@ -32,6 +52,7 @@ $env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
 Set-Location $repo
 Initialize-GateState 'Churches' $repo
+Assert-RequestedSteps $Steps
 Invoke-CatalogSteps
 
 $installed = (Test-Path (Join-Path $repo 'node_modules\.package-lock.json')) -and
