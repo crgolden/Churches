@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Force -Path $gateOutput | Out-Null
 $GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:integration/zz-maxfail-plant.spec.ts', 'plant:src/app/app.config.ts')
 
 Register-GateSteps @('node_modules install markers', 'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec',
-    'npm run lint:css', 'Install Playwright browsers', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Run E2E tests',
+    'npm run lint:css', 'npm run audit', 'Install Playwright browsers', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Run E2E tests',
     'Assert E2E executed at least its floor', 'Publish command reaches the CLI', 'Playwright max-failures plant', 'Transfer-cache plant', 'npm run lint:utilities',
     'SonarCloud analysis', 'Fail on open Sonar issues', 'Build (production)')
 Register-StepInputs @{
@@ -20,7 +20,8 @@ Register-StepInputs @{
     'npm run lint'                           = @('src/*', '*.ts', '*.mts', '*.js', '*.mjs', '*.cjs', 'eslint-sonar.rules.json', 'angular.json', 'tsconfig*.json', 'package.json', 'package-lock.json')
     'npm run typecheck:e2e'                  = @('src/*', 'e2e/*', 'integration/*', 'playwright.config.ts', 'tsconfig*.json', 'package.json', 'package-lock.json')
     'npm run typecheck:spec'                 = @('src/*', 'tsconfig*.json', 'package.json', 'package-lock.json')
-    'npm run lint:css'                       = @('src/*', 'stylelint.config.mjs', 'package.json', 'package-lock.json')
+    'npm run lint:css'                       = @('src/*', 'stylelint.config.mjs', 'package.json', 'package-lock.json', 'tools/stylelint/*')
+    'npm run audit'                          = @('package.json', 'package-lock.json')
     'Install Playwright browsers'            = @('*')
     'Run unit tests with coverage'           = @('*')
     'Vitest bail plant'                      = @('*')
@@ -35,6 +36,7 @@ Register-StepInputs @{
     'Fail on open Sonar issues'              = @('*')
     'Build (production)'                     = @('*')
 }
+Register-VolatileSteps @('npm run audit')
 $repo = $PSScriptRoot
 $scratch = $gateOutput
 $bailReport = Join-Path $scratch 'churches-bail-plant.json'
@@ -58,7 +60,8 @@ Invoke-CatalogSteps
 $installed = (Test-Path (Join-Path $repo 'node_modules\.package-lock.json')) -and
     (Test-Path (Join-Path $repo 'node_modules\.bin\tsc.cmd')) -and (Test-Path (Join-Path $repo 'node_modules\.bin\vitest.cmd'))
 if (-not $installed) { Stop-Gate 'node_modules install markers' 'incomplete install; run npm ci deliberately first' }
-Write-Row 'node_modules install markers' 'PASS' '.package-lock.json, tsc.cmd, vitest.cmd present'
+Assert-NodeInstallCurrent $repo
+Write-Row 'node_modules install markers' 'PASS' 'tsc.cmd, vitest.cmd present; every package matches package-lock.json'
 
 if (-not (Test-StepCarried 'npm run lint')) {
     $global:LASTEXITCODE = $null
@@ -79,6 +82,11 @@ if (-not (Test-StepCarried 'npm run lint:css')) {
     $global:LASTEXITCODE = $null
     npm run lint:css
     $null = Test-Exit 'npm run lint:css'
+}
+if (-not (Test-StepCarried 'npm run audit')) {
+    $global:LASTEXITCODE = $null
+    npm run audit
+    $null = Test-Exit 'npm run audit'
 }
 
 Install-PlaywrightBrowsers 'Install Playwright browsers (npm run playwright:install)' { npx playwright install --dry-run chromium } { npm run playwright:install }

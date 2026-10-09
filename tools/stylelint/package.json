@@ -1,0 +1,8 @@
+{
+  "name": "churches-stylelint-tool",
+  "private": true,
+  "description": "The stylelint the lint:css step runs, installed apart from the app so its dependency tree never reaches the app's lockfile or the build's npm audit.",
+  "devDependencies": {
+    "stylelint": "17.15.0"
+  }
+}

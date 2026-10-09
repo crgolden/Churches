@@ -53,6 +53,9 @@ jobs:
       - name: Lint stylesheets
         run: npm run lint:css
 
+      - name: Audit dependencies (fails on high or critical)
+        run: npm run audit
+
       - name: Get Playwright version
         id: playwright-version
         run: |
