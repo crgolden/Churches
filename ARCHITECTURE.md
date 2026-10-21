@@ -1,16 +1,10 @@
-# Church Platform Architecture
+# Architecture
 
 <!-- Keep flowchart/ER edges label-free (GitHub's Mermaid fails on labeled edges in hidden iframes); use the borderless label-node pattern seen in the diagrams below. -->
 
-This document describes the nationwide U.S. church-discovery platform end-to-end: how a page request travels through the **Churches** app (Angular SSR + Node BFF), how the **Directory** API serves and curates the data, and how the **Functions** pipeline discovers, scrapes, enriches, geocodes, and scores churches in the background. It is the authoritative architecture reference for the platform; the per-repo READMEs keep only operational reference (commands, config keys, deployment steps).
-
-| Repo | Role | Reference docs |
-|---|---|---|
-| [Churches](https://github.com/crgolden/Churches) (this repo) | Angular 22 SSR app + Node (Express) BFF — the only user-facing surface | [README](README.md), [TESTING](TESTING.md), [DESIGN](DESIGN.md) |
-| [Directory](https://github.com/crgolden/Directory) | ASP.NET Core 10 Minimal API + SQL Server — the church data service | [README](https://github.com/crgolden/Directory/blob/main/README.md), [SEEDING](https://github.com/crgolden/Directory/blob/main/SEEDING.md) |
-| [Functions](https://github.com/crgolden/Functions) | Azure Functions isolated worker — the data-acquisition pipeline and scheduled jobs | [README](https://github.com/crgolden/Functions/blob/main/README.md) |
-| [Identity](https://github.com/crgolden/Identity) | Duende IdentityServer — issues every token the platform validates | [README](https://github.com/crgolden/Identity/blob/main/README.md) |
-| [Shared](https://github.com/crgolden/Shared) | Private NuGet package with self-validating domain entities | — |
+Churches is the web front end of a U.S. church-discovery service: an Angular 22 server-side renderer and an Express
+Backend-for-Frontend (BFF) in one Node process. The BFF holds the user's OIDC session and proxies every data call to
+the church Directory API, so the browser never holds an access token.
 
 ## System context
 
@@ -18,60 +12,25 @@ This document describes the nationwide U.S. church-discovery platform end-to-end
 graph TB
     Browser["Browser"]
 
-    subgraph ChurchesApp["Churches — one Node process"]
+    subgraph ChurchesApp["Churches: one Node process"]
         SSR["Angular 22 SSR"]
         BFF["Express BFF<br/>(session, OIDC, proxy)"]
     end
 
-    Identity["Identity<br/>(Duende IdentityServer)"]
-    DirectoryAPI["Directory API<br/>(ASP.NET Core Minimal API)"]
-    SQL[("SQL Server<br/>catalog: Directory<br/>(self-hosted)")]
-    Redis[("Redis<br/>(sessions, self-hosted)")]
-
-    subgraph Pipeline["Functions — isolated worker"]
-        Workers["Scrape / Extract / Enrich /<br/>Geocode / Write / Score workers"]
-        Jobs["Timers: crawl scheduler, dedup,<br/>sitemap, queue monitor"]
-    end
-
-    ServiceBus[["Azure Service Bus<br/>7 queues"]]
-    Blob[("Azure Blob Storage<br/>churches / imports / $web")]
-
-    Census["US Census Geocoder"]
-    Zippo["Zippopotam.us"]
-    OpenAI["Azure OpenAI<br/>(gpt-5-mini)"]
-    Resend["Resend<br/>(email)"]
-
-    Obs["Grafana Alloy (OTLP) + Elasticsearch<br/>(self-hosted observability)"]
-    Infra["Infrastructure dashboard<br/>polls /health"]
+    OIDC["OIDC provider"]
+    DirectoryAPI["Directory API"]
+    Redis[("Redis<br/>sessions")]
+    Blob[("Blob static hosting<br/>sitemaps")]
 
     Browser --> ChurchesApp
-    BFF --- L1["OIDC code flow"] --> Identity
+    BFF --- L1["OIDC code flow"] --> OIDC
     BFF --- L2["/directory/api/**<br/>(Bearer or anon)"] --> DirectoryAPI
     BFF --> Redis
-    DirectoryAPI --> SQL
-    DirectoryAPI --> ServiceBus
-    ServiceBus <--> Workers
-    Workers --> SQL
-    Workers --> Blob
-    Workers --> Census
-    Workers --> Zippo
-    Workers --> OpenAI
-    Workers --> Resend
-    Jobs --> ServiceBus
-    Jobs --> Blob
-    ChurchesApp -.-> Obs
-    DirectoryAPI -.-> Obs
-    Pipeline -.-> Obs
-    Infra -.-> ChurchesApp
-    Infra -.-> DirectoryAPI
+    BFF --- L3["/sitemap-index.xml, /sitemaps/*"] --> Blob
 
     classDef edgeLabel fill:none,stroke:none
-    class L1,L2 edgeLabel
+    class L1,L2,L3 edgeLabel
 ```
-
-The browser only ever talks to the Churches app. The Directory API is the single interactive data service, consumed exclusively through the Churches BFF. All background data acquisition flows through Azure Service Bus queues into the Functions workers, which write to the same SQL database the Directory API reads — but through exactly one gate (`ChurchWriter`, described below).
-
----
 
 ## The Churches app (UI + BFF)
 
@@ -114,11 +73,11 @@ The BFF holds all tokens in the server-side session; the browser only ever has t
 sequenceDiagram
     participant B as Browser
     participant BFF as Churches BFF
-    participant IdP as Identity (IdentityServer)
+    participant IdP as OIDC provider
 
     B->>BFF: GET /bff/login
     BFF->>BFF: generate PKCE verifier (S256) + state,<br/>store in session
-    BFF-->>B: 302 to Identity /connect/authorize<br/>(scopes: offline_access openid profile email directory)
+    BFF-->>B: 302 to the provider's authorize endpoint<br/>(scopes: offline_access openid profile email directory)
     B->>IdP: authorize (user signs in)
     IdP-->>B: 302 to /bff/callback?code=…&state=…
     B->>BFF: GET /bff/callback
@@ -130,9 +89,9 @@ sequenceDiagram
     BFF-->>B: 302 to app (session cookie set)
 ```
 
-- The session cookie is `sameSite: 'lax'` — `Strict` breaks the OIDC callback (the redirect back from Identity is a cross-site navigation, so a Strict cookie wouldn't be sent and the callback couldn't find the session's PKCE verifier). `secure` in production.
+- The session cookie is `sameSite: 'lax'` — `Strict` breaks the OIDC callback (the redirect back from the provider is a cross-site navigation, so a Strict cookie wouldn't be sent and the callback couldn't find the session's PKCE verifier). `secure` in production.
 - Sessions live in Redis via `connect-redis` unless `SessionStore=memory` selects `express-session`'s built-in `MemoryStore`, whose sessions don't survive a restart. **Nothing falls back silently**: without `SessionStore=memory`, a missing `RedisHost` or a missing or non-integer `RedisPort` throws at startup, and so does a missing `SessionSecret` (`src/bff/settings.ts`), so the process never runs on an in-memory store or a per-process secret by accident. `NODE_ENV` has no say in which store is chosen. It governs only whether the Redis socket uses TLS, and it makes `applySession` warn when `SessionStore=memory` is set in production.
-- `/bff/user` returns the session's claims (requires the `X-CSRF` header) and appends a `bff:logout_url` claim carrying the session ID. A visitor with no session gets `200` with a `null` body: a non-2xx would put a line in the browser console that no script can suppress. The body must be `null` and never `[]`, because `AuthService` reads a non-null body as signed in, and `null` keeps "no session" distinct from "a session with no claims". This is the shape of Duende BFF's `AnonymousSessionResponse.Response200` option. `src/bff/routes.spec.ts` pins the exact body. `/bff/logout` verifies that sid matches the live session before doing RP-initiated logout at Identity. `/bff/login` and `/bff/callback` are browser-navigation redirects, not XHR/fetch calls, so they're exempt from the `X-CSRF` check — PKCE plus the `state` parameter protect them instead; `/bff/logout`'s CSRF protection is the server-issued `sid` query parameter rather than the header.
+- `/bff/user` returns the session's claims (requires the `X-CSRF` header) and appends a `bff:logout_url` claim carrying the session ID. A visitor with no session gets `200` with a `null` body: a non-2xx would put a line in the browser console that no script can suppress. The body must be `null` and never `[]`, because `AuthService` reads a non-null body as signed in, and `null` keeps "no session" distinct from "a session with no claims". This is the shape of Duende BFF's `AnonymousSessionResponse.Response200` option. `src/bff/routes.spec.ts` pins the exact body. `/bff/logout` verifies that sid matches the live session before doing RP-initiated logout at the provider. `/bff/login` and `/bff/callback` are browser-navigation redirects, not XHR/fetch calls, so they're exempt from the `X-CSRF` check — PKCE plus the `state` parameter protect them instead; `/bff/logout`'s CSRF protection is the server-issued `sid` query parameter rather than the header.
 - Known quirk: `/bff/login` accepts but ignores the `returnUrl` query parameter that `authGuard` appends — after login you land on the app root, not the page that triggered the redirect.
 
 ### Proxying to the Directory API
@@ -143,7 +102,7 @@ Every data call from Angular goes to `/directory/api/**`, and the BFF forwards i
 sequenceDiagram
     participant A as Angular (browser or SSR)
     participant P as BFF proxy
-    participant IdP as Identity
+    participant IdP as OIDC provider
     participant D as Directory API
 
     A->>P: /directory/api/… (X-CSRF on mutating)
@@ -190,313 +149,33 @@ The split is deliberate: anonymous routes are `RenderMode.Server` because they a
 
 ### SEO
 
-`SeoService` (`src/shared/seo.service.ts`) sets title, meta description, canonical, Open Graph, and Twitter tags per page; detail pages additionally emit a JSON-LD `@graph` containing schema.org `Church` and `BreadcrumbList`. All of it renders server-side on the public routes. The sitemap files themselves are *not* generated by this app — the Functions `SitemapGenerator` timer writes them to blob static hosting nightly as a `sitemapindex` blob plus one gzip-compressed `urlset` blob per 50,000-URL chunk (see the pipeline section) — but this app serves all of it under its own origin, via `src/bff/sitemap.ts`: `GET /sitemap-index.xml` fetches and buffers the index blob, and `GET /sitemaps/:file` fetches and buffers a chunk blob after strictly whitelisting `:file` against `^sitemap-\d+\.xml\.gz$` before resolving any blob URL from it (the same SSRF-safe `new URL(path, base)` resolution `directoryProxy` uses for `DirectoryApiAddress`, keyed off the `SitemapBlobBaseUrl` config value). Both routes buffer the full response and set an explicit `Content-Length` rather than streaming it through as `Transfer-Encoding: chunked` — chunk files are gzip-compressed down to a few hundred KB, small enough to buffer safely. `public/robots.txt` points crawlers at `/sitemap-index.xml`.
+`SeoService` (`src/shared/seo.service.ts`) sets title, meta description, canonical, Open Graph, and Twitter tags per page; detail pages additionally emit a JSON-LD `@graph` containing schema.org `Church` and `BreadcrumbList`. All of it renders server-side on the public routes. The sitemap files themselves are *not* generated by this app: a separate job writes them to blob static hosting as a `sitemapindex` blob plus one gzip-compressed `urlset` blob per 50,000-URL chunk, and this app serves all of it under its own origin, via `src/bff/sitemap.ts`: `GET /sitemap-index.xml` fetches and buffers the index blob, and `GET /sitemaps/:file` fetches and buffers a chunk blob after strictly whitelisting `:file` against `^sitemap-\d+\.xml\.gz$` before resolving any blob URL from it (the same SSRF-safe `new URL(path, base)` resolution `directoryProxy` uses for `DirectoryApiAddress`, keyed off the `SitemapBlobBaseUrl` config value). Both routes buffer the full response and set an explicit `Content-Length` rather than streaming it through as `Transfer-Encoding: chunked` — chunk files are gzip-compressed down to a few hundred KB, small enough to buffer safely. `public/robots.txt` points crawlers at `/sitemap-index.xml`.
 
 `NotFoundComponent` serves both the catch-all route (`{ path: '**' }`) and a church slug that fails to resolve, and it does two SEO-specific things beyond rendering a message: it sets a real HTTP 404 during SSR via `RESPONSE_INIT`, and it sets a `noindex` robots tag. Without the status code a crawler receives 200 with "not found" content — a soft 404, which Google treats as a quality signal against the whole site rather than as a missing page.
 
-> **Hostname note:** a sitemap or sitemap index must be served from the same host as the URLs/sub-sitemaps it references, or crawlers discard every entry. The URLs inside are built from `ChurchesBaseUrl`, so `robots.txt`'s `Sitemap:` line and the `/sitemap-index.xml` + `/sitemaps/:file` routes all need to agree with `ChurchesBaseUrl`. Once a custom domain is bound to the app, all of it should move to it together.
+> **Hostname note:** a sitemap or sitemap index must be served from the same host as the URLs/sub-sitemaps it references, or crawlers discard every entry. The URLs inside are built from the base URL the sitemap job is given, so `robots.txt`'s `Sitemap:` line and the `/sitemap-index.xml` + `/sitemaps/:file` routes all need to agree with it. Once a custom domain is bound to the app, all of it should move to it together.
 >
-> **Gzip note:** chunk files are served as the `.xml.gz` resource itself — `Content-Type: application/gzip`, no `Content-Encoding` header — matching Google's documented convention of fetching a resource literally named `.xml.gz` and decompressing it because of what it is, not via negotiated HTTP compression. Nothing in the chain (blob upload in `Functions`, Node's `fetch`, the Express response) may apply transparent gzip semantics, or the crawler receives mismatched bytes.
+> **Gzip note:** chunk files are served as the `.xml.gz` resource itself — `Content-Type: application/gzip`, no `Content-Encoding` header — matching Google's documented convention of fetching a resource literally named `.xml.gz` and decompressing it because of what it is, not via negotiated HTTP compression. Nothing in the chain (the blob upload, Node's `fetch`, the Express response) may apply transparent gzip semantics, or the crawler receives mismatched bytes.
 
 ---
 
-## The Directory API
+## What the app relies on
 
-The Directory API is the platform's only interactive data service: an ASP.NET Core 10 Minimal API over SQL Server using BCL ADO.NET (no EF Core, no Dapper), organized as vertical feature slices — each slice is a folder with `*Endpoints.cs` + a scoped `*Service.cs`.
+- **The Directory API.** Routes are unprefixed (`/search`, `/denominations`, `/churches/{slug}`, the moderation and
+  crawl-source routes), anonymous for reads and bearer-protected for writes. A token carrying the `directory` scope may
+  submit a correction; moderation requires the `churches.mod` claim, which the provider attaches to the `directory`
+  scope's access token.
+- **The OIDC provider.** A confidential client (`ChurchesClientId`/`ChurchesClientSecret`) using code + PKCE with
+  `offline_access`, whose registered redirect URI is `<origin>/bff/callback`.
+- **Sitemap blobs** under `SitemapBlobBaseUrl`: `sitemap-index.xml` and `sitemaps/sitemap-{n}.xml.gz`, written by
+  whatever job generates them.
 
-### Slices and authorization
+## Hosting
 
-JWT Bearer validation against Identity with `ValidateAudience = false` and `MapInboundClaims = false` (claims keep their OIDC names). Two policies:
-
-- **`Directory`** — requires claim `scope = directory` (any authenticated user of the platform).
-- **`ChurchesMod`** — requires claim `churches.mod = true` (moderators).
-
-| Slice | Endpoints | Auth |
-|---|---|---|
-| `Search/` | `GET /search` (text, geo-radius, state, denomination, worship style, accessibility, schedule filters) | Anonymous |
-| `Church/` | `GET /churches`, `GET /churches/{slug}` | Anonymous |
-| | `POST /churches`, `PUT`/`PATCH`/`DELETE /churches/{id}` | `ChurchesMod` |
-| `Denomination/` | `GET /denominations` | Anonymous |
-| `Schedules/` `Ministries/` `Campuses/` | `POST /churches/{id}/…`, `PUT`/`DELETE /…/{id}` (child curation) | `ChurchesMod` |
-| `Moderation/` | `GET /corrections`, `PATCH …/approve`, `PATCH …/reject`, `POST /churches/{id}/merge/{id}` | `ChurchesMod` |
-| | `POST /corrections` | `Directory` scope |
-| `Crawling/` | `GET`/`POST /crawl-sources`, `DELETE`, `POST …/trigger` | `ChurchesMod` |
-| `Admin/` | `POST /admin/import` (CSV), `GET /admin/export` (CSV stream) | `ChurchesMod` |
-| `User/` | `GET /me` | Anonymous |
-
-`GET /me` reports identity only and carries no moderation flag. The browser's flag is read in `src/auth/auth.service.ts` from the BFF session claim that `ACCESS_TOKEN_CLAIM_ALLOWLIST` merges at `/bff/callback` (`src/bff/routes.ts`), which is the same `churches.mod` claim the `ChurchesMod` policy enforces, so the UI and the API answer from one source.
-
-`/me` previously returned a `HasModerationScope` boolean derived from a `scope` claim carrying `churches.mod`, a shape Identity does not mint: `churches.mod` is an `ApiScopeClaim` on the `directory` scope, so it arrives under its own claim type while `scope` carries `directory`. The field was therefore false for every user, including moderators, and nothing noticed because nothing read it. It was **removed rather than corrected**: a second answer on a public response DTO is one a future client can read, and correcting it would have left two places to hold in agreement for a fact this app already computes correctly.
-
-### Search internals
-
-`GET /search` builds dynamic SQL from whichever filters are present:
-
-- Free text → full-text `CONTAINSTABLE` over `(CanonicalName, City)`, AND-ing prefix terms; the rank drives the default relevance sort.
-- Location → `dbo.fn_HaversineDistance` (miles, Earth radius 3958.8) filters within `radiusMiles` (default 25) and powers the distance sort.
-- Schedule filters (`dayOfWeek`, `startTimeBefore/After`) → an `EXISTS` subquery against `ServiceSchedules`.
-- Paging → a separate `COUNT(*)` statement over the same `FROM`/`WHERE`, then the page (two result sets from one command); `pageSize` clamped to 1–50.
-
-### Data model
-
-Schema is owned by `Directory.Data` (a `Microsoft.Build.Sql` SQL project, deployed as a dacpac — always before the app in CI). No views or stored procedures; one scalar function (`fn_HaversineDistance`).
-
-```mermaid
-erDiagram
-    Denominations ||--o{ Churches : ""
-    Churches ||--o{ Campuses : ""
-    Churches ||--o{ Ministries : ""
-    Churches ||--o{ ServiceSchedules : ""
-    Churches ||--o{ ChurchAttributes : ""
-    Churches ||--o{ UserCorrections : ""
-    Churches |o--o{ CrawlSources : ""
-
-    Churches {
-        uniqueidentifier Id PK
-        nvarchar CanonicalName "full-text indexed"
-        nvarchar Slug UK "name-city-state, -N suffix on collision"
-        nvarchar City "full-text indexed"
-        nchar State
-        decimal Latitude "0,0 = not yet geocoded"
-        decimal Longitude
-        decimal ConfidenceScore "DECIMAL(5,4), computed by pipeline"
-        bit IsActive "soft delete"
-    }
-    Denominations {
-        uniqueidentifier Id PK
-        nvarchar Name UK "~41 seeded via post-deploy MERGE"
-    }
-    CrawlSources {
-        uniqueidentifier Id PK
-        uniqueidentifier ChurchId FK "nullable until first write"
-        nvarchar Url
-        int LastStatus
-    }
-    UserCorrections {
-        uniqueidentifier Id PK
-        uniqueidentifier ChurchId FK
-        nvarchar Type "correction | merge (from dedup)"
-        nvarchar Status "pending | approved | rejected"
-        uniqueidentifier UserId "submitter's sub; NULL for dedup suggestions"
-        uniqueidentifier ReviewedBy "moderator's sub"
-    }
-    ChurchAttributes {
-        uniqueidentifier ChurchId FK
-        nvarchar Key "provenance + enrichment; feeds confidence score"
-        nvarchar Value
-    }
-    MergeAuditLog {
-        uniqueidentifier SurvivingChurchId "no FK - survives deletes"
-        uniqueidentifier AbsorbedChurchId
-    }
-```
-
-All `Churches` child relationships (`Campuses`, `Ministries`, `ServiceSchedules`, `ChurchAttributes`, `UserCorrections`) cascade-delete with their church. `CrawlSources.ChurchId` is nullable — a crawl source is only linked to a church after its first successful crawl produces a write.
-
-### What Directory writes vs. what it delegates
-
-The API writes churches and their children directly only for **moderator-initiated** operations: church CRUD, child curation, correction approve/reject, and merge. Merge is a single ADO.NET transaction that repoints all child FKs (CrawlSources, ChurchAttributes, ServiceSchedules, Ministries, Campuses, UserCorrections) to the surviving church, soft-deletes the absorbed one, and inserts a `MergeAuditLog` row.
-
-Everything else it **delegates to the pipeline** by publishing Service Bus messages (its managed identity has only the *Sender* role — it cannot consume):
-
-| Endpoint | Queue | Consumer |
-|---|---|---|
-| `POST /admin/import` (CSV) | `geocoding-requests` (one message per row) | `GeocoderWorker` |
-| `POST /crawl-sources/{id}/trigger` | `scrape-requests` | `ScraperWorker` |
-| `POST /corrections` | `contributions` | `ContributionProcessor` |
-
-Submitting a correction does **not** write to SQL — the message goes to the `contributions` queue and the Functions `ContributionProcessor` inserts the pending row. Only the approve/reject moderation step is a direct API write.
-
----
-
-## The Functions data pipeline
-
-All church data acquisition is an Azure Functions isolated worker driven by Service Bus queues. Seven queues exist (exactly these — also the set `QueueDepthMonitorJob` watches): `email`, `scrape-requests`, `extraction-requests`, `enrichment-requests`, `geocoding-requests`, `confidence-requests`, `contributions`.
-
-### The queue cascade
-
-```mermaid
-flowchart TD
-    CS["CrawlSchedulerWorker<br/>timer: every 6h<br/>re-enqueues sources older than CrawlRefreshDays"]
-    TRG["Directory API<br/>POST /crawl-sources/{id}/trigger"]
-    BIJ["BulkImportJob (HTTP admin)<br/>IRS 990 CSV / OSM JSON from 'imports' blob container"]
-
-    Q1[["scrape-requests"]]
-    SW["ScraperWorker<br/>fetch page → blob churches/{sourceId}/{ts}.html"]
-    Q2[["extraction-requests"]]
-    EX["ExtractorWorker<br/>AngleSharp + microdata scoring<br/>+0.2 each: name/city/state/zip · +0.1: phone/email"]
-    Q3[["enrichment-requests"]]
-    EN["EnrichmentWorker<br/>Azure OpenAI gpt-5-mini<br/>re-reads raw HTML blob (≤20k chars)<br/>publishes with Confidence = 0.6"]
-    Q4[["geocoding-requests"]]
-    GW["GeocoderWorker<br/>Normalizer (state/zip/phone/website)<br/>Zippopotam.us zip backfill<br/>US Census geocode (fallback 0,0)"]
-    CW["ChurchWriter<br/>single-writer transaction"]
-    Q5[["confidence-requests"]]
-    CC["CalculateConfidenceScore<br/>(ConfidenceWorker)<br/>recomputes ConfidenceScore from attributes"]
-    DB[("SQL: Directory")]
-
-    CS --> Q1
-    TRG --> Q1
-    Q1 --> SW --> Q2 --> EX
-    EX --- EXT["confidence ≥ 0.5 AND city present"] --> Q4
-    EX --- EXO["otherwise"] --> Q3 --> EN --> Q4
-    BIJ --- BIL["dedup by name+state, Chunk(100)"] --> Q4
-    Q4 --> GW --> CW --> DB
-    CW --- CWL["after commit"] --> Q5 --> CC --> DB
-
-    classDef edgeLabel fill:none,stroke:none
-    class EXT,EXO,BIL,CWL edgeLabel
-```
-
-The extractor branch is the cost gate: pages the deterministic extractor can read with confidence ≥ 0.5 (`Tier2Threshold`) *and* a city skip the LLM entirely; only ambiguous pages pay for an OpenAI call. The enrichment worker deliberately re-downloads the original HTML blob and prompts against the raw page — not the extractor's already-incomplete partial fields.
-
-### ChurchWriter — the single-writer invariant
-
-Every church row written by the pipeline goes through `ChurchWriter.UpsertAsync`, whose only caller is `GeocoderWorker`. One transaction covers:
-
-1. Take an exclusive application lock on the crawl source (`sp_getapplock`, owned by the transaction) and, in the same batch, look up `CrawlSources.ChurchId` to decide insert vs. update. Two deliveries for one crawl source therefore write one after the other, and the second becomes an update rather than a second church.
-2. Duplicate guard on new inserts (name + city + state + lat + lng already present → link instead of insert).
-3. Validate through `Shared.Domain.ChurchBuilder` — an invalid church cannot reach SQL; a bad value throws a specific `ArgumentException` here instead of a constraint violation deep in the write.
-4. Upsert `Churches` (slug `name-city-state`, `-N` suffix on collision; denomination resolved by name), link the `CrawlSource`, delete-then-insert all children (`ChurchAttributes`, `ServiceSchedules`, `Ministries`, `Campuses`), and register the church's own website as a crawl source on first insert.
-5. After commit: publish to `confidence-requests` so `CalculateConfidenceScore` recomputes the score.
-
-This is why the Directory API never has to defend against concurrent pipeline writes to the same aggregate: there is exactly one write path and it is transactional.
-
-### Function inventory
-
-| Function | Trigger | What it does |
-|---|---|---|
-| `ScraperWorker` | queue `scrape-requests` | Fetch page → blob `churches/`, enqueue extraction |
-| `ExtractorWorker` | queue `extraction-requests` | AngleSharp extraction + confidence scoring, branch to geocode or enrich |
-| `EnrichmentWorker` | queue `enrichment-requests` | LLM extraction from raw HTML (gpt-5-mini) |
-| `GeocoderWorker` | queue `geocoding-requests` | Normalize, backfill zip, geocode, call `ChurchWriter` |
-| `CalculateConfidenceScore` | queue `confidence-requests` | Recompute `ConfidenceScore` from attributes (`ConfidenceScoreCalculator`, lives in this repo) |
-| `ContributionProcessor` | queue `contributions` | Insert pending `UserCorrections` row (does not apply the correction) |
-| `Email` | queue `email` | Deliver via Resend (used by Identity + Infrastructure alerts) |
-| `CrawlSchedulerWorker` | timer `0 0 */6 * * *` | Enqueue recrawls for sources older than `CrawlRefreshDays`, in batches of `CrawlSchedulerBatchSize` (both required settings) |
-| `DeduplicationJob` | timer `0 0 4 * * *` | 0.1-mile geo-grid + Jaro-Winkler ≥ 0.85 name similarity → writes `merge`-type `UserCorrections` rows (UserId `NULL`) for moderator review — it never auto-merges |
-| `SitemapGenerator` | timer `0 0 3 * * *` | Active church slugs, chunked to 50,000 URLs each → `$web/sitemaps/sitemap-{n}.xml.gz` (gzipped) + `$web/sitemap-index.xml` (URLs based on `ChurchesBaseUrl`) |
-| `QueueDepthMonitorJob` | timer `0 */15 * * * *` | Active + dead-letter message-count gauges for all 7 queues (needs Service Bus Data Owner) |
-| `BulkImportJob` | HTTP `POST /api/bulk-import?source=irs\|osm&blobPath=…` (admin key) | Seed from IRS 990 CSV / OSM JSON in `imports` container |
-| `ReGeocodeJob` | HTTP `POST /api/re-geocode?max=N` (admin key) | Re-geocode rows stranded at `(0,0)` (excluding PO Boxes) |
-
-### Corrections lifecycle
-
-```mermaid
-sequenceDiagram
-    actor U as User
-    participant C as Churches (BFF)
-    participant D as Directory API
-    participant SB as Service Bus
-    participant CP as ContributionProcessor
-    participant DB as SQL (UserCorrections)
-    actor M as Moderator
-
-    U->>C: submit correction (/contribute/:slug)
-    C->>D: POST /corrections (Bearer, scope directory)
-    D->>SB: publish to 'contributions'<br/>(no direct SQL write)
-    D-->>C: 202-style accept
-    SB->>CP: deliver message
-    CP->>DB: INSERT pending correction
-    Note over DB: DeduplicationJob also inserts<br/>'merge'-type rows here (UserId = NULL)
-    M->>C: review at /admin/moderation
-    C->>D: PATCH /corrections/{id}/approve | reject (churches.mod)
-    D->>DB: apply / mark rejected (direct write)
-```
-
-### Failure handling
-
-The pipeline distinguishes *expected* failures (dead websites, unparseable addresses) from *unexpected* ones, because retrying a dead site is pure alert noise:
-
-- **Malformed/null payloads** are dead-lettered with `deadLetterReason: "malformed-payload"` in every worker — never silently completed.
-- **ScraperWorker**: expected fetch failures (`HttpRequestException`, timeouts) mark the source failed (`LastStatus = 2`) and *complete* the message — the next scheduler pass retries naturally. Unexpected exceptions abandon + rethrow.
-- **EnrichmentWorker**: OpenAI `ClientResultException` is quietly abandoned for the first few deliveries, then degrades to the extractor's partial data and continues to geocoding rather than dead-lettering indefinitely.
-- **GeocoderWorker**: unresolvable state/zip completes the message with a trace event; geocode misses fall back to `(0,0)` — a deliberate "not yet geocoded" marker that `ReGeocodeJob` sweeps later, and the one coordinate `Shared.Domain` validation intentionally allows.
-- **Handled failures** are recorded as Tempo trace events (`Telemetry.Tracing.RecordHandledFailure`), not `ILogger` noise. **Unhandled** ones pass through `ExceptionHandlingMiddleware`, which records telemetry and always rethrows (so the Functions runtime's retry/DLQ semantics still apply).
-
----
-
-## Shared domain layer
-
-`Shared.Domain` (from the private `Shared` NuGet package) provides self-validating entities — `Church`, `Campus`, `Ministry`, `ServiceSchedule`, `ChurchAttribute` — with private constructors and static factories that enforce every NOT NULL/range invariant at construction, mirroring the SQL schema exactly. The one intentional exception: `(0,0)` coordinates are valid, as the pipeline's not-yet-geocoded marker.
-
-Adoption is currently validation-only: Directory's `ChurchService`/`ScheduleService`/`MinistryService`/`CampusService` and Functions' `ChurchWriter` build a `Shared.Domain` entity to *validate* input before writing, then discard it — the wire models and persisted shapes are still local DTOs. Migrating those to the shared entities is a planned follow-up.
-
----
-
-## Cross-cutting
-
-### Identity and tokens
-
-Identity (Duende IdentityServer) issues every token. The Churches BFF is a confidential client (`ChurchesClientId`/`ChurchesClientSecret`, delivered as Key Vault-referenced App Service settings) doing code + PKCE with `offline_access`; the Directory API is a pure resource server validating Bearer JWTs. The browser never holds a token — only the session cookie. Moderation rights ride on the `churches.mod` claim minted by Identity.
-
-### Telemetry
-
-All three services export OTLP traces and metrics to a self-hosted Grafana Alloy (gated on `AlloyEndpoint`; `/health` excluded from tracing), and structured logs to self-hosted Elasticsearch — pino (`pino-elasticsearch` multistream, index `logs-app-churches`) for the Node app, Serilog data streams for the .NET services. The Churches OTLP SDK loads as a `node --import ./instrumentation.mjs` sidecar before the app.
-
-### Azure hosting
-
-Everything sits in one resource group. The data stores and observability stack are not Azure — SQL Server, Redis, Elasticsearch, and Grafana Alloy are self-hosted.
-
-```mermaid
-graph LR
-    subgraph Azure["Azure — one resource group"]
-        CH["Churches<br/>App Service · Linux · Node 24"]
-        DIR["Directory<br/>App Service · Windows · .NET 10"]
-        FN["Functions<br/>Function App · Linux"]
-        SB[["Service Bus<br/>Basic tier · 7 queues"]]
-        ST[("Storage<br/>$web · churches · imports")]
-        KV["Key Vault"]
-        AOAI["Azure OpenAI<br/>gpt-5-mini"]
-        MSI["Deploy identity<br/>(GitHub Actions OIDC)"]
-    end
-    subgraph SelfHosted["Self-hosted"]
-        SQL[("SQL Server<br/>catalog Directory")]
-        RED[("Redis")]
-        ES[("Elasticsearch")]
-        AL["Grafana Alloy"]
-    end
-    CH --> KV
-    CH --> RED
-    CH --> DIR
-    DIR --> SQL
-    DIR --> SB
-    DIR --> KV
-    FN --> SB
-    FN --> ST
-    FN --> SQL
-    FN --> KV
-    FN --> AOAI
-    CH -.-> AL
-    CH -.-> ES
-    DIR -.-> AL
-    DIR -.-> ES
-    FN -.-> AL
-    FN -.-> ES
-```
-
-| App | Plan/OS | Runtime identity | Notes |
-|---|---|---|---|
-| Churches | Linux, Node 24 LTS | System-assigned MI | Startup: `node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`. No custom domain bound yet |
-| Directory | **Windows**, .NET 10 | System-assigned MI | Data protection keys in blob, wrapped by a Key Vault key |
-| Functions | Linux Function App | System-assigned MI | Fully identity-based bindings (`ServiceBusConnection__fullyQualifiedNamespace` + `__credential`, `AzureWebJobsStorage__credential`) — no connection strings anywhere |
-
-**RBAC per managed identity** (least privilege):
-
-| Identity | Roles |
-|---|---|
-| churches | Key Vault Secrets User + Crypto User; Storage Blob Data Contributor |
-| directory | Key Vault Secrets User + Crypto User; Storage Blob Data Contributor; **Service Bus Data Sender** (publish-only — it can enqueue but never consume) |
-| functions | Key Vault Secrets User; Storage Blob Data Contributor; **Service Bus Data Sender + Receiver + Data Owner** (Owner is required by `QueueDepthMonitorJob` — reading runtime queue properties needs more than Receiver); **Cognitive Services OpenAI User** on the Azure OpenAI account |
-| deploy identity | GitHub Actions federated-credential deploy identity — deployment only, not runtime |
-
-All configuration reaches the app as App Service settings. Secret ones (`ChurchesClientId`/`ChurchesClientSecret`, `RedisPassword`, `SessionSecret`, `Elasticsearch*`) hold a `@Microsoft.KeyVault(SecretUri=...)` reference that App Service resolves from Key Vault at startup using the app's system-assigned managed identity, then injects as a plain environment variable; non-secret ones (`OidcAuthority`, `DirectoryApiAddress`, `RedisHost`, …) carry their value directly. The app itself holds no Key Vault SDK and never calls the vault. Directory and Functions (.NET) use the same App Settings-referenced pattern — neither calls `SecretClient` anymore either.
-
-### Deployment pipelines
-
-Each repo deploys independently via GitHub Actions with Azure OIDC federated credentials:
-
-- **Churches** → Linux App Service: `npm ci` → lint → CI build → Vitest → Playwright E2E → SonarCloud → production build → deploy. The deployed app is exercised by the scheduled synthetic walker rather than a post-deploy job.
-- **Directory** → Windows App Service: build (compiles the `Directory.Data` dacpac) → unit tests + coverage → SonarCloud → **dacpac deployed via SqlPackage before the app** — the schema is always ahead of or equal to the code.
-- **Functions** → Function App: build + deploy (no test job).
-
-Testing strategy per repo: [Churches/TESTING.md](TESTING.md), [Directory/TESTING.md](https://github.com/crgolden/Directory/blob/main/TESTING.md), [Functions/TESTING.md](https://github.com/crgolden/Functions/blob/main/TESTING.md).
+Linux Azure App Service, Node 24, with a system-assigned managed identity. The startup command is
+`node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`. Every setting reaches the process as an
+App Service setting; the secret ones (`ChurchesClientId`, `ChurchesClientSecret`, `RedisPassword`, `SessionSecret`,
+`ElasticsearchUsername`, `ElasticsearchPassword`) hold a `@Microsoft.KeyVault(SecretUri=...)` reference that the
+platform resolves through the managed identity before the app starts, so the app holds no Key Vault SDK. Telemetry is
+OTLP traces and metrics to `AlloyEndpoint` (`/health` excluded) and `pino` logs to Elasticsearch
+(`logs-app-churches`). Testing strategy: [TESTING.md](TESTING.md); design rules: [DESIGN.md](DESIGN.md).
