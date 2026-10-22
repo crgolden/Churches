@@ -14,6 +14,7 @@ import {
 import { isPlatformBrowser } from '@angular/common';
 import type * as LeafletType from 'leaflet';
 import { LOCATION_MAP_ID, LOCATION_MAP_TILES_ID } from './map-ids';
+import { isGeocoded } from './coordinates';
 import { environment } from '../../environments/environment';
 import { AriaRoles } from '../../shared/aria-roles';
 
@@ -103,7 +104,7 @@ export class LocationMapComponent implements AfterViewInit, OnChanges, OnDestroy
     this.markers = [];
     let index = 0;
     for (const point of this.points()) {
-      if (!point.lat || !point.lng) continue;
+      if (!isGeocoded(point.lat, point.lng)) continue;
       const marker = L.marker([point.lat, point.lng], { alt: point.label })
         .addTo(this.map)
         .bindPopup(point.label);

@@ -25,6 +25,7 @@ import {
   WORSHIP_STYLES,
 } from '../../shared/models';
 import { LocationMapComponent, MapPoint } from '../map/location-map.component';
+import { isGeocoded } from '../map/coordinates';
 import { RouteDataKeys } from '../../app/app-paths';
 import { AriaRoles } from '../../shared/aria-roles';
 
@@ -127,11 +128,11 @@ export class ChurchDetailComponent implements OnInit {
     const c = this.church();
     if (!c) return [];
     const points: MapPoint[] = [];
-    if (c.latitude && c.longitude) {
+    if (isGeocoded(c.latitude, c.longitude)) {
       points.push({ lat: c.latitude, lng: c.longitude, label: c.canonicalName });
     }
     for (const campus of c.campuses) {
-      if (campus.latitude && campus.longitude) {
+      if (isGeocoded(campus.latitude, campus.longitude)) {
         points.push({ lat: campus.latitude, lng: campus.longitude, label: campus.name });
       }
     }

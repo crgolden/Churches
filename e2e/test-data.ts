@@ -35,8 +35,8 @@ function newLatitude(): number {
   return randomIntBetween(-89, 90);
 }
 
-function newLongitude(): number {
-  return randomIntBetween(-179, 180);
+function newWesternHemisphereLongitude(): number {
+  return randomIntBetween(-179, 0);
 }
 
 function newStartTime(): string {
@@ -77,7 +77,7 @@ function newCampus(churchId: string): CampusRecord {
     state: newMemberOf(US_STATES).code,
     zip: newText(),
     latitude: newLatitude(),
-    longitude: newLongitude(),
+    longitude: newWesternHemisphereLongitude(),
     createdAt: newUtcInstant(),
     updatedAt: newUtcInstant(),
   };
@@ -89,7 +89,7 @@ export function newChurchWithoutDetails(): ChurchRecord {
     canonicalName: newDisplayName(),
     slug: `${newPathSegment()}-${newPathSegment()}`,
     latitude: newLatitude(),
-    longitude: newLongitude(),
+    longitude: newWesternHemisphereLongitude(),
     street: null,
     city: newText(),
     state: newMemberOf(US_STATES).code,
