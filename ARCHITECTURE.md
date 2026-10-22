@@ -6,7 +6,7 @@ Churches is the web front end of a U.S. church-discovery service: an Angular 22 
 Backend-for-Frontend (BFF) in one Node process. The BFF holds the user's OIDC session and proxies every data call to
 the church Directory API, so the browser never holds an access token.
 
-## System context
+## Bird's-eye view
 
 ```mermaid
 graph TB
@@ -31,6 +31,25 @@ graph TB
     classDef edgeLabel fill:none,stroke:none
     class L1,L2,L3 edgeLabel
 ```
+
+## Codemap
+
+| Path | What it does |
+|---|---|
+| `src/server.ts` | The Express app: `createApp()` mounts `/health`, logging, the session, `/bff`, the Directory proxy, the sitemap routes, static files and the Angular SSR catch-all; `reqHandler` is the entry `ng serve` calls |
+| `src/bff/` | `oidc.ts` (the `openid-client` configuration), `routes.ts` (`/bff/login`, `/bff/callback`, `/bff/user`, `/bff/logout`), `session.ts` (Redis or in-memory store), `proxy.ts` (the Directory proxy and its CSRF check), `sitemap.ts`, `settings.ts` (every required setting, validated at startup) |
+| `src/app/` | The application shell: `app.routes.ts` and `app.routes.server.ts` (routes and render modes), `app.config.ts` and `app.config.server.ts` (providers, hydration, the transfer cache), `app.interceptor.ts`, the nav and footer |
+| `src/churches/` | One folder per page: `search/`, `list/` (results, grid, list and map views), `detail/` (the church page with moderator curation), `contribute/` (the correction form), `map/` (the two Leaflet components), each with its resolver |
+| `src/admin/moderation/` | The moderation queue and its resolver |
+| `src/auth/` | `AuthService` (the client-side session signals), `authGuard`, `modGuard`, and the startup session fetch with its server-side gate |
+| `src/shared/` | The Directory client (`church.service.ts`, `directory-api.ts`, `models.ts`), `seo.service.ts`, `NotFoundComponent`, and this app's directives in `primitives/` |
+| `src/telemetry/` | `pino` logging and the route-named spans |
+| `src/environments/` | Per-configuration values: the allowed hosts and the map tile URL |
+| `src/testing/` | Unit-test helpers |
+| `instrumentation.mjs` | OpenTelemetry, loaded before the app with `--import` |
+| `e2e/`, `integration/` | The Gherkin journeys, the mock Directory API and the synthetic walker; the server-rendered HTML checks |
+| `tools/stylelint/` | The stylesheet linter, installed with its own lockfile |
+| `.github/workflows/` | `main_crgolden-churches.yml` (checks, build and deploy) and `synthetic.yml` (the scheduled walker) |
 
 ## The Churches app (UI + BFF)
 
@@ -157,9 +176,25 @@ The split is deliberate: anonymous routes are `RenderMode.Server` because they a
 >
 > **Gzip note:** chunk files are served as the `.xml.gz` resource itself — `Content-Type: application/gzip`, no `Content-Encoding` header — matching Google's documented convention of fetching a resource literally named `.xml.gz` and decompressing it because of what it is, not via negotiated HTTP compression. Nothing in the chain (the blob upload, Node's `fetch`, the Express response) may apply transparent gzip semantics, or the crawler receives mismatched bytes.
 
+## Invariants
+
+- **`src/server.ts` does nothing when imported.** Every settings read, the session store and the Redis connect live
+  in `createApp()`, which only the entry-point branch (or the first request through `reqHandler`) runs. Angular's
+  route extraction imports the server bundle during `npm run build` with no settings present, so anything at module
+  scope would fail the build; an app initializer that makes a request at bootstrap takes the same gate as the session
+  fetch (`FETCHES_SESSION_ON_STARTUP`, false while routes are being discovered).
+- **No setting falls back silently.** A missing required setting stops the process at startup; the in-memory session
+  store is chosen only by `SessionStore=memory`, never by a missing Redis setting.
+- **The browser never holds a token.** Tokens live in the server-side session; the browser carries only the
+  `churches.sid` cookie, and every data call goes through the BFF proxy.
+- **Anonymous routes render on the server and signed-in routes in the browser**, because the anonymous routes are the
+  SEO surface and the server has no session to render a signed-in page with.
+- **A host outside `allowedHosts` is a 400**, and a missing church is a real HTTP 404 with `noindex`, never a soft 404.
+- **`/bff/user` answers a visitor with 200 and a `null` body**, never `[]` and never a non-2xx.
+
 ---
 
-## What the app relies on
+## Boundaries
 
 - **The Directory API.** Routes are unprefixed (`/search`, `/denominations`, `/churches/{slug}`, the moderation and
   crawl-source routes), anonymous for reads and bearer-protected for writes. A token carrying the `directory` scope may
@@ -170,7 +205,7 @@ The split is deliberate: anonymous routes are `RenderMode.Server` because they a
 - **Sitemap blobs** under `SitemapBlobBaseUrl`: `sitemap-index.xml` and `sitemaps/sitemap-{n}.xml.gz`, written by
   whatever job generates them.
 
-## Hosting
+## Cross-cutting concerns
 
 Linux Azure App Service, Node 24, with a system-assigned managed identity. The startup command is
 `node --import ./instrumentation.mjs dist/churches.client/server/server.mjs`. Every setting reaches the process as an

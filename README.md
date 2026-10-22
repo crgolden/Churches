@@ -44,12 +44,13 @@ run it: [TESTING.md](TESTING.md).
   confidential client for this app (redirect `<origin>/bff/callback`, scopes
   `offline_access openid profile email directory`). Redis is optional locally (`SessionStore=memory`).
 
-## Clone and install
+## Clone and build
 
 ```powershell
 git clone https://github.com/crgolden/Churches.git
 cd Churches
 npm ci
+npm run build:ci
 ```
 
 ## Configuration
@@ -85,11 +86,10 @@ resolves at startup through the app's managed identity; the app makes no vault c
 ## Run locally
 
 ```powershell
-npm run build:ci
 npm run serve:ssr     # http://localhost:4000: SSR, the BFF and the Directory proxy
 ```
 
-Use the `ci` build to serve locally: the production configuration only accepts the production hosts, so
+Use the `ci` build from [Clone and build](#clone-and-build) to serve locally: the production configuration only accepts the production hosts, so
 `localhost` is answered with a one-line `Header "host" ... is not allowed` page. `serve:ssr` runs the built
 `dist/`, so rebuild after a change. For template and style work, `npm start` runs `ng serve` on port 56432,
 server-rendering through `src/server.ts`; set `ASPNETCORE_URLS=http://localhost:4000` so its proxy sends `/bff`
@@ -107,8 +107,10 @@ synthetic walker that exercises the deployed app on a schedule, and the local So
 
 ## Gate
 
-`gate.ps1` is the maintainers' gate. It loads a private toolkit from a folder beside this repo, so in a
-plain clone it stops at once. To gate your own change, run the checks CI runs, in this order:
+`gate.ps1` is the maintainers' gate. It dot-sources the gate library script that the `GATE_LIBRARY` environment
+variable names, which defines the step functions `gate.ps1` calls; unset, as in a plain clone, it stops at once with
+`GATE: FAILED` and records nothing. To gate with a library of your own, set `GATE_LIBRARY` to its path; it must
+define every function `gate.ps1` calls, since those functions decide whether each step ran and passed. To gate your own change without one, run the checks CI runs, in this order:
 
 ```powershell
 npm ci
@@ -130,18 +132,7 @@ stay out of the app's. CI additionally runs a SonarCloud analysis and fails on a
 
 ## Project structure
 
-| Path | What it holds |
-|---|---|
-| `src/server.ts` | the Express app: health, logging, session, `/bff`, the Directory proxy, sitemaps, the SSR catch-all |
-| `src/bff/` | OIDC sign-in, the session store, the Directory proxy, CSRF, sitemap serving, settings validation |
-| `src/app/` | the application shell: routes, render modes, the HTTP interceptor |
-| `src/churches/` | search, results, the church detail page with moderator curation, the correction form, the maps |
-| `src/admin/` | the moderation queue |
-| `src/auth/` | the client-side session and the guards |
-| `src/shared/`, `src/environments/`, `src/telemetry/`, `src/testing/` | shared components and SEO, per-configuration values, logging, unit-test helpers |
-| `e2e/`, `integration/` | the Playwright journeys, the mock Directory API and the synthetic walker; the server-rendered HTML checks |
-| `instrumentation.mjs` | OpenTelemetry, loaded before the app with `--import` |
-| `tools/stylelint/` | the stylesheet linter, installed on its own |
+What each folder holds: [ARCHITECTURE.md § Codemap](ARCHITECTURE.md#codemap).
 
 ## Deployment
 
