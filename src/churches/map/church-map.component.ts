@@ -16,6 +16,7 @@ import { isPlatformBrowser } from '@angular/common';
 import type * as LeafletType from 'leaflet';
 import type { SearchResult } from '../../shared/models';
 import { CHURCH_MAP_ID, CHURCH_MAP_TILES_ID, MARKER_CLICK_EVENT } from './map-ids';
+import { isGeocoded } from './coordinates';
 import { environment } from '../../environments/environment';
 import { AriaRoles } from '../../shared/aria-roles';
 
@@ -95,7 +96,7 @@ export class ChurchMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     for (const item of current) {
       const lat = item.church.latitude;
       const lng = item.church.longitude;
-      if (!lat || !lng) continue;
+      if (!isGeocoded(lat, lng)) continue;
       const marker = L.marker([lat, lng], { alt: item.church.canonicalName })
         .addTo(this.map)
         .bindPopup(item.church.canonicalName);

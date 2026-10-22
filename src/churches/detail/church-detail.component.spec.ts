@@ -167,7 +167,7 @@ describe('ChurchDetailComponent', () => {
     expect(points.map(point => point.label)).toEqual([churchName, campusName]);
   });
 
-  it('mapPoints skips entries without coordinates', () => {
+  it('mapPoints skips a church still at the ungeocoded (0,0) sentinel', () => {
     component.church.set({
       canonicalName: newDisplayName(),
       latitude: 0,
@@ -175,6 +175,21 @@ describe('ChurchDetailComponent', () => {
       campuses: [],
     } as never);
     expect(component.mapPoints()).toHaveLength(0);
+  });
+
+  it('mapPoints keeps a campus on the equator', () => {
+    const churchName = newDisplayName();
+    const campusName = newDisplayName();
+    component.church.set({
+      canonicalName: churchName,
+      latitude: newCoordinate(),
+      longitude: newCoordinate(),
+      campuses: [{ id: newId(), name: campusName, latitude: 0, longitude: newCoordinate() }],
+    } as never);
+
+    const points = component.mapPoints();
+
+    expect(points.map(point => point.label)).toEqual([churchName, campusName]);
   });
 
   it('addSchedule POSTs the form to the church schedules endpoint', () => {
