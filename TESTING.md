@@ -17,6 +17,19 @@ Unit tests carry no control flow: no `if`, loop or `try` in a test body.
 | E2E (regression) | Gherkin features, `playwright-bdd` (`--project=e2e`) | `e2e/features/`, steps in `e2e/steps/` | No: Playwright manages the Node SSR server and the mock Directory API | Every push/PR |
 | Synthetic walker | Playwright (`--project=synthetic`) | `e2e/synthetic/` | Yes — targets the deployed stack | Scheduled (`synthetic.yml`), never a merge gate |
 
+## Running tests locally
+
+```powershell
+npm ci
+npm run playwright:install   # Chromium, for the browser unit project and Playwright
+npx vitest run               # unit and browser-unit tiers
+npm run test:coverage        # the same, with LCOV in coverage/lcov.info
+npm run e2e                  # builds the ci configuration, then the integration and e2e projects
+```
+
+`npm run e2e` starts the mock Directory API on port 4001 and the SSR server on port 4000, so both must be
+free. The synthetic walker runs only against a deployed app ([Synthetic walker](#synthetic-walker)).
+
 ---
 
 ## Frontend unit tests
