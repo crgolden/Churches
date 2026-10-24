@@ -10,6 +10,7 @@ export const HEALTH_PATH = '/health';
 
 export const LogFields = {
   serviceName: 'service.name',
+  serviceInstanceId: 'service.instance.id',
   statusCode: 'http.response.status_code',
   durationMs: 'event.duration_ms',
 } as const;
@@ -28,6 +29,13 @@ const LEVEL_NAMES: Record<string, string> = {
   error: 'Error',
   fatal: 'Fatal',
 };
+
+function logBase(): Record<string, string> {
+  const serviceInstanceId = process.env[BffSettingKeys.ServiceInstanceId];
+  return serviceInstanceId === undefined
+    ? { [LogFields.serviceName]: serviceName }
+    : { [LogFields.serviceName]: serviceName, [LogFields.serviceInstanceId]: serviceInstanceId };
+}
 
 function buildLogger(): Logger {
   const streams: StreamEntry[] = [{ stream: pino.destination(1) }];
@@ -57,7 +65,7 @@ function buildLogger(): Logger {
 
   return pino(
     {
-      base: { [LogFields.serviceName]: serviceName },
+      base: logBase(),
       messageKey: 'message',
       timestamp: pino.stdTimeFunctions.isoTime,
       formatters: {

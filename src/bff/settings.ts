@@ -23,6 +23,7 @@ export const BffSettingKeys = {
   ElasticsearchUsername: 'ElasticsearchUsername',
   ElasticsearchPassword: 'ElasticsearchPassword',
   AlloyEndpoint: 'AlloyEndpoint',
+  ServiceInstanceId: 'ServiceInstanceId',
 } as const;
 
 export type BffSettingKey = (typeof BffSettingKeys)[keyof typeof BffSettingKeys];
