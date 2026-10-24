@@ -31,13 +31,10 @@ if (process.env.NODE_ENV === 'production' && (alloyEndpoint === undefined || !UR
 
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 
-const serviceInstanceId = randomUUID();
-process.env.ServiceInstanceId = serviceInstanceId;
-
 const resource = resourceFromAttributes({
   [ATTR_SERVICE_NAME]: serviceName,
   [ATTR_SERVICE_VERSION]: serviceVersion,
-  [ATTR_SERVICE_INSTANCE_ID]: serviceInstanceId,
+  [ATTR_SERVICE_INSTANCE_ID]: randomUUID(),
   'deployment.environment': deploymentEnvironment,
 });
 
@@ -84,12 +81,7 @@ if (alloyEndpoint) {
   });
 }
 
-function recordSigtermForRedisDiagnosis() {
-  tracerProvider.getTracer(serviceName).startSpan('lifecycle.sigterm').end();
-}
-
 async function shutdown() {
-  recordSigtermForRedisDiagnosis();
   await Promise.allSettled([
     tracerProvider.shutdown(),
     meterProvider.shutdown(),

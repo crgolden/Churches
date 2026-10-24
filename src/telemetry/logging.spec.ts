@@ -114,7 +114,7 @@ describe('logger construction', () => {
     BffSettingKeys.ElasticsearchUsername,
     BffSettingKeys.ElasticsearchPassword,
   ] as const;
-  const ENV_KEYS = [...ELASTICSEARCH_KEYS, NODE_ENV, WEBSITE_SITE_NAME, BffSettingKeys.ServiceInstanceId];
+  const ENV_KEYS = [...ELASTICSEARCH_KEYS, NODE_ENV, WEBSITE_SITE_NAME];
   const savedEnv: Record<string, string | undefined> = {};
 
   interface ElasticsearchSettings {
@@ -227,25 +227,6 @@ describe('logger construction', () => {
 
     const [pinoOptions] = vi.mocked(pino).mock.calls[0] as [{ base: Record<string, string> }, unknown];
     expect(pinoOptions.base[LogFields.serviceName]).toBe(siteName);
-  });
-
-  it('stamps the service.instance.id instrumentation exposed as a base field', async () => {
-    const serviceInstanceId = randomUUID();
-    process.env[BffSettingKeys.ServiceInstanceId] = serviceInstanceId;
-
-    const { LogFields } = await import('./logging');
-    const { default: pino } = await import('pino');
-
-    const [pinoOptions] = vi.mocked(pino).mock.calls[0] as [{ base: Record<string, string> }, unknown];
-    expect(pinoOptions.base[LogFields.serviceInstanceId]).toBe(serviceInstanceId);
-  });
-
-  it('carries no service.instance.id base field when instrumentation exposed none', async () => {
-    const { LogFields } = await import('./logging');
-    const { default: pino } = await import('pino');
-
-    const [pinoOptions] = vi.mocked(pino).mock.calls[0] as [{ base: Record<string, string> }, unknown];
-    expect(pinoOptions.base).not.toHaveProperty([LogFields.serviceInstanceId]);
   });
 
   it('lets a failure building the log streams stop the process instead of falling back to stdout', async () => {
