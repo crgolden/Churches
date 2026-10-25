@@ -7,8 +7,11 @@ if (-not $gateCommon -or -not (Test-Path -LiteralPath $gateCommon -PathType Leaf
     exit 1
 }
 . $gateCommon
-$gateOutput = Join-Path ([IO.Path]::GetTempPath()) "crgolden-gates\$(Split-Path -Leaf $PSScriptRoot)"
-New-Item -ItemType Directory -Force -Path $gateOutput | Out-Null
+$gateOutput = if (Get-Command Get-GateOutputDirectory -ErrorAction SilentlyContinue) {
+    Get-GateOutputDirectory (Split-Path -Leaf $PSScriptRoot)
+} else {
+    (New-Item -ItemType Directory -Force -Path (Join-Path ([IO.Path]::GetTempPath()) "claude\crgolden-gates\$(Split-Path -Leaf $PSScriptRoot)")).FullName
+}
 $GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:integration/zz-maxfail-plant.spec.ts', 'plant:src/app/app.config.ts')
 
 Register-GateSteps @('node_modules install markers', 'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec',
