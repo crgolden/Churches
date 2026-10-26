@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import type { Express } from 'express';
 import session from 'express-session';
-import { createClient } from 'redis';
+import { ConnectionTimeoutError, createClient, SocketClosedUnexpectedlyError, SocketTimeoutError } from 'redis';
 import { RedisStore } from 'connect-redis';
 import { logger } from '../telemetry/logging';
 import {
@@ -33,6 +33,43 @@ export const MEMORY_STORE_IN_PRODUCTION_WARNING =
   `[Session] WARNING: using MemoryStore in production. Remove ${BffSettingKeys.SessionStore}=${MEMORY_SESSION_STORE} to switch to Redis.`;
 
 export const REDIS_CONNECTION_ERROR_LOG = '[Redis] Connection error';
+
+export const REDIS_DROP_RECONNECTED_LOG = '[Redis] Connection dropped and reconnected';
+
+type StoreCallback = (err?: unknown, data?: session.SessionData | null) => unknown;
+
+function isConnectionDrop(err: unknown): boolean {
+  return err instanceof SocketTimeoutError || err instanceof SocketClosedUnexpectedlyError || err instanceof ConnectionTimeoutError;
+}
+
+async function retryOnceOnDrop(attempt: () => Promise<session.SessionData | null>, cb?: StoreCallback): Promise<unknown> {
+  let data: session.SessionData | null;
+  try {
+    data = await attempt();
+  } catch (error) {
+    if (!isConnectionDrop(error)) {
+      if (cb) return cb(error, null);
+      throw error;
+    }
+    try {
+      data = await attempt();
+    } catch (error_) {
+      if (cb) return cb(error_, null);
+      throw error_;
+    }
+  }
+  return cb ? cb(null, data) : data;
+}
+
+export class ReconnectingRedisStore extends RedisStore {
+  override get(sid: string, cb?: StoreCallback): Promise<unknown> {
+    return retryOnceOnDrop(() => super.get(sid), cb);
+  }
+
+  override touch(sid: string, sess: session.SessionData, cb?: StoreCallback): Promise<unknown> {
+    return retryOnceOnDrop(() => super.touch(sid, sess), cb);
+  }
+}
 
 export const RedisClientEvents = {
   error: 'error',
@@ -99,15 +136,35 @@ export function applySession(app: Express): Promise<void> {
           pingInterval,
         });
 
+    let pendingDrop: { err: unknown; errors: number; timer: ReturnType<typeof setTimeout> } | undefined;
     redisClient.on(RedisClientEvents.error, (err: unknown) => {
-      logger.error({ err }, REDIS_CONNECTION_ERROR_LOG);
+      if (pendingDrop) {
+        pendingDrop.errors += 1;
+        return;
+      }
+      if (!redisHasBeenReady) {
+        logger.error({ err }, REDIS_CONNECTION_ERROR_LOG);
+        return;
+      }
+      const timer = setTimeout(() => {
+        const unrecovered = pendingDrop;
+        pendingDrop = undefined;
+        logger.error({ err, errors: unrecovered?.errors }, REDIS_CONNECTION_ERROR_LOG);
+      }, socketTimeout);
+      timer.unref();
+      pendingDrop = { err, errors: 1, timer };
     });
     redisClient.on(RedisClientEvents.ready, () => {
       redisHasBeenReady = true;
+      if (pendingDrop) {
+        clearTimeout(pendingDrop.timer);
+        logger.warn({ err: pendingDrop.err, errors: pendingDrop.errors }, REDIS_DROP_RECONNECTED_LOG);
+        pendingDrop = undefined;
+      }
     });
 
     ready = redisClient.connect().then(() => undefined);
-    store = new RedisStore({ client: redisClient });
+    store = new ReconnectingRedisStore({ client: redisClient });
   }
 
   app.use(

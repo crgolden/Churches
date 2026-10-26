@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import type { Express } from 'express';
+import type { MockedFunction } from 'vitest';
 
 vi.mock('express-session', () => {
   const MemoryStore = vi.fn();
@@ -15,23 +16,31 @@ vi.mock('redis', () => ({
     on: vi.fn().mockReturnThis(),
     connect: vi.fn().mockResolvedValue(undefined),
   }),
+  SocketTimeoutError: class SocketTimeoutError extends Error {},
+  SocketClosedUnexpectedlyError: class SocketClosedUnexpectedlyError extends Error {},
+  ConnectionTimeoutError: class ConnectionTimeoutError extends Error {},
 }));
 
-vi.mock('connect-redis', () => ({
-  RedisStore: vi.fn(),
-}));
+vi.mock('connect-redis', () => {
+  const RedisStore = vi.fn();
+  RedisStore.prototype.get = vi.fn();
+  RedisStore.prototype.touch = vi.fn();
+  return { RedisStore };
+});
 
 vi.mock('../telemetry/logging', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 import session from 'express-session';
-import { createClient } from 'redis';
+import { createClient, SocketTimeoutError } from 'redis';
 import { RedisStore } from 'connect-redis';
 import { logger } from '../telemetry/logging';
 import {
   MEMORY_STORE_IN_PRODUCTION_WARNING,
   REDIS_CONNECTION_ERROR_LOG,
+  REDIS_DROP_RECONNECTED_LOG,
+  ReconnectingRedisStore,
   RedisClientEvents,
   SESSION_COOKIE_NAME,
   SESSION_COOKIE_SAME_SITE,
@@ -67,11 +76,27 @@ function reconnectStrategy(): RedisReconnectStrategy {
   return callArg.socket.reconnectStrategy;
 }
 
-function emitRedisEvent(event: string): void {
+function emitRedisEvent(event: string, payload?: unknown): void {
   const client = vi.mocked(createClient).mock.results[0].value as { on: ReturnType<typeof vi.fn> };
   client.on.mock.calls
     .filter(([name]) => name === event)
-    .forEach(([, listener]) => (listener as () => void)());
+    .forEach(([, listener]) => (listener as (payload?: unknown) => void)(payload));
+}
+
+function newSocketTimeoutMs(): number {
+  return randomInt(1, 65536);
+}
+
+function newSocketTimeout(): Error {
+  return new SocketTimeoutError(newSocketTimeoutMs());
+}
+
+function storeGet(): MockedFunction<RedisStore['get']> {
+  return vi.mocked(RedisStore.prototype.get);
+}
+
+function storeTouch(): MockedFunction<RedisStore['touch']> {
+  return vi.mocked(RedisStore.prototype.touch);
 }
 
 function newTunableMs(): number {
@@ -334,7 +359,7 @@ describe('applySession', () => {
     );
   });
 
-  it('logs a connection error when Redis emits an "error" event', async () => {
+  it('logs a connection error when Redis emits an "error" event before it has ever been ready', async () => {
     useRedis(randomUUID(), newRedisPort());
 
     const listeners = new Map<string, (err: unknown) => void>();
@@ -352,6 +377,115 @@ describe('applySession', () => {
     listeners.get(RedisClientEvents.error)?.(connectionError);
 
     expect(logger.error).toHaveBeenCalledWith({ err: connectionError }, REDIS_CONNECTION_ERROR_LOG);
+  });
+
+  describe('a drop after Redis has been ready', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('logs a warning, never an error, when the client is ready again within one socket timeout', async () => {
+      const tunables = useRedis(randomUUID(), newRedisPort());
+      const [drop, repeat] = [newSocketTimeout(), newSocketTimeout()];
+      await applySession(makeApp() as unknown as Express);
+      emitRedisEvent(RedisClientEvents.ready);
+
+      emitRedisEvent(RedisClientEvents.error, drop);
+      emitRedisEvent(RedisClientEvents.error, repeat);
+      vi.advanceTimersByTime(tunables[BffSettingKeys.RedisSocketTimeoutMs] - 1);
+      emitRedisEvent(RedisClientEvents.ready);
+      vi.advanceTimersByTime(tunables[BffSettingKeys.RedisSocketTimeoutMs]);
+
+      expect(logger.warn).toHaveBeenCalledExactlyOnceWith({ err: drop, errors: [drop, repeat].length }, REDIS_DROP_RECONNECTED_LOG);
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it('logs an error when the client is not ready again within one socket timeout', async () => {
+      const tunables = useRedis(randomUUID(), newRedisPort());
+      const drop = newSocketTimeout();
+      await applySession(makeApp() as unknown as Express);
+      emitRedisEvent(RedisClientEvents.ready);
+
+      emitRedisEvent(RedisClientEvents.error, drop);
+      vi.advanceTimersByTime(tunables[BffSettingKeys.RedisSocketTimeoutMs]);
+
+      expect(logger.error).toHaveBeenCalledExactlyOnceWith({ err: drop, errors: 1 }, REDIS_CONNECTION_ERROR_LOG);
+      expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    it('logs an error again for a later drop that also never recovers', async () => {
+      const tunables = useRedis(randomUUID(), newRedisPort());
+      const [first, later] = [newSocketTimeout(), newSocketTimeout()];
+      await applySession(makeApp() as unknown as Express);
+      emitRedisEvent(RedisClientEvents.ready);
+      emitRedisEvent(RedisClientEvents.error, first);
+      vi.advanceTimersByTime(tunables[BffSettingKeys.RedisSocketTimeoutMs]);
+
+      emitRedisEvent(RedisClientEvents.error, later);
+      vi.advanceTimersByTime(tunables[BffSettingKeys.RedisSocketTimeoutMs]);
+
+      expect(vi.mocked(logger.error).mock.calls).toEqual([
+        [{ err: first, errors: 1 }, REDIS_CONNECTION_ERROR_LOG],
+        [{ err: later, errors: 1 }, REDIS_CONNECTION_ERROR_LOG],
+      ]);
+    });
+  });
+
+  describe('ReconnectingRedisStore', () => {
+    function newStore(): ReconnectingRedisStore {
+      return new ReconnectingRedisStore({ client: {} });
+    }
+
+    it('retries a session read once after a connection drop and returns the second answer', async () => {
+      const sid = randomUUID();
+      const stored = { value: randomUUID() };
+      const callback = vi.fn();
+      storeGet().mockRejectedValueOnce(newSocketTimeout()).mockResolvedValueOnce(stored);
+
+      await newStore().get(sid, callback);
+
+      expect(storeGet().mock.calls).toEqual([[sid], [sid]]);
+      expect(callback).toHaveBeenCalledExactlyOnceWith(null, stored);
+    });
+
+    it('passes a non-connection error through without a retry', async () => {
+      const refusal = new Error(randomUUID());
+      const callback = vi.fn();
+      storeGet().mockRejectedValueOnce(refusal);
+
+      await newStore().get(randomUUID(), callback);
+
+      expect(storeGet()).toHaveBeenCalledOnce();
+      expect(callback).toHaveBeenCalledExactlyOnceWith(refusal, null);
+    });
+
+    it('retries only once, passing the second drop through', async () => {
+      const sid = randomUUID();
+      const second = newSocketTimeout();
+      const callback = vi.fn();
+      storeGet().mockRejectedValueOnce(newSocketTimeout()).mockRejectedValueOnce(second);
+
+      await newStore().get(sid, callback);
+
+      expect(storeGet().mock.calls).toEqual([[sid], [sid]]);
+      expect(callback).toHaveBeenCalledExactlyOnceWith(second, null);
+    });
+
+    it('retries a session touch once after a connection drop', async () => {
+      const sid = randomUUID();
+      const sess = {} as never;
+      const callback = vi.fn();
+      storeTouch().mockRejectedValueOnce(newSocketTimeout()).mockResolvedValueOnce(undefined);
+
+      await newStore().touch(sid, sess, callback);
+
+      expect(storeTouch().mock.calls).toEqual([[sid, sess], [sid, sess]]);
+      expect(callback).toHaveBeenCalledExactlyOnceWith(null, undefined);
+    });
   });
 
   it('rejects rather than serving when Redis cannot be reached at startup', async () => {
