@@ -1,4 +1,4 @@
-param([string]$Goal, [string]$Probe)
+param([string]$Goal, [string]$Probe, [string]$Only)
 
 $ErrorActionPreference = 'Continue'
 $gateCommon = $env:GATE_LIBRARY
@@ -56,9 +56,47 @@ $env:TZ = 'UTC'
 $env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
 Set-Location $repo
-Initialize-GateState 'Churches' $repo -Probe $Probe
+$probeSteps = @('Run unit tests with coverage', 'Run E2E tests')
+if ($Only -and -not $Probe) { Write-Host 'PROBE: FAILED (-Only names the one test a probe runs, so it needs -Probe)'; exit 1 }
+if ($Probe -and ($Probe.Trim() -cnotin $probeSteps -or [string]::IsNullOrWhiteSpace($Only) -or $Only.Contains(','))) {
+    Write-Host "PROBE: FAILED (a probe runs exactly one test: -Probe '<$($probeSteps -join ' | ')>' -Only '<the test's name>')"
+    exit 1
+}
+$gateState = @{ Probe = $Probe }
+if ((Get-Command Initialize-GateState).Parameters.ContainsKey('Only')) { $gateState['Only'] = $Only }
+Initialize-GateState 'Churches' $repo @gateState
 Resolve-OwedSteps
 Invoke-CatalogSteps
+
+if ($Probe) {
+    $probeStep = $Probe.Trim()
+    $probeReport = Join-Path $gateOutput 'probe-report.json'
+    if (Test-Path -LiteralPath $probeReport) { Remove-Item -LiteralPath $probeReport -Force }
+    $global:LASTEXITCODE = $null
+    if ($probeStep -ceq 'Run unit tests with coverage') {
+        npx vitest run --coverage.enabled=false --reporter=json --outputFile="$probeReport" -t $Only
+        $probeExit = $global:LASTEXITCODE
+        if (-not (Test-Path -LiteralPath $probeReport)) { Stop-Gate $probeStep "no JSON report (exit $probeExit)" }
+        $report = Get-Content -LiteralPath $probeReport -Raw | ConvertFrom-Json
+        $passed = [int]$report.numPassedTests
+        $failed = [int]$report.numFailedTests
+    }
+    else {
+        $env:PLAYWRIGHT_JSON_OUTPUT_NAME = $probeReport
+        npx playwright test --project=e2e --no-deps --reporter=json --grep $Only
+        $probeExit = $global:LASTEXITCODE
+        Remove-Item Env:PLAYWRIGHT_JSON_OUTPUT_NAME -ErrorAction SilentlyContinue
+        if (-not (Test-Path -LiteralPath $probeReport)) { Stop-Gate $probeStep "no JSON report (exit $probeExit)" }
+        $report = Get-Content -LiteralPath $probeReport -Raw | ConvertFrom-Json
+        $passed = [int]$report.stats.expected
+        $failed = [int]$report.stats.unexpected
+    }
+    if ($probeExit -ne 0 -or $passed -ne 1 -or $failed -ne 0) {
+        Stop-Gate $probeStep "a probe runs one test, and '$Only' passed $passed, failed $failed (exit $probeExit)"
+    }
+    Write-Row $probeStep 'PASS' "one test, '$Only', passed (the last build; a probe builds nothing)"
+    Complete-Gate
+}
 
 $installed = (Test-Path (Join-Path $repo 'node_modules\.package-lock.json')) -and
     (Test-Path (Join-Path $repo 'node_modules\.bin\tsc.cmd')) -and (Test-Path (Join-Path $repo 'node_modules\.bin\vitest.cmd'))
