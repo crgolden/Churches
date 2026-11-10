@@ -96,6 +96,7 @@ if ($Only) {
     Write-Host 'PROBE: PASSED for the one test named, against the last build; no verdict was saved'
     exit 0
 }
+exit (Invoke-Gate {
 Initialize-GateState 'Churches' $repo
 Resolve-OwedSteps
 Invoke-CatalogSteps
@@ -109,27 +110,27 @@ Write-Row 'node_modules install markers' 'PASS' 'tsc.cmd, vitest.cmd present; ev
 if (-not (Test-StepCarried 'npm run lint')) {
     $global:LASTEXITCODE = $null
     npm run lint
-    $null = Test-Exit 'npm run lint'
+    Assert-StepExit 'npm run lint'
 }
 if (-not (Test-StepCarried 'npm run typecheck:e2e')) {
     $global:LASTEXITCODE = $null
     npm run typecheck:e2e
-    $null = Test-Exit 'npm run typecheck:e2e'
+    Assert-StepExit 'npm run typecheck:e2e'
 }
 if (-not (Test-StepCarried 'npm run typecheck:spec')) {
     $global:LASTEXITCODE = $null
     npm run typecheck:spec
-    $null = Test-Exit 'npm run typecheck:spec'
+    Assert-StepExit 'npm run typecheck:spec'
 }
 if (-not (Test-StepCarried 'npm run lint:css')) {
     $global:LASTEXITCODE = $null
     npm run lint:css
-    $null = Test-Exit 'npm run lint:css'
+    Assert-StepExit 'npm run lint:css'
 }
 if (-not (Test-StepCarried 'npm run audit')) {
     $global:LASTEXITCODE = $null
     npm run audit
-    $null = Test-Exit 'npm run audit'
+    Assert-StepExit 'npm run audit'
 }
 
 Install-PlaywrightBrowsers 'Install Playwright browsers (npm run playwright:install)' { npx playwright install --dry-run chromium } { npm run playwright:install }
@@ -137,7 +138,7 @@ Install-PlaywrightBrowsers 'Install Playwright browsers (npm run playwright:inst
 if (-not (Test-StepCarried $unitStep)) {
     $global:LASTEXITCODE = $null
     npm run test:coverage
-    $null = Test-Exit $unitStep
+    Assert-StepExit $unitStep
 }
 
 $bailStep = "Vitest bail plant ($plantedFailures failing tests planted, bail: 1 must stop the run before the second)"
@@ -173,7 +174,7 @@ if (-not (Test-StepCarried $e2eStep)) {
     if (Test-Path $results) { Remove-Item $results -Force }
     $global:LASTEXITCODE = $null
     npm run e2e
-    $null = Test-Exit $e2eStep
+    Assert-StepExit $e2eStep
     $floorStep = 'Assert E2E executed at least its floor'
     if (-not (Test-Path $results)) { Stop-Gate $floorStep 'playwright-results.xml missing' }
     $floor = [int](Get-Content (Join-Path $repo 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).executedTestFloor
@@ -260,7 +261,7 @@ if (-not (Test-StepCarried $transferCacheStep)) {
 if (-not (Test-StepCarried 'npm run lint:utilities')) {
     $global:LASTEXITCODE = $null
     npm run lint:utilities
-    $null = Test-Exit 'npm run lint:utilities'
+    Assert-StepExit 'npm run lint:utilities'
 }
 
 if (Test-StepCarried $sonarIssues) {
@@ -270,15 +271,16 @@ else {
     $sonarStartedAt = [DateTimeOffset]::UtcNow
     $global:LASTEXITCODE = $null
     sonar-scanner -D"sonar.projectKey=crgolden_Churches" -D"sonar.organization=crgolden" -D"sonar.host.url=https://sonarcloud.io" -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" -D"sonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,integration/**,.features-gen/**,instrumentation.mjs,**/*.spec.ts" -D"sonar.tests=src" -D"sonar.coverage.exclusions=e2e/**,integration/**,scripts/**,**/*.config.*,src/test-setup*.ts,gate.ps1,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" -D"sonar.test.inclusions=**/*.spec.ts" -D"sonar.scanner.skipJreProvisioning=true" -D"sonar.qualitygate.wait=true" -D"sonar.branch.name=$sonarBranch"
-    $null = Test-Exit $sonarStep
+    Assert-StepExit $sonarStep
     Test-SonarIssues $sonarIssues 'crgolden_Churches' $sonarBranch $sonarStartedAt
 }
 
 if (-not (Test-StepCarried 'Build (production)')) {
     $global:LASTEXITCODE = $null
     npm run build
-    $null = Test-Exit 'Build (production)'
+    Assert-StepExit 'Build (production)'
 }
 
 Write-Row 'Publish E2E scenario results / upload / prune devDependencies / assemble / deploy' 'NOT RUN' 'delivery steps, not checks'
 Complete-Gate
+})
