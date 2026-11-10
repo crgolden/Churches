@@ -30,3 +30,10 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      - dependency-name: "@opentelemetry/api"
+        versions: [">=1.10.0"]
+      - dependency-name: "@opentelemetry/auto-instrumentations-node"
+        versions: [">=0.82.0"]
+      - dependency-name: "@opentelemetry/*"
+        update-types: ["version-update:semver-major"]
