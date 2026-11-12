@@ -37,3 +37,5 @@ updates:
         versions: [">=0.82.0"]
       - dependency-name: "@opentelemetry/*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "@opentelemetry/*"
+        versions: [">=0.300.0 <1.0.0"]

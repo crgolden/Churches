@@ -18,7 +18,7 @@
     "e2e:synthetic": "playwright test --project=synthetic",
     "typecheck:e2e": "bddgen && tsc -p tsconfig.e2e.json",
     "typecheck:spec": "tsc -p tsconfig.spec.json --noEmit",
-    "playwright:install": "playwright install --with-deps chromium",
+    "playwright:install": "playwright install chromium",
     "audit": "check-npm-audit"
   },
   "private": true,
