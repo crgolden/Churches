@@ -155,7 +155,8 @@ login through the deployed OIDC provider, then a weighted random sequence of rea
 open results, paginate, map view, contribute-form view; no mutating POSTs). It runs on a schedule
 from `.github/workflows/synthetic.yml` (twice daily, plus `workflow_dispatch` with a `seed`
 input) and is **never a merge gate**: it exists to catch regressions in production and to feed
-real traffic into observability. Tests skip unless `WalkerBaseUrl` is set.
+real traffic into observability. It lives in its own `synthetic` Playwright project, which `npm run e2e` never
+selects, so the gate and CI leave it out by structure; it carries no skip.
 
 There is no separate post-deploy smoke test: `/health`, bootstrap, CSRF and the unauthenticated session
 are covered by the E2E tier against mocks, and the walker exercises the same paths against production.
