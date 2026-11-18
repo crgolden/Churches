@@ -14,32 +14,30 @@ $gateOutput = if (Get-Command Get-GateOutputDirectory -ErrorAction SilentlyConti
 }
 $GateDelta = @('plant:src/zz-bail-plant.spec.ts', 'plant:integration/zz-maxfail-plant.spec.ts', 'plant:src/app/app.config.ts')
 
-Register-GateSteps @('node_modules install markers', 'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec',
+Register-GateStep @('node_modules install markers', 'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec',
     'npm run lint:css', 'npm run audit', 'Install Playwright browsers', 'Run unit tests with coverage', 'Vitest bail plant', 'Fix LCOV paths', 'Run E2E tests',
     'Assert E2E executed at least its floor', 'Publish command reaches the CLI', 'Playwright max-failures plant', 'Transfer-cache plant', 'npm run lint:utilities',
     'SonarCloud analysis', 'Fail on open Sonar issues', 'Build (production)')
-Register-StepInputs @{
-    'node_modules install markers'           = @('*')
-    'npm run lint'                           = @('src/*', '*.ts', '*.mts', '*.js', '*.mjs', '*.cjs', 'eslint-sonar.rules.json', 'angular.json', 'tsconfig*.json', 'package.json', 'package-lock.json')
-    'npm run typecheck:e2e'                  = @('src/*', 'e2e/*', 'integration/*', 'playwright.config.ts', 'tsconfig*.json', 'package.json', 'package-lock.json')
-    'npm run typecheck:spec'                 = @('src/*', 'tsconfig*.json', 'package.json', 'package-lock.json')
-    'npm run lint:css'                       = @('src/*', 'stylelint.config.mjs', 'package.json', 'package-lock.json', 'tools/stylelint/*')
-    'npm run audit'                          = @('package.json', 'package-lock.json')
-    'Install Playwright browsers'            = @('*')
-    'Run unit tests with coverage'           = @('*', '!e2e/*', '!integration/*')
-    'Vitest bail plant'                      = @('*', '!e2e/*', '!integration/*')
-    'Fix LCOV paths'                         = @('*', '!e2e/*', '!integration/*')
-    'Run E2E tests'                          = @('*', '!src/*.spec.ts')
-    'Assert E2E executed at least its floor' = @('*', '!src/*.spec.ts')
-    'Publish command reaches the CLI'        = @('*')
-    'Playwright max-failures plant'          = @('*', '!src/*.spec.ts')
-    'Transfer-cache plant'                   = @('*', '!src/*.spec.ts')
-    'npm run lint:utilities'                 = @('*')
-    'SonarCloud analysis'                    = @('*')
-    'Fail on open Sonar issues'              = @('*')
-    'Build (production)'                     = @('*')
-}
-Register-VolatileSteps @('npm run audit')
+Register-StepInput 'node_modules install markers' @('*')
+Register-StepInput 'npm run lint' @('src/*', '*.ts', '*.mts', '*.js', '*.mjs', '*.cjs', 'eslint-sonar.rules.json', 'angular.json', 'tsconfig*.json', 'package.json', 'package-lock.json')
+Register-StepInput 'npm run typecheck:e2e' @('src/*', 'e2e/*', 'integration/*', 'playwright.config.ts', 'tsconfig*.json', 'package.json', 'package-lock.json')
+Register-StepInput 'npm run typecheck:spec' @('src/*', 'tsconfig*.json', 'package.json', 'package-lock.json')
+Register-StepInput 'npm run lint:css' @('src/*', 'stylelint.config.mjs', 'package.json', 'package-lock.json', 'tools/stylelint/*')
+Register-StepInput 'npm run audit' @('package.json', 'package-lock.json')
+Register-StepInput 'Install Playwright browsers' @('*')
+Register-StepInput 'Run unit tests with coverage' @('*', '!e2e/*', '!integration/*')
+Register-StepInput 'Vitest bail plant' @('*', '!e2e/*', '!integration/*')
+Register-StepInput 'Fix LCOV paths' @('*', '!e2e/*', '!integration/*')
+Register-StepInput 'Run E2E tests' @('*', '!src/*.spec.ts')
+Register-StepInput 'Assert E2E executed at least its floor' @('*', '!src/*.spec.ts')
+Register-StepInput 'Publish command reaches the CLI' @('*')
+Register-StepInput 'Playwright max-failures plant' @('*', '!src/*.spec.ts')
+Register-StepInput 'Transfer-cache plant' @('*', '!src/*.spec.ts')
+Register-StepInput 'npm run lint:utilities' @('*')
+Register-StepInput 'SonarCloud analysis' @('*')
+Register-StepInput 'Fail on open Sonar issues' @('*')
+Register-StepInput 'Build (production)' @('*')
+Register-VolatileStep @('npm run audit')
 $repo = $PSScriptRoot
 $scratch = $gateOutput
 $bailReport = Join-Path $scratch 'churches-bail-plant.json'
@@ -98,8 +96,8 @@ if ($Only) {
 }
 exit (Invoke-Gate {
 Initialize-GateState 'Churches' $repo
-Resolve-OwedSteps
-Invoke-CatalogSteps
+Get-OwedStep | Register-OwedStep
+Invoke-GateLibraryStep
 
 $installed = (Test-Path (Join-Path $repo 'node_modules\.package-lock.json')) -and
     (Test-Path (Join-Path $repo 'node_modules\.bin\tsc.cmd')) -and (Test-Path (Join-Path $repo 'node_modules\.bin\vitest.cmd'))
@@ -133,7 +131,7 @@ if (-not (Test-StepCarried 'npm run audit')) {
     Assert-StepExit 'npm run audit'
 }
 
-Install-PlaywrightBrowsers 'Install Playwright browsers (npm run playwright:install)' { npx playwright install --dry-run chromium } { npm run playwright:install }
+Install-PlaywrightBrowser 'Install Playwright browsers (npm run playwright:install)' { npx playwright install --dry-run chromium } { npm run playwright:install }
 
 if (-not (Test-StepCarried $unitStep)) {
     $global:LASTEXITCODE = $null
@@ -272,7 +270,7 @@ else {
     $global:LASTEXITCODE = $null
     sonar-scanner -D"sonar.projectKey=crgolden_Churches" -D"sonar.organization=crgolden" -D"sonar.host.url=https://sonarcloud.io" -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" -D"sonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,integration/**,.features-gen/**,instrumentation.mjs,**/*.spec.ts" -D"sonar.tests=src" -D"sonar.coverage.exclusions=e2e/**,integration/**,scripts/**,**/*.config.*,src/test-setup*.ts,gate.ps1,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" -D"sonar.test.inclusions=**/*.spec.ts" -D"sonar.scanner.skipJreProvisioning=true" -D"sonar.qualitygate.wait=true" -D"sonar.branch.name=$sonarBranch"
     Assert-StepExit $sonarStep
-    Test-SonarIssues $sonarIssues 'crgolden_Churches' $sonarBranch $sonarStartedAt
+    Assert-NoOpenSonarIssue $sonarIssues 'crgolden_Churches' $sonarBranch $sonarStartedAt
 }
 
 if (-not (Test-StepCarried 'Build (production)')) {
