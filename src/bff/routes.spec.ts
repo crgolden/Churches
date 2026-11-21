@@ -68,6 +68,12 @@ import {
   SID_QUERY_PARAMETER,
 } from '../shared/bff-contract';
 
+type UserInfo = Awaited<ReturnType<typeof fetchUserInfo>>;
+
+function userInfoOf(claims: Record<string, unknown>): UserInfo {
+  return claims as UserInfo;
+}
+
 interface Session {
   pkceCodeVerifier?: string;
   oauthState?: string;
@@ -238,7 +244,7 @@ describe(BffPaths.callback, () => {
     const tokens = newTokenSet();
     const subject = newText();
     vi.mocked(authorizationCodeGrant).mockResolvedValueOnce(grantResponse(tokens, { [ClaimTypes.subject]: subject }));
-    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ [ClaimTypes.subject]: subject, [ClaimTypes.name]: newText() });
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce(userInfoOf({ [ClaimTypes.subject]: subject, [ClaimTypes.name]: newText() }));
 
     const req = makeReq({ session: pendingSignIn() });
     const res = makeRes();
@@ -273,7 +279,7 @@ describe(BffPaths.callback, () => {
     vi.mocked(authorizationCodeGrant).mockResolvedValueOnce(
       grantResponse(newTokenSet(), { [ClaimTypes.subject]: subject, [arrayClaimType]: arrayClaimValues }),
     );
-    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ [ClaimTypes.subject]: subject });
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce(userInfoOf({ [ClaimTypes.subject]: subject }));
 
     const req = makeReq({ session: pendingSignIn() });
     const res = makeRes();
@@ -291,7 +297,7 @@ describe(BffPaths.callback, () => {
     vi.mocked(authorizationCodeGrant).mockResolvedValueOnce(
       grantResponse(newTokenSet(accessToken), { [ClaimTypes.subject]: subject }),
     );
-    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ [ClaimTypes.subject]: subject });
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce(userInfoOf({ [ClaimTypes.subject]: subject }));
 
     const req = makeReq({ session: pendingSignIn() });
     const res = makeRes();
@@ -312,7 +318,7 @@ describe(BffPaths.callback, () => {
     vi.mocked(authorizationCodeGrant).mockResolvedValueOnce(
       grantResponse(newTokenSet(accessToken), { [ClaimTypes.subject]: subject }),
     );
-    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ [ClaimTypes.subject]: subject });
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce(userInfoOf({ [ClaimTypes.subject]: subject }));
 
     const req = makeReq({ session: pendingSignIn() });
     const res = makeRes();
@@ -329,7 +335,7 @@ describe(BffPaths.callback, () => {
     vi.mocked(authorizationCodeGrant).mockResolvedValueOnce(
       grantResponse(newTokenSet(newText()), { [ClaimTypes.subject]: subject }),
     );
-    vi.mocked(fetchUserInfo).mockResolvedValueOnce({ [ClaimTypes.subject]: subject });
+    vi.mocked(fetchUserInfo).mockResolvedValueOnce(userInfoOf({ [ClaimTypes.subject]: subject }));
 
     const req = makeReq({ session: pendingSignIn() });
     const res = makeRes();
