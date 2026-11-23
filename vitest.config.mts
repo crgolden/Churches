@@ -6,7 +6,6 @@ const BROWSER_SPECS = 'src/**/*.browser.spec.ts';
 export default defineConfig({
   test: {
     globals: true,
-    bail: 1,
     coverage: {
       provider: 'istanbul',
       reporter: ['lcov', 'text'],

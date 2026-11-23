@@ -14,7 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "build:ci": "ng build --configuration=ci",
     "bddgen": "bddgen",
-    "e2e": "npm run build:ci && bddgen && playwright test --project=integration --project=e2e --max-failures=1",
+    "e2e": "npm run build:ci && bddgen && playwright test --project=integration --project=e2e",
     "e2e:synthetic": "playwright test --project=synthetic",
     "typecheck:e2e": "bddgen && tsc -p tsconfig.e2e.json",
     "typecheck:spec": "tsc -p tsconfig.spec.json --noEmit",
