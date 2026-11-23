@@ -40,11 +40,10 @@ $repo = $PSScriptRoot
 $scratch = $gateOutput
 $sonarBranch = Get-SonarBranchName
 $unitStep = 'Run unit tests with coverage (npm run test:coverage)'
-$e2eStep = 'Run E2E tests (npm run e2e, CI=true)'
+$e2eStep = 'Run E2E tests (npm run e2e)'
 $sonarStep = "SonarCloud analysis (sonar-scanner, branch $sonarBranch, quality gate waited)"
 $sonarIssues = 'Fail on open Sonar issues'
 $env:TZ = 'UTC'
-$env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
 Set-Location $repo
 $probeRoots = @('src/', 'e2e/')
@@ -193,7 +192,7 @@ Invoke-GateStep -Name $transferCacheStep -Needs @($markers, $playwright) -Body {
     $env:PLAYWRIGHT_JSON_OUTPUT_NAME = $transferCacheReport
     try {
         $global:LASTEXITCODE = $null
-        npm run build:ci
+        npm run build:e2e
         $plantBuildExit = $global:LASTEXITCODE
         $global:LASTEXITCODE = $null
         npx playwright test --project=e2e --no-deps --reporter=json --grep "Server-rendered pages"
@@ -205,7 +204,7 @@ Invoke-GateStep -Name $transferCacheStep -Needs @($markers, $playwright) -Body {
     }
     if ([IO.File]::ReadAllText($appConfig) -ne $original) { Stop-Gate $transferCacheStep 'app.config.ts was not restored' }
     $global:LASTEXITCODE = $null
-    npm run build:ci
+    npm run build:e2e
     if ($global:LASTEXITCODE -ne 0) { Stop-Gate $transferCacheStep "the rebuild after restoring app.config.ts exited $global:LASTEXITCODE" }
     if ($plantBuildExit -ne 0) { Stop-Gate $transferCacheStep "the planted build exited $plantBuildExit, so the spec never ran against the plant" }
     if (-not (Test-Path $transferCacheReport)) { Stop-Gate $transferCacheStep "no JSON report (exit $plantExit): the plant did not run" }

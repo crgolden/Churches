@@ -50,7 +50,7 @@ run it: [TESTING.md](TESTING.md).
 git clone https://github.com/crgolden/Churches.git
 cd Churches
 npm ci
-npm run build:ci
+npm run build:e2e
 ```
 
 ## Configuration
@@ -89,7 +89,7 @@ resolves at startup through the app's managed identity; the app makes no vault c
 npm run serve:ssr     # http://localhost:4000: SSR, the BFF and the Directory proxy
 ```
 
-Use the `ci` build from [Clone and build](#clone-and-build) to serve locally: the production configuration only accepts the production hosts, so
+Use the `e2e` build from [Clone and build](#clone-and-build) to serve locally: the production configuration only accepts the production hosts, so
 `localhost` is answered with a one-line `Header "host" ... is not allowed` page. `serve:ssr` runs the built
 `dist/`, so rebuild after a change. For template and style work, `npm start` runs `ng serve` on port 44432,
 server-rendering through `src/server.ts`; set `ASPNETCORE_URLS=http://localhost:4000` so its proxy sends `/bff`
@@ -99,7 +99,7 @@ and `/directory/api` to the running `serve:ssr`.
 
 ```powershell
 npx vitest run           # unit and browser-unit tiers
-npm run e2e              # build:ci, then the Integration and E2E tiers against the mock
+npm run e2e              # build:e2e, then the Integration and E2E tiers against the mock
 ```
 
 Free ports 4000 and 4001 before `npm run e2e`. [TESTING.md](TESTING.md) covers every tier, the mock, the

@@ -24,7 +24,7 @@ npm ci
 npm run playwright:install   # Chromium, for the browser unit project and Playwright
 npx vitest run               # unit and browser-unit tiers
 npm run test:coverage        # the same, with LCOV in coverage/lcov.info
-npm run e2e                  # builds the ci configuration, then the integration and e2e projects
+npm run e2e                  # builds the e2e configuration, then the integration and e2e projects
 ```
 
 `npm run e2e` starts the mock Directory API on port 4001 and the SSR server on port 4000, so both must be
@@ -95,10 +95,10 @@ npx playwright install chromium
 **Run:**
 
 ```powershell
-npm run e2e   # self-builds the ci configuration (allowedHosts=localhost), then runs Playwright
+npm run e2e   # self-builds the e2e configuration (allowedHosts=localhost), then runs Playwright
 ```
 
-> `npm run e2e` builds the `ci` configuration itself, so it always runs against a correct SSR build
+> `npm run e2e` builds the `e2e` configuration itself, so it always runs against a correct SSR build
 > regardless of what is currently in `dist/` (a prior `npm run build` production build won't break it).
 
 Failure artifacts (screenshot, trace, video) are written to `playwright-artifacts/`.
@@ -217,11 +217,11 @@ The GitHub Actions workflow (`.github/workflows/main_crgolden-churches.yml`) run
    or critical advisory)
 2. Playwright Chromium (cached by version), which the `browser` Vitest project needs as well as E2E
 3. `npm run test:coverage` (both Vitest projects; LCOV → `coverage/lcov.info`)
-4. `npm run e2e` (self-builds the `ci` configuration, runs `bddgen`, then the `integration` and `e2e` projects),
+4. `npm run e2e` (self-builds the `e2e` configuration, runs `bddgen`, then the `integration` and `e2e` projects),
    then an assertion that it executed at least `executedTestFloor` tests (`e2e/e2e-settings.json`), then
    `publish-bdd-results`. Adding or removing a scenario or an integration test changes that floor in the same
    change.
-5. `lint:utilities` (reads the `ci` build E2E made), then SonarCloud analysis via
+5. `lint:utilities` (reads the `e2e` build E2E made), then SonarCloud analysis via
    `sonarsource/sonarqube-scan-action`, then a step that fails on any open Sonar issue. The scan action, not the
    deprecated `sonarcloud-github-action`, whose pinned scanner bundles a JRE that SonarCloud rejects;
    it needs no JDK or scanner setup step of its own.

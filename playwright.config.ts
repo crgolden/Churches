@@ -19,6 +19,7 @@ export default defineConfig({
   outputDir: './playwright-artifacts',
 
   workers: 1,
+  forbidOnly: true,
 
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
@@ -66,7 +67,7 @@ export default defineConfig({
     {
       command: 'npx tsx e2e/mocks/directory-server.ts',
       port: MOCK_DIR_PORT,
-      reuseExistingServer: !process.env['CI'],
+      reuseExistingServer: false,
       timeout: 30_000,
     },
     {
@@ -83,7 +84,7 @@ export default defineConfig({
         OidcAuthority: `http://localhost:${e2eSettings.ports.unusedOidcAuthority}`,
         SessionSecret: `${newId()}${newId()}`,
       },
-      reuseExistingServer: !process.env['CI'],
+      reuseExistingServer: false,
       timeout: 60_000,
     },
   ],

@@ -1,7 +1,7 @@
 import { constants } from 'node:http2';
 import type { Page } from '@playwright/test';
 import { LeafletUrlTemplate } from './leaflet-constants.js';
-import { environment } from '../src/environments/environment.ci';
+import { environment } from '../src/environments/environment.e2e';
 
 const tileHost = new URL(environment.mapTileUrlTemplate.replace(LeafletUrlTemplate.subdomainPlaceholder, '')).hostname;
 

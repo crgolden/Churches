@@ -81,7 +81,7 @@ flowchart TD
 
 Two details here matter more than they look:
 
-- **`allowedHosts` is an SSRF guard, and a host outside it is a hard 400.** `@angular/ssr` answers a request whose `Host` (or `X-Forwarded-Host`) is not allow-listed with `400 Bad Request` and the body `Header "host" with value "…" is not allowed`, while `/health` (Express, ahead of the engine) keeps answering 200. The allow-list is sourced per environment via `fileReplacements` (`src/environments/`); dev and CI allow only `localhost`. Any new production hostname must be added there.
+- **`allowedHosts` is an SSRF guard, and a host outside it is a hard 400.** `@angular/ssr` answers a request whose `Host` (or `X-Forwarded-Host`) is not allow-listed with `400 Bad Request` and the body `Header "host" with value "…" is not allowed`, while `/health` (Express, ahead of the engine) keeps answering 200. The allow-list is sourced per environment via `fileReplacements` (`src/environments/`); the `development` and `e2e` builds allow only `localhost`. Any new production hostname must be added there.
 - **The proxy is hand-rolled, not `http-proxy-middleware`.** `src/bff/proxy.ts` uses `fetch` directly because it needs token-aware behavior a generic proxy doesn't have (next section).
 
 ### Authentication
