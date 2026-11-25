@@ -138,7 +138,7 @@ Invoke-GateStep -Name $unitStep -Needs @($markers, $playwright) -Body {
 }
 
 $lcovStep = 'Fix LCOV paths for SonarQube'
-Invoke-GateStep -Name $lcovStep -Needs @($unitStep) -Body {
+Invoke-GateStep -Name $lcovStep -Needs @($markers, $playwright) -Body {
     $lcov = Join-Path $repo 'coverage\lcov.info'
     if (-not (Test-Path $lcov)) { Stop-Gate $lcovStep 'coverage/lcov.info missing' }
     (Get-Content $lcov) -replace '\\', '/' | Set-Content $lcov
@@ -226,7 +226,7 @@ if (Test-StepCarried $sonarIssues) {
 }
 else {
     $sonarStartedAt = [DateTimeOffset]::UtcNow
-    Invoke-GateStep -Name $sonarStep -Needs @($unitStep, $lcovStep) -Always -Body {
+    Invoke-GateStep -Name $sonarStep -Needs @($lcovStep) -Always -Body {
         $global:LASTEXITCODE = $null
         sonar-scanner -D"sonar.projectKey=crgolden_Churches" -D"sonar.organization=crgolden" -D"sonar.host.url=https://sonarcloud.io" -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" -D"sonar.exclusions=**/node_modules/**,**/*.d.ts,e2e/**,integration/**,.features-gen/**,instrumentation.mjs,**/*.spec.ts" -D"sonar.tests=src" -D"sonar.coverage.exclusions=e2e/**,integration/**,scripts/**,**/*.config.*,src/test-setup*.ts,gate.ps1,src/proxy.conf.js,src/environments/**,src/main.ts,src/main.server.ts,src/server.ts,src/app/app.routes.server.ts" -D"sonar.test.inclusions=**/*.spec.ts" -D"sonar.scanner.skipJreProvisioning=true" -D"sonar.scm.use.blame.algorithm=GIT_NATIVE_BLAME" -D"sonar.qualitygate.wait=true" -D"sonar.branch.name=$sonarBranch"
         Assert-StepExit $sonarStep
