@@ -49,6 +49,7 @@ graph TB
 | `instrumentation.mjs` | OpenTelemetry, loaded before the app with `--import` |
 | `e2e/`, `integration/` | The Gherkin journeys, the mock Directory API and the synthetic walker; the server-rendered HTML checks |
 | `tools/stylelint/` | The stylesheet linter, installed with its own lockfile |
+| `gate.ps1`, `gate.steps.psd1`, `scripts/gate/` | The local gate: its entry point, its step list, and the three checks with logic of their own (LCOV paths, the E2E floor, the transfer-cache plant) |
 | `.github/workflows/` | `main_crgolden-churches.yml` (checks, build and deploy) and `synthetic.yml` (the scheduled walker) |
 
 ## The Churches app (UI + BFF)
