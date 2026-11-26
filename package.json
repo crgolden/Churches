@@ -50,7 +50,7 @@
     "@opentelemetry/semantic-conventions": "^1.45.0",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/leaflet": "^1.9.22",
-    "connect-redis": "^10.0.0",
+    "connect-redis": "^11.0.0",
     "express": "^5.3.0",
     "express-session": "^1.19.0",
     "leaflet": "^1.9.4",
