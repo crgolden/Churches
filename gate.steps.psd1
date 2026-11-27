@@ -14,24 +14,28 @@
         @{ Name = 'Install npm dependencies'; NodeInstall = @('tsc', 'vitest'); Inputs = @('*'); Always = $true }
         @{
             Name   = 'Lint'
+            Tier   = 'Fast'
             Run    = @('npm', 'run', 'lint')
             Needs  = @('Install npm dependencies')
             Inputs = @('src/*', '*.ts', '*.mts', '*.js', '*.mjs', '*.cjs', 'eslint-sonar.rules.json', 'angular.json', 'tsconfig*.json', 'package.json', 'package-lock.json')
         }
         @{
             Name   = 'Type-check E2E specs'
+            Tier   = 'Fast'
             Run    = @('npm', 'run', 'typecheck:e2e')
             Needs  = @('Install npm dependencies')
             Inputs = @('src/*', 'e2e/*', 'integration/*', 'playwright.config.ts', 'tsconfig*.json', 'package.json', 'package-lock.json')
         }
         @{
             Name   = 'Type-check unit specs'
+            Tier   = 'Fast'
             Run    = @('npm', 'run', 'typecheck:spec')
             Needs  = @('Install npm dependencies')
             Inputs = @('src/*', 'tsconfig*.json', 'package.json', 'package-lock.json')
         }
         @{
             Name   = 'Lint stylesheets'
+            Tier   = 'Fast'
             Run    = @('npm', 'run', 'lint:css')
             Needs  = @('Install npm dependencies')
             Inputs = @('src/*', 'stylelint.config.mjs', 'package.json', 'package-lock.json', 'tools/stylelint/*')
@@ -112,7 +116,7 @@
                 '-Dsonar.qualitygate.wait=true'
                 '-Dsonar.branch.name={sonarBranch}'
             )
-            Needs  = @('Fix LCOV paths for SonarQube')
+            Needs  = @('Install npm dependencies')
             Inputs = @('*')
         }
         @{ Name = 'Fail on open Sonar issues'; Sonar = 'issues'; Needs = @('SonarCloud analysis'); Inputs = @('*') }
